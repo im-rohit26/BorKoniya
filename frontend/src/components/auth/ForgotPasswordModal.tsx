@@ -1,0 +1,240 @@
+import React, { useState } from 'react';
+import { X, KeyRound, ShieldCheck, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { forgotPassword, resetPassword } from '../../lib/authApi';
+
+interface ForgotPasswordModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialPhoneOrEmail?: string;
+}
+
+export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
+  isOpen,
+  onClose,
+  initialPhoneOrEmail = '',
+}) => {
+  const [step, setStep] = useState<'request_otp' | 'verify_and_reset' | 'success'>('request_otp');
+  const [phoneOrEmail, setPhoneOrEmail] = useState(initialPhoneOrEmail);
+  const [otpCode, setOtpCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phoneOrEmail.trim()) {
+      setErrorMessage('Please enter your mobile number or email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await forgotPassword(phoneOrEmail.trim());
+      if (res.demo_otp) {
+        setDemoOtp(res.demo_otp);
+      }
+      setStep('verify_and_reset');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to send OTP code. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpCode.length < 4) {
+      setErrorMessage('Please enter the OTP verification code');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setErrorMessage('New password must contain at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMessage('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await resetPassword(phoneOrEmail.trim(), otpCode.trim(), newPassword);
+      setStep('success');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to update password. Please check OTP code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-amber-100">
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        {step === 'request_otp' && (
+          <form onSubmit={handleSendOtp} className="space-y-5">
+            <div className="text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
+                <KeyRound className="h-6 w-6" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 font-serif">Reset Password</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Enter your registered mobile number or email. We will send you a verification code.
+              </p>
+            </div>
+
+            {errorMessage && (
+              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Registered Mobile Number or Email
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. 9876543210 or your.email@example.com"
+                value={phoneOrEmail}
+                onChange={(e) => setPhoneOrEmail(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-amber-600 focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center space-x-2 rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition-all disabled:opacity-50"
+            >
+              <span>{isLoading ? 'Sending verification code...' : 'Send Verification OTP'}</span>
+              <ArrowRight className="h-4 w-4 text-amber-400" />
+            </button>
+          </form>
+        )}
+
+        {step === 'verify_and_reset' && (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 font-serif">Enter Code & New Password</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Verification code sent for <span className="font-semibold text-slate-800">{phoneOrEmail}</span>
+              </p>
+
+              {demoOtp && (
+                <div className="mt-2 inline-block rounded-lg bg-amber-50 px-3 py-1 text-xs text-amber-900 border border-amber-200">
+                  Demo Code: <span className="font-mono font-bold text-amber-700">{demoOtp}</span>
+                </div>
+              )}
+            </div>
+
+            {errorMessage && (
+              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                6-Digit Verification Code
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={6}
+                placeholder="749201"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 font-mono font-bold tracking-widest text-center focus:border-amber-600 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                New Password (minimum 8 characters)
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="At least 8 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-amber-600 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Re-enter your new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-amber-600 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setStep('request_otp')}
+                className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-2/3 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                {isLoading ? 'Updating...' : 'Update Password'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 'success' && (
+          <div className="py-6 text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 border border-emerald-300">
+              <CheckCircle2 className="h-9 w-9" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 font-serif">Password Reset Successful</h3>
+            <p className="text-xs text-slate-600 max-w-xs mx-auto">
+              Your password has been securely updated. You can now log in with your new password.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-800"
+            >
+              Continue to Login
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

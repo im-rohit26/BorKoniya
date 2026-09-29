@@ -1,0 +1,82 @@
+{
+  "brand": {
+    "name": "BorKonya",
+    "tagline": "Find Your Life Partner Within Your Community",
+    "subheading": "Meaningful connections for Sadgope, Gowala & Goala families."
+  },
+  "nav": {
+    "home": "Home",
+    "search": "Search",
+    "matches": "Matches",
+    "interests": "Interests",
+    "messages": "Messages",
+    "shortlist": "Shortlist",
+    "plans": "Plans",
+    "upgrade": "Upgrade",
+    "successStories": "Success Stories",
+    "about": "About",
+    "help": "Help",
+    "login": "Login",
+    "register": "Register",
+    "dashboard": "Dashboard",
+    "settings": "Settings"
+  },
+  "language": {
+    "selectTitle": "Choose your language",
+    "selectSubtitle": "Welcome to BorKonya. Find a meaningful connection within your community.",
+    "en": "English",
+    "hi": "हिन्दी (Hindi)",
+    "or": "ଓଡ଼ିଆ (Odia)",
+    "bn": "বাংলা (Bengali)"
+  },
+  "hero": {
+    "title": "Find Your Life Partner Within Your Community",
+    "subtitle": "A dedicated, trustworthy matrimonial platform honoring the traditions and aspirations of the Sadgope and Gowala / Goala communities.",
+    "ctaRegister": "Create Your Profile",
+    "ctaSearch": "Find Your Match",
+    "trustedBadge": "Verified Community Profiles"
+  },
+  "searchPreview": {
+    "title": "Start Your Search",
+    "lookingFor": "Looking for",
+    "bride": "Bride",
+    "groom": "Groom",
+    "age": "Age",
+    "ageFrom": "From",
+    "ageTo": "To",
+    "state": "State",
+    "city": "City",
+    "education": "Education",
+    "profession": "Profession",
+    "btnSearch": "Search Profiles"
+  },
+  "onboarding": {
+    "whoForTitle": "Who are you creating this profile for?",
+    "myself": "Myself",
+    "son": "My Son",
+    "daughter": "My Daughter",
+    "brother": "My Brother",
+    "sister": "My Sister",
+    "relative": "Relative",
+    "other": "Other"
+  },
+  "subscription": {
+    "planName": "BorKonya Premium",
+    "price": "₹200",
+    "period": "/month",
+    "couponPrompt": "Have a coupon code?",
+    "apply": "Apply",
+    "discount": "Discount",
+    "payable": "Total Payable",
+    "unlockTitle": "Unlock Full Matrimonial Access"
+  },
+  "safety": {
+    "banner": "Safety First: Never send money or sensitive financial details to anyone online. Meet in a public place for initial meetings."
+  },
+  "footer": {
+    "rights": "All rights reserved. Dedicated to the Sadgope and Gowala / Goala community.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "safetyTips": "Safety Tips"
+  }
+}
