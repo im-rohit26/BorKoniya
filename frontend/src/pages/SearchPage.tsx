@@ -24,12 +24,14 @@ import {
   startOrGetConversation,
   blockProfile,
   getShortlistedIds,
+  getSentInterestIds,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import { getSearchProfiles, mapProfileResponseToCard } from '../lib/profileApi'
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
+import { masterDataApi, type Community, type SelectOption } from '../lib/masterDataApi'
 
 export const SearchPage: React.FC = () => {
   const [searchParams] = useSearchParams()
@@ -70,18 +72,26 @@ export const SearchPage: React.FC = () => {
   }, [user?.gender])
 
   // Saved Searches
-  const [savedSearches, setSavedSearches] = useState([
-    {
-      id: 'saved-1',
-      name: 'Kolkata Sadgope Brides',
-      filters: { lookingFor: 'FEMALE', community: 'Sadgope', state: 'West Bengal' },
-    },
-    {
-      id: 'saved-2',
-      name: 'Software Engineers (Sadgope / Gowala)',
-      filters: { education: 'Tech', profession: 'Software' },
-    },
-  ])
+  const [savedSearches, setSavedSearches] = useState<any[]>([])
+
+  const [communities, setCommunities] = useState<Community[]>([])
+  const [states, setStates] = useState<SelectOption[]>([])
+  const [maritalStatuses, setMaritalStatuses] = useState<SelectOption[]>([])
+  const [dietOptions, setDietOptions] = useState<SelectOption[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      masterDataApi.getCommunities(),
+      masterDataApi.getStates(),
+      masterDataApi.getMaritalStatuses(),
+      masterDataApi.getDietOptions(),
+    ]).then(([comm, st, mar, diet]) => {
+      setCommunities(comm)
+      setStates(st)
+      setMaritalStatuses(mar)
+      setDietOptions(diet)
+    }).catch(console.error)
+  }, [])
 
   const [profiles, setProfiles] = useState<ProfileCardData[]>([])
 
@@ -117,16 +127,22 @@ export const SearchPage: React.FC = () => {
         const raw = await getSearchProfiles(filters, 3)
 
         let shortlistedIds: string[] = []
+        let sentInterestIds: string[] = []
         try {
-          shortlistedIds = await getShortlistedIds()
+          [shortlistedIds, sentInterestIds] = await Promise.all([
+            getShortlistedIds().catch(() => []),
+            getSentInterestIds().catch(() => []),
+          ])
         } catch {
           shortlistedIds = []
+          sentInterestIds = []
         }
         const shortlistedSet = new Set(shortlistedIds)
+        const sentInterestSet = new Set(sentInterestIds)
 
         if (!isCancelled) {
           const mapped = raw.slice(0, 3).map((p) =>
-            mapProfileResponseToCard(p, shortlistedSet.has(p.id))
+            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id))
           )
           setProfiles(mapped)
         }
@@ -416,9 +432,10 @@ export const SearchPage: React.FC = () => {
                     onChange={(e) => setCommunity(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-600 focus:outline-none"
                   >
-                    <option value="ALL">All Communities</option>
-                    <option value="Sadgope">Sadgope</option>
-                    <option value="Gowala">Gowala / Goala</option>
+                    <option value="ALL">{communities.length > 0 ? 'All Communities' : 'Loading...'}</option>
+                    {communities.map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -430,13 +447,10 @@ export const SearchPage: React.FC = () => {
                     onChange={(e) => setState(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-600 focus:outline-none"
                   >
-                    <option value="ALL">All Locations</option>
-                    <option value="West Bengal">West Bengal</option>
-                    <option value="Odisha">Odisha</option>
-                    <option value="Jharkhand">Jharkhand</option>
-                    <option value="Bihar">Bihar</option>
-                    <option value="Maharashtra">Maharashtra</option>
-                    <option value="Delhi">Delhi / NCR</option>
+                    <option value="ALL">{states.length > 0 ? 'All Locations' : 'Loading...'}</option>
+                    {states.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -451,9 +465,10 @@ export const SearchPage: React.FC = () => {
                     onChange={(e) => setDiet(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-600 focus:outline-none"
                   >
-                    <option value="ALL">Does not matter</option>
-                    <option value="VEG">Vegetarian</option>
-                    <option value="NON_VEG">Non-Vegetarian</option>
+                    <option value="ALL">{dietOptions.length > 0 ? 'Does not matter' : 'Loading...'}</option>
+                    {dietOptions.map((d) => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -465,10 +480,10 @@ export const SearchPage: React.FC = () => {
                     onChange={(e) => setMaritalStatus(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-600 focus:outline-none"
                   >
-                    <option value="ALL">Does not matter</option>
-                    <option value="NEVER_MARRIED">Never Married</option>
-                    <option value="DIVORCED">Divorced</option>
-                    <option value="WIDOWED">Widowed</option>
+                    <option value="ALL">{maritalStatuses.length > 0 ? 'Does not matter' : 'Loading...'}</option>
+                    {maritalStatuses.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
                   </select>
                 </div>
 

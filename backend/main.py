@@ -17,6 +17,11 @@ def init_db_and_seed():
     # Seed Initial Data if empty
     db = SessionLocal()
     try:
+        # DB connectivity health check log
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        print("Database connected successfully.")
+
         if db.query(Community).count() == 0:
             c1 = Community(name="Sadgope", is_active=True)
             c2 = Community(name="Gowala / Goala", is_active=True)
@@ -44,93 +49,10 @@ def init_db_and_seed():
             )
             db.add(c)
 
-        if db.query(Profile).count() == 0:
-            demo_user = User(
-                email="priyanka.ghosh@demo.com",
-                phone_number="9876543210",
-                is_phone_verified=True,
-                is_email_verified=True,
-                password_hash=get_password_hash("borkonya123"),
-            )
-            db.add(demo_user)
-            db.flush()
-
-            demo_profile = Profile(
-                user_id=demo_user.id,
-                first_name="Priyanka",
-                last_name="Ghosh",
-                gender="FEMALE",
-                date_of_birth=date(1998, 5, 14),
-                height_cm=163,
-                marital_status="NEVER_MARRIED",
-                mother_tongue="Bengali",
-                community="Sadgope",
-                sub_community="Kulin Sadgope",
-                native_place="Bardhaman",
-                current_state="West Bengal",
-                current_city="Kolkata",
-                highest_qualification="M.Tech in Computer Science",
-                occupation="Senior Software Engineer",
-                company_name="Tata Consultancy Services",
-                diet="NON_VEGETARIAN",
-                about_me="Working as a software professional in Kolkata. Values traditional family ethics while holding a modern progressive mindset.",
-                profile_completion_pct=90,
-            )
-            db.add(demo_profile)
-            db.flush()
-
-            privacy = ProfilePrivacy(
-                profile_id=demo_profile.id,
-                phone_visibility="PREMIUM_ONLY",
-                email_visibility="PRIVATE",
-            )
-            db.add(privacy)
-
-            demo_user2 = User(
-                email="subham.pal@demo.com",
-                phone_number="9876543211",
-                is_phone_verified=True,
-                is_email_verified=True,
-                password_hash=get_password_hash("borkonya123"),
-            )
-            db.add(demo_user2)
-            db.flush()
-
-            demo_profile2 = Profile(
-                user_id=demo_user2.id,
-                first_name="Subham",
-                last_name="Pal",
-                gender="MALE",
-                date_of_birth=date(1995, 8, 20),
-                height_cm=178,
-                marital_status="NEVER_MARRIED",
-                mother_tongue="Odia",
-                community="Sadgope",
-                sub_community="Pal",
-                native_place="Balasore",
-                current_state="Odisha",
-                current_city="Bhubaneswar",
-                highest_qualification="B.Tech + MBA",
-                occupation="Product Manager",
-                company_name="Fintech Enterprise",
-                diet="NON_VEGETARIAN",
-                about_me="Raised in a cultured family in Odisha. Tech enthusiast with a grounded lifestyle.",
-                profile_completion_pct=85,
-            )
-            db.add(demo_profile2)
-            db.flush()
-
-            privacy2 = ProfilePrivacy(
-                profile_id=demo_profile2.id,
-                phone_visibility="PREMIUM_ONLY",
-                email_visibility="PRIVATE",
-            )
-            db.add(privacy2)
-
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Startup seed error: {e}")
+        print(f"Startup error: {e}")
     finally:
         db.close()
 
@@ -169,6 +91,15 @@ app.add_middleware(
 
 # Include API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+# Static Files for Uploads fallback
+import os
+from fastapi.staticfiles import StaticFiles
+
+uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+os.makedirs(os.path.join(uploads_dir, "photos"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
 
 
 @app.get("/")

@@ -6,6 +6,9 @@ import {
   getAuthToken,
   setAuthToken,
   removeAuthToken,
+  removeRefreshToken,
+  setRefreshToken,
+  refreshAccessToken,
   loginUser,
   registerUser,
   getCurrentUser,
@@ -30,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshUser = async () => {
-    const currentToken = getAuthToken();
+    let currentToken = getAuthToken();
     if (!currentToken) {
       setUser(null);
       setIsLoading(false);
@@ -41,11 +44,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData = await getCurrentUser();
       setUser(userData);
       setTokenState(currentToken);
-    } catch (err) {
-      console.warn('Session expired or invalid token:', err);
-      removeAuthToken();
-      setTokenState(null);
-      setUser(null);
+    } catch (err: any) {
+      if (err.message === 'Session expired or invalid token' || err.message?.includes('Session expired')) {
+        try {
+          const newToken = await refreshAccessToken();
+          currentToken = newToken;
+          const userData = await getCurrentUser();
+          setUser(userData);
+          setTokenState(currentToken);
+        } catch (refreshErr) {
+          console.warn('Session expired or invalid token:', refreshErr);
+          removeAuthToken();
+          setTokenState(null);
+          setUser(null);
+        }
+      } else {
+        console.warn('Failed to fetch user:', err);
+        removeAuthToken();
+        setTokenState(null);
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -61,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await loginUser(phoneOrEmail, password);
       setAuthToken(res.access_token);
       setTokenState(res.access_token);
+      if (res.refresh_token) setRefreshToken(res.refresh_token);
       // Fetch full user details
       try {
         const userData = await getCurrentUser();
@@ -89,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await registerUser(payload);
       setAuthToken(res.access_token);
       setTokenState(res.access_token);
+      if (res.refresh_token) setRefreshToken(res.refresh_token);
       try {
         const userData = await getCurrentUser();
         setUser(userData);
@@ -111,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     removeAuthToken();
+    removeRefreshToken();
     setTokenState(null);
     setUser(null);
   };

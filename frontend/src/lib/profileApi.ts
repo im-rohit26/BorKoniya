@@ -33,11 +33,19 @@ export interface ProfileResponse {
   match_score?: number;
   match_breakdown?: string[];
   photo_url?: string;
+  photos?: PhotoItem[];
   contact_phone_masked?: string;
   contact_email_masked?: string;
   is_contact_revealed: boolean;
   revealed_phone?: string;
   revealed_email?: string;
+}
+
+export interface PhotoItem {
+  id: string;
+  storage_path: string;
+  is_primary: boolean;
+  privacy: string;
 }
 
 export function formatHeight(heightCm?: number): string {
@@ -148,4 +156,58 @@ export async function getMyProfile(): Promise<ProfileResponse> {
   }
   return res.json();
 }
+
+export async function uploadProfilePhoto(file: File, isPrimary = false): Promise<PhotoItem> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('is_primary', String(isPrimary));
+
+  const authHeaders = getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/profile/me/photos/upload`, {
+    method: 'POST',
+    headers: {
+      ...(authHeaders.Authorization ? { Authorization: authHeaders.Authorization } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to upload photo' }));
+    throw new Error(err.detail || 'Failed to upload photo');
+  }
+  return res.json();
+}
+
+export async function getMyPhotos(): Promise<PhotoItem[]> {
+  const res = await fetch(`${API_BASE_URL}/profile/me/photos`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function deleteProfilePhoto(photoId: string): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/profile/me/photos/${photoId}`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete photo' }));
+    throw new Error(err.detail || 'Failed to delete photo');
+  }
+  return res.json();
+}
+
+export async function setPrimaryPhoto(photoId: string): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/profile/me/photos/${photoId}/primary`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to set primary photo' }));
+    throw new Error(err.detail || 'Failed to set primary photo');
+  }
+  return res.json();
+}
+
 

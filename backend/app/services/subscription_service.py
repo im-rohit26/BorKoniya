@@ -53,15 +53,16 @@ class SubscriptionService:
     def apply_coupon(
         self,
         code: Optional[str],
-        plan_id: str = "monthly_premium",
-        db: Optional[Session] = None,
+        plan_id: str,
+        db: Session,
     ) -> CouponApplyResponse:
-        original_price = 200.00
-        plan = None
-        if db:
-            plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id).first()
-            if plan:
-                original_price = float(plan.price_inr)
+        from fastapi import HTTPException
+        
+        plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id).first()
+        if not plan:
+            raise HTTPException(status_code=404, detail="Subscription plan not found.")
+            
+        original_price = float(plan.price_inr)
 
         if not code or not code.strip():
             return CouponApplyResponse(
@@ -74,49 +75,26 @@ class SubscriptionService:
             )
 
         code_clean = code.strip().upper()
+        coupon = db.query(Coupon).filter(Coupon.code == code_clean, Coupon.is_active == True).first()
 
-        coupon = None
-        if db:
-            coupon = db.query(Coupon).filter(Coupon.code == code_clean, Coupon.is_active == True).first()
+        if not coupon:
+            raise HTTPException(status_code=400, detail="Invalid or expired coupon code.")
 
-        # Fallback for standard BOR50 demo code if database session wasn't supplied
-        if not coupon and code_clean == "BOR50":
-            discount = min(original_price * 0.50, 100.00)
-            net = max(0.00, original_price - discount)
-            return CouponApplyResponse(
-                is_valid=True,
-                coupon_code="BOR50",
-                original_price_inr=original_price,
-                discount_amount_inr=discount,
-                net_payable_inr=net,
-                message="50% Community Discount Applied Successfully!",
-            )
+        if coupon.discount_type == "PERCENTAGE":
+            calc_discount = original_price * (float(coupon.discount_value) / 100.0)
+            max_discount = float(coupon.max_discount_inr) if coupon.max_discount_inr else calc_discount
+            discount = min(calc_discount, max_discount)
+        else:
+            discount = min(float(coupon.discount_value), original_price)
 
-        if coupon:
-            if coupon.discount_type == "PERCENTAGE":
-                calc_discount = original_price * (float(coupon.discount_value) / 100.0)
-                max_discount = float(coupon.max_discount_inr) if coupon.max_discount_inr else calc_discount
-                discount = min(calc_discount, max_discount)
-            else:
-                discount = min(float(coupon.discount_value), original_price)
-
-            net = max(0.00, original_price - discount)
-            return CouponApplyResponse(
-                is_valid=True,
-                coupon_code=coupon.code,
-                original_price_inr=original_price,
-                discount_amount_inr=round(discount, 2),
-                net_payable_inr=round(net, 2),
-                message=f"Community coupon '{coupon.code}' applied! You save ₹{round(discount, 2):.0f}.",
-            )
-
+        net = max(0.00, original_price - discount)
         return CouponApplyResponse(
-            is_valid=False,
-            coupon_code=code,
+            is_valid=True,
+            coupon_code=coupon.code,
             original_price_inr=original_price,
-            discount_amount_inr=0.00,
-            net_payable_inr=original_price,
-            message="Invalid or expired coupon code. Use BOR50 for 50% discount.",
+            discount_amount_inr=round(discount, 2),
+            net_payable_inr=round(net, 2),
+            message=f"Community coupon '{coupon.code}' applied! You save ₹{round(discount, 2):.0f}.",
         )
 
     def initiate_payment(

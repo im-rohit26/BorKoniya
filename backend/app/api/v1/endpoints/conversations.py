@@ -77,66 +77,101 @@ def get_conversations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Find all conversations the current profile belongs to
-    memberships = (
-        db.query(ConversationMember)
-        .filter(ConversationMember.profile_id == current_profile.id)
-        .all()
+    from sqlalchemy import func, and_, or_
+
+    my_convs = db.query(ConversationMember.conversation_id).filter(
+        ConversationMember.profile_id == current_profile.id
+    ).subquery()
+
+    unread_subq = (
+        db.query(
+            Message.conversation_id,
+            func.count(Message.id).label("unread_count")
+        )
+        .filter(
+            Message.sender_profile_id != current_profile.id,
+            Message.is_read == False
+        )
+        .group_by(Message.conversation_id)
+        .subquery()
     )
 
-    conv_ids = [m.conversation_id for m in memberships]
-    if not conv_ids:
-        return []
+    last_msg_time_subq = (
+        db.query(
+            Message.conversation_id,
+            func.max(Message.created_at).label("max_time")
+        )
+        .group_by(Message.conversation_id)
+        .subquery()
+    )
 
-    conversations = (
-        db.query(Conversation)
-        .filter(Conversation.id.in_(conv_ids))
+    last_msg_subq = (
+        db.query(
+            Message.conversation_id,
+            Message.content,
+            Message.created_at
+        )
+        .join(
+            last_msg_time_subq,
+            and_(
+                Message.conversation_id == last_msg_time_subq.c.conversation_id,
+                Message.created_at == last_msg_time_subq.c.max_time
+            )
+        )
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            Conversation,
+            Profile,
+            last_msg_subq.c.content,
+            last_msg_subq.c.created_at,
+            func.coalesce(unread_subq.c.unread_count, 0).label("unread")
+        )
+        .join(ConversationMember, ConversationMember.conversation_id == Conversation.id)
+        .join(Profile, Profile.id == ConversationMember.profile_id)
+        .outerjoin(last_msg_subq, last_msg_subq.c.conversation_id == Conversation.id)
+        .outerjoin(unread_subq, unread_subq.c.conversation_id == Conversation.id)
+        .filter(
+            Conversation.id.in_(my_convs),
+            ConversationMember.profile_id != current_profile.id
+        )
         .order_by(Conversation.updated_at.desc())
         .all()
     )
 
+    active_sub = (
+        db.query(Subscription)
+        .filter(
+            Subscription.user_id == current_user.id,
+            Subscription.status == "ACTIVE",
+            Subscription.expires_at > datetime.now(timezone.utc),
+        )
+        .first()
+    )
+    is_premium = bool(active_sub)
+
+    accepted_interests = (
+        db.query(Interest)
+        .filter(
+            Interest.status == "ACCEPTED",
+            or_(
+                Interest.sender_profile_id == current_profile.id,
+                Interest.receiver_profile_id == current_profile.id
+            )
+        )
+        .all()
+    )
+    mutual_ids = {
+        inc.receiver_profile_id if inc.sender_profile_id == current_profile.id else inc.sender_profile_id
+        for inc in accepted_interests
+    }
+
     results = []
-    for conv in conversations:
-        # Find the other member
-        other_member = (
-            db.query(ConversationMember)
-            .filter(
-                ConversationMember.conversation_id == conv.id,
-                ConversationMember.profile_id != current_profile.id,
-            )
-            .first()
-        )
-        if not other_member:
-            continue
-
-        other_profile = (
-            db.query(Profile).filter(Profile.id == other_member.profile_id).first()
-        )
-        if not other_profile:
-            continue
-
-        # Get last message
-        last_msg = (
-            db.query(Message)
-            .filter(Message.conversation_id == conv.id)
-            .order_by(Message.created_at.desc())
-            .first()
-        )
-
-        # Unread count
-        unread = (
-            db.query(Message)
-            .filter(
-                Message.conversation_id == conv.id,
-                Message.sender_profile_id != current_profile.id,
-                Message.is_read == False,
-            )
-            .count()
-        )
-
-        can_chat = check_chat_entitlement(
-            current_user.id, current_profile.id, other_profile.id, db
-        )
+    for conv, other_profile, last_msg_content, last_msg_time, unread in rows:
+        can_chat = is_premium or (other_profile.id in mutual_ids)
+        last_name_display = other_profile.last_name if can_chat else f"{other_profile.last_name[0]}."
 
         results.append(
             ConversationSummaryResponse(
@@ -144,7 +179,7 @@ def get_conversations(
                 other_profile=ConversationMemberInfo(
                     profile_id=other_profile.id,
                     first_name=other_profile.first_name,
-                    last_name=f"{other_profile.last_name[0]}.",
+                    last_name=last_name_display,
                     photo_url=None,
                     community=other_profile.community,
                     current_city=other_profile.current_city,
@@ -152,8 +187,8 @@ def get_conversations(
                     occupation=other_profile.occupation,
                     is_online=True,
                 ),
-                last_message=last_msg.content if last_msg else None,
-                last_message_time=last_msg.created_at if last_msg else conv.updated_at,
+                last_message=last_msg_content,
+                last_message_time=last_msg_time if last_msg_time else conv.updated_at,
                 unread_count=unread,
                 can_chat=can_chat,
                 created_at=conv.created_at,

@@ -5,10 +5,11 @@ from datetime import date
 import json
 from app.core.database import get_db
 from app.api.deps import get_optional_current_user, get_current_user
-from app.models.entities import Profile, User, SavedSearch, BlockedUser
+from app.models.entities import Profile, User, SavedSearch, BlockedUser, MatchScore
+from sqlalchemy import or_, and_
 from app.schemas.profile import ProfileResponse
 from app.api.v1.endpoints.profiles import format_profile_response
-from app.services.matching_service import matching_service
+from app.services.matching_service import matching_service, get_match_score
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/search", tags=["Matrimonial Search"])
@@ -48,7 +49,21 @@ def search_profiles(
             b2 = db.query(BlockedUser.blocker_profile_id).filter(BlockedUser.blocked_profile_id == my_profile.id).all()
             blocked_ids = blocked_ids.union({r[0] for r in b1}).union({r[0] for r in b2})
 
-    query = db.query(Profile).filter(Profile.status == "ACTIVE")
+    query = db.query(Profile, User).join(User, Profile.user_id == User.id).filter(Profile.status == "ACTIVE")
+    
+    today = date.today()
+    if age_min:
+        try:
+            min_date = date(today.year - age_min, today.month, today.day)
+        except ValueError:
+            min_date = date(today.year - age_min, 3, 1) if today.month == 2 and today.day == 29 else date(today.year - age_min, today.month, today.day)
+        query = query.filter(Profile.date_of_birth <= min_date)
+    if age_max:
+        try:
+            max_date = date(today.year - age_max - 1, today.month, today.day)
+        except ValueError:
+            max_date = date(today.year - age_max - 1, 3, 1) if today.month == 2 and today.day == 29 else date(today.year - age_max - 1, today.month, today.day)
+        query = query.filter(Profile.date_of_birth > max_date)
     if blocked_ids:
         query = query.filter(~Profile.id.in_(blocked_ids))
 
@@ -80,14 +95,29 @@ def search_profiles(
     if profession and profession.upper() != "ANY":
         query = query.filter(Profile.occupation.ilike(f"%{profession}%"))
 
-    profiles = query.limit(50).all()
+    if sort_by == "newest":
+        query = query.order_by(Profile.id.desc())
+    elif sort_by == "age_asc":
+        query = query.order_by(Profile.date_of_birth.desc())
+    elif sort_by == "age_desc":
+        query = query.order_by(Profile.date_of_birth.asc())
+    else:
+        if my_profile:
+            query = query.outerjoin(
+                MatchScore,
+                or_(
+                    and_(MatchScore.profile_a_id == my_profile.id, MatchScore.profile_b_id == Profile.id),
+                    and_(MatchScore.profile_b_id == my_profile.id, MatchScore.profile_a_id == Profile.id)
+                )
+            ).order_by(MatchScore.score.desc().nulls_last())
+
+    profiles_users = query.limit(50).all()
     results = []
 
     today = date.today()
-    ref_profile = my_profile if my_profile else (profiles[0] if profiles else None)
+    ref_profile = my_profile if my_profile else (profiles_users[0][0] if profiles_users else None)
 
-    for p in profiles:
-        user = db.query(User).filter(User.id == p.user_id).first()
+    for p, user in profiles_users:
         res = format_profile_response(p, user=user)
 
         # Calculate actual age
@@ -96,35 +126,20 @@ def search_profiles(
         )
         res.age = calculated_age
 
-        # Filter by age range in memory
-        if age_min and calculated_age < age_min:
-            continue
-        if age_max and calculated_age > age_max:
-            continue
-
         if ref_profile and p.id != ref_profile.id:
-            score, breakdown = matching_service.evaluate_match(ref_profile, p)
-            res.match_score = score
-            res.match_breakdown = breakdown
+            db_score = get_match_score(db, ref_profile.id, p.id)
+            if db_score is not None:
+                res.match_score = db_score
+                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
+            else:
+                score, breakdown = matching_service.evaluate_match(ref_profile, p)
+                res.match_score = score
+                res.match_breakdown = breakdown
         else:
-            res.match_score = 94
-            res.match_breakdown = [
-                f"Community aligns: {p.community}",
-                f"Location preference: {p.current_state}",
-                "Age compatibility verified",
-            ]
+            res.match_score = 0
+            res.match_breakdown = []
 
         results.append(res)
-
-    # Sorting
-    if sort_by == "newest":
-        results = sorted(results, key=lambda x: x.id, reverse=True)
-    elif sort_by == "age_asc":
-        results = sorted(results, key=lambda x: x.age)
-    elif sort_by == "age_desc":
-        results = sorted(results, key=lambda x: x.age, reverse=True)
-    else:  # match_score default
-        results = sorted(results, key=lambda x: x.match_score or 0, reverse=True)
 
     return results[:limit]
 

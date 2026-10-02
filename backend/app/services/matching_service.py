@@ -105,4 +105,30 @@ class MatchingService:
         return final_score, breakdown
 
 
+def store_match_score(db, profile_a_id: str, profile_b_id: str, score: int):
+    from app.models.entities import MatchScore
+    # Always store in a consistent order (e.g. sorted by ID) to avoid duplicates
+    p1, p2 = sorted([profile_a_id, profile_b_id])
+    existing = db.query(MatchScore).filter(
+        MatchScore.profile_a_id == p1,
+        MatchScore.profile_b_id == p2
+    ).first()
+    if existing:
+        existing.score = score
+    else:
+        new_score = MatchScore(profile_a_id=p1, profile_b_id=p2, score=score)
+        db.add(new_score)
+    db.commit()
+
+
+def get_match_score(db, profile_a_id: str, profile_b_id: str):
+    from app.models.entities import MatchScore
+    p1, p2 = sorted([profile_a_id, profile_b_id])
+    score_record = db.query(MatchScore).filter(
+        MatchScore.profile_a_id == p1,
+        MatchScore.profile_b_id == p2
+    ).first()
+    return score_record.score if score_record else None
+
+
 matching_service = MatchingService()

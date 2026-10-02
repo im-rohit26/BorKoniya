@@ -24,6 +24,15 @@ class ProfileBase(BaseModel):
     about_me: Optional[str] = None
 
 
+class PhotoItemResponse(BaseModel):
+    id: str
+    storage_path: str
+    is_primary: bool
+    privacy: str = "REGISTERED_ONLY"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProfileResponse(ProfileBase):
     id: str
     user_id: str
@@ -36,6 +45,7 @@ class ProfileResponse(ProfileBase):
     match_score: Optional[int] = 90
     match_breakdown: Optional[List[str]] = None
     photo_url: Optional[str] = None
+    photos: Optional[List[PhotoItemResponse]] = None
 
     # Sensitive contact details are masked by default!
     contact_phone_masked: Optional[str] = None

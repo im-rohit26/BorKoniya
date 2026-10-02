@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         return v
 
     # Database
-    DATABASE_URL: str = "sqlite:///./borkonya.db"
+    DATABASE_URL: str
 
     # Supabase (Optional in dev, required in production)
     SUPABASE_URL: str = "https://mock.supabase.co"
@@ -35,10 +35,16 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET: str = "super_secret_jwt_signing_key_borkonya_community_2026_dev"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # OTP
+    # OTP / Email SMTP
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_NAME: str = "BorKonya"
+    OTP_EXPIRY_MINUTES: int = 10
     OTP_PROVIDER_KEY: str = "mock_otp_provider_key"
     SMS_SENDER_ID: str = "BORKON"
 

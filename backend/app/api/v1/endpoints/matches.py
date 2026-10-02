@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Set
 from app.core.database import get_db
 from app.api.deps import get_optional_current_user
-from app.models.entities import Profile, User, BlockedUser
+from app.models.entities import Profile, User, BlockedUser, MatchScore
+from sqlalchemy import or_, and_
 from app.schemas.profile import ProfileResponse
 from app.api.v1.endpoints.profiles import format_profile_response
-from app.services.matching_service import matching_service
+from app.services.matching_service import matching_service, get_match_score
 
 router = APIRouter(prefix="/matches", tags=["Matching Engine"])
 
@@ -38,6 +39,15 @@ def get_recommended_matches(
     if blocked_ids:
         query = query.filter(~Profile.id.in_(blocked_ids))
 
+    if my_profile:
+        query = query.outerjoin(
+            MatchScore,
+            or_(
+                and_(MatchScore.profile_a_id == my_profile.id, MatchScore.profile_b_id == Profile.id),
+                and_(MatchScore.profile_b_id == my_profile.id, MatchScore.profile_a_id == Profile.id)
+            )
+        ).order_by(MatchScore.score.desc().nulls_last())
+
     # Opposite-gender filtering rule
     if my_profile and my_profile.gender:
         if my_profile.gender.upper() == "FEMALE":
@@ -57,22 +67,21 @@ def get_recommended_matches(
         res = format_profile_response(p, user=user)
 
         if ref_profile and p.id != ref_profile.id:
-            score, breakdown = matching_service.evaluate_match(ref_profile, p)
-            res.match_score = score
-            res.match_breakdown = breakdown
+            db_score = get_match_score(db, ref_profile.id, p.id)
+            if db_score is not None:
+                res.match_score = db_score
+                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
+            else:
+                score, breakdown = matching_service.evaluate_match(ref_profile, p)
+                res.match_score = score
+                res.match_breakdown = breakdown
         else:
-            res.match_score = 96
-            res.match_breakdown = [
-                "Direct Sadgope / Gowala community match",
-                "High cultural and family alignment",
-                "Verified background details",
-                "Preferred regional belt",
-            ]
+            res.match_score = 0
+            res.match_breakdown = []
 
         results.append(res)
 
-    sorted_results = sorted(results, key=lambda x: x.match_score or 0, reverse=True)
-    return sorted_results[:limit]
+    return results[:limit]
 
 
 @router.get("/new", response_model=List[ProfileResponse])
@@ -110,15 +119,22 @@ def get_new_matches(
         .all()
     )
     results = []
+    ref_profile = my_profile
     for p in profiles:
         user = db.query(User).filter(User.id == p.user_id).first()
         res = format_profile_response(p, user=user)
-        res.match_score = 90
-        res.match_breakdown = [
-            "Recently registered member",
-            f"Active in {p.current_city}, {p.current_state}",
-            f"Community: {p.community}",
-        ]
+        if ref_profile and p.id != ref_profile.id:
+            db_score = get_match_score(db, ref_profile.id, p.id)
+            if db_score is not None:
+                res.match_score = db_score
+                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
+            else:
+                score, breakdown = matching_service.evaluate_match(ref_profile, p)
+                res.match_score = score
+                res.match_breakdown = breakdown
+        else:
+            res.match_score = 0
+            res.match_breakdown = []
         results.append(res)
     return results[:limit]
 
@@ -143,7 +159,7 @@ def get_near_you_matches(
     query = (
         db.query(Profile)
         .filter(Profile.status == "ACTIVE")
-        .filter(Profile.current_state.ilike(f"%{state}%"))
+        .filter(Profile.current_state == state)
     )
     if blocked_ids:
         query = query.filter(~Profile.id.in_(blocked_ids))
@@ -158,14 +174,22 @@ def get_near_you_matches(
 
     profiles = query.limit(20).all()
     results = []
+    ref_profile = my_profile
     for p in profiles:
         user = db.query(User).filter(User.id == p.user_id).first()
         res = format_profile_response(p, user=user)
-        res.match_score = 92
-        res.match_breakdown = [
-            f"Living in nearby region: {p.current_city}, {p.current_state}",
-            "Regional community belt",
-        ]
+        if ref_profile and p.id != ref_profile.id:
+            db_score = get_match_score(db, ref_profile.id, p.id)
+            if db_score is not None:
+                res.match_score = db_score
+                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
+            else:
+                score, breakdown = matching_service.evaluate_match(ref_profile, p)
+                res.match_score = score
+                res.match_breakdown = breakdown
+        else:
+            res.match_score = 0
+            res.match_breakdown = []
         results.append(res)
     return results[:limit]
 
@@ -200,14 +224,21 @@ def get_profile_visitors(
 
     profiles = query.limit(10).all()
     results = []
+    ref_profile = my_profile
     for p in profiles:
         user = db.query(User).filter(User.id == p.user_id).first()
         res = format_profile_response(p, user=user)
-        res.match_score = 88
-        res.match_breakdown = [
-            "Viewed your profile in the past 48 hours",
-            f"Community: {p.community}",
-            f"Education: {p.highest_qualification}",
-        ]
+        if ref_profile and p.id != ref_profile.id:
+            db_score = get_match_score(db, ref_profile.id, p.id)
+            if db_score is not None:
+                res.match_score = db_score
+                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
+            else:
+                score, breakdown = matching_service.evaluate_match(ref_profile, p)
+                res.match_score = score
+                res.match_breakdown = breakdown
+        else:
+            res.match_score = 0
+            res.match_breakdown = []
         results.append(res)
     return results[:limit]

@@ -1,14 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import uuid
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, datetime, timezone
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_optional_current_user
-from app.models.entities import Profile, ProfilePrivacy, User, Subscription, Interest
-from app.schemas.profile import ProfileResponse, PrivacySettingsUpdate, ProfileUpdate
+from app.models.entities import Profile, ProfilePrivacy, User, Subscription, Interest, ProfilePhoto
+from app.schemas.profile import ProfileResponse, PrivacySettingsUpdate, ProfileUpdate, PhotoItemResponse
 from app.services.matching_service import matching_service
+from app.core.supabase import get_supabase_client
 
 router = APIRouter(prefix="/profile", tags=["Matrimonial Profiles"])
+
+
+def save_photo_file(file: UploadFile, filename: str) -> str:
+    # 1. Try Supabase Storage first
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            file_bytes = file.file.read()
+            file.file.seek(0)
+            res = supabase.storage.from_("profile-photos").upload(
+                filename,
+                file_bytes,
+                {"content-type": file.content_type or "image/jpeg", "upsert": "true"},
+            )
+            public_url = supabase.storage.from_("profile-photos").get_public_url(filename)
+            if public_url:
+                return public_url
+        except Exception as e:
+            print(f"Supabase photo upload warning: {e}")
+            file.file.seek(0)
+
+    # 2. Local fallback
+    upload_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
+        "uploads",
+        "photos",
+    )
+    os.makedirs(upload_dir, exist_ok=True)
+    local_path = os.path.join(upload_dir, filename)
+    with open(local_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return f"http://localhost:8000/uploads/photos/{filename}"
 
 
 def is_user_premium(user_id: str, db: Session) -> bool:
@@ -38,6 +74,7 @@ def format_profile_response(
     user: Optional[User] = None,
     is_owner: bool = False,
     is_premium: bool = False,
+    match_score: Optional[int] = None,
 ) -> ProfileResponse:
 
     age = matching_service.calculate_age(profile.date_of_birth)
@@ -45,37 +82,33 @@ def format_profile_response(
     # Profile gender display logic: true gender is always preserved
     display_gender = profile.gender
 
-    # Curated portrait photos matching profile gender
-    photo_url = None
+    # Real uploaded photos
+    photos_list = []
     if hasattr(profile, "photos") and profile.photos:
-        primary_photo = next((p for p in profile.photos if p.is_primary), profile.photos[0])
+        photos_list = [
+            PhotoItemResponse(
+                id=p.id,
+                storage_path=p.storage_path,
+                is_primary=p.is_primary,
+                privacy=p.privacy,
+            )
+            for p in profile.photos
+        ]
+
+    photo_url = None
+    if photos_list:
+        primary_photo = next((p for p in photos_list if p.is_primary), photos_list[0])
         photo_url = primary_photo.storage_path
 
-    if not photo_url:
-        female_photos = [
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600",
-            "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=600",
-            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600",
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=600",
-        ]
-        male_photos = [
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600",
-            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=600",
-            "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=600",
-            "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=600",
-        ]
-        if profile.gender.upper() == "FEMALE":
-            idx = abs(hash(str(profile.id))) % len(female_photos)
-            photo_url = female_photos[idx]
-        else:
-            idx = abs(hash(str(profile.id))) % len(male_photos)
-            photo_url = male_photos[idx]
-
     # Mask contact information unless authorized (owner or active premium member)
-    phone_raw = user.phone_number if user else "+91 9876543210"
+    phone_raw = user.phone_number if user else "+919876543210"
     email_raw = user.email if (user and user.email) else "candidate@borkonya.com"
 
-    masked_phone = f"+91 {phone_raw[3:5]}••••••{phone_raw[-2:]}" if len(phone_raw) >= 10 else "+91 98••••••10"
+    if len(phone_raw) >= 10:
+        masked_phone = phone_raw[:3] + "••••••" + phone_raw[-2:]
+    else:
+        masked_phone = "+91 98••••••10"
+
     masked_email = f"{email_raw[:2]}••••••@{email_raw.split('@')[-1]}" if "@" in email_raw else "c••••@borkonya.com"
 
     can_view_contact = is_owner or is_premium
@@ -107,7 +140,7 @@ def format_profile_response(
         profile_completion_pct=profile.profile_completion_pct,
         is_mobile_verified=True,
         is_email_verified=True,
-        match_score=92,
+        match_score=match_score,
         match_breakdown=[
             "Age preference aligns",
             f"Community matches: {profile.community}",
@@ -115,6 +148,7 @@ def format_profile_response(
             f"Education criteria met: {profile.highest_qualification}",
         ],
         photo_url=photo_url,
+        photos=photos_list,
         contact_phone_masked=masked_phone,
         contact_email_masked=masked_email,
         is_contact_revealed=can_view_contact,
@@ -176,6 +210,7 @@ def get_profile_by_id(
 
     user = db.query(User).filter(User.id == profile.user_id).first()
     is_owner = (current_user and current_user.id == profile.user_id)
+    viewer_profile = None
     if current_user and not is_owner:
         viewer_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
         if viewer_profile and viewer_profile.gender and profile.gender:
@@ -187,7 +222,18 @@ def get_profile_by_id(
 
     is_premium = is_user_premium(current_user.id, db) if current_user else False
 
-    return format_profile_response(profile, user=user, is_owner=is_owner, is_premium=is_premium)
+    # Fetch Match Score
+    match_score_val = None
+    if current_user and viewer_profile and not is_owner:
+        from app.models.entities import MatchScore
+        score_record = db.query(MatchScore).filter(
+            ((MatchScore.profile_a_id == viewer_profile.id) & (MatchScore.profile_b_id == profile.id)) |
+            ((MatchScore.profile_a_id == profile.id) & (MatchScore.profile_b_id == viewer_profile.id))
+        ).first()
+        if score_record:
+            match_score_val = score_record.score
+
+    return format_profile_response(profile, user=user, is_owner=is_owner, is_premium=is_premium, match_score=match_score_val)
 
 
 @router.put("/privacy")
@@ -197,4 +243,149 @@ def update_privacy(payload: PrivacySettingsUpdate, db: Session = Depends(get_db)
         "message": "Privacy settings updated successfully.",
         "settings": payload.model_dump(),
     }
+
+
+# Photo Management APIs
+@router.post("/me/photos/upload", response_model=PhotoItemResponse)
+async def upload_my_photo(
+    file: UploadFile = File(...),
+    is_primary: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found for this account.",
+        )
+
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only image files (JPG, PNG, WEBP, etc.) are allowed.",
+        )
+
+    # Max 5 photos
+    existing_count = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).count()
+    if existing_count >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum of 5 photos reached. Please delete an existing photo to upload a new one.",
+        )
+
+    ext = os.path.splitext(file.filename or "")[1] or ".jpg"
+    unique_filename = f"{profile.id}_{uuid.uuid4().hex[:8]}{ext}"
+
+    photo_url = save_photo_file(file, unique_filename)
+
+    should_be_primary = is_primary or (existing_count == 0)
+    if should_be_primary:
+        db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).update({"is_primary": False})
+
+    new_photo = ProfilePhoto(
+        profile_id=profile.id,
+        storage_path=photo_url,
+        is_primary=should_be_primary,
+        privacy="REGISTERED_ONLY",
+    )
+    db.add(new_photo)
+    db.commit()
+    db.refresh(new_photo)
+
+    # Update completion percentage if needed
+    if profile.profile_completion_pct < 85:
+        profile.profile_completion_pct = min(100, profile.profile_completion_pct + 10)
+        db.commit()
+
+    return PhotoItemResponse(
+        id=new_photo.id,
+        storage_path=new_photo.storage_path,
+        is_primary=new_photo.is_primary,
+        privacy=new_photo.privacy,
+    )
+
+
+@router.get("/me/photos", response_model=List[PhotoItemResponse])
+def get_my_photos(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found.",
+        )
+    photos = (
+        db.query(ProfilePhoto)
+        .filter(ProfilePhoto.profile_id == profile.id)
+        .order_by(ProfilePhoto.is_primary.desc())
+        .all()
+    )
+    return [
+        PhotoItemResponse(
+            id=p.id,
+            storage_path=p.storage_path,
+            is_primary=p.is_primary,
+            privacy=p.privacy,
+        )
+        for p in photos
+    ]
+
+
+@router.delete("/me/photos/{photo_id}")
+def delete_my_photo(
+    photo_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+    photo = db.query(ProfilePhoto).filter(
+        ProfilePhoto.id == photo_id,
+        ProfilePhoto.profile_id == profile.id,
+    ).first()
+    if not photo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found.")
+
+    was_primary = photo.is_primary
+    db.delete(photo)
+    db.commit()
+
+    if was_primary:
+        remaining = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).first()
+        if remaining:
+            remaining.is_primary = True
+            db.commit()
+
+    return {"status": "SUCCESS", "message": "Photo deleted successfully."}
+
+
+@router.post("/me/photos/{photo_id}/primary")
+def set_primary_photo(
+    photo_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+
+    photo = db.query(ProfilePhoto).filter(
+        ProfilePhoto.id == photo_id,
+        ProfilePhoto.profile_id == profile.id,
+    ).first()
+    if not photo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found.")
+
+    db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).update({"is_primary": False})
+    photo.is_primary = True
+    db.commit()
+
+    return {"status": "SUCCESS", "message": "Primary photo updated successfully."}
+
 

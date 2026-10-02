@@ -97,6 +97,28 @@ export async function getSentInterests(statusFilter?: string): Promise<InterestI
   return res.json();
 }
 
+export async function getSentInterestIds(): Promise<string[]> {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/interests/sent/ids`, {
+      headers: { ...headers },
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // Fall back to getSentInterests
+  }
+
+  try {
+    const sent = await getSentInterests();
+    return sent.map((item) => item.receiver_profile_id);
+  } catch {
+    return [];
+  }
+}
+
 export async function acceptInterest(interestId: string) {
   const res = await fetch(`${API_BASE_URL}/interests/${interestId}/accept`, {
     method: 'POST',

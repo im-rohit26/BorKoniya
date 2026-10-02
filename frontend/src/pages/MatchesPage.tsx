@@ -22,6 +22,7 @@ import {
   removeFromShortlist,
   blockProfile,
   getShortlistedIds,
+  getSentInterestIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
@@ -73,16 +74,22 @@ export const MatchesPage: React.FC = () => {
         }
 
         let shortlistedIds: string[] = []
+        let sentInterestIds: string[] = []
         try {
-          shortlistedIds = await getShortlistedIds()
+          [shortlistedIds, sentInterestIds] = await Promise.all([
+            getShortlistedIds().catch(() => []),
+            getSentInterestIds().catch(() => []),
+          ])
         } catch {
           shortlistedIds = []
+          sentInterestIds = []
         }
         const shortlistedSet = new Set(shortlistedIds)
+        const sentInterestSet = new Set(sentInterestIds)
 
         if (!isCancelled) {
           const mapped = rawProfiles.slice(0, 3).map((p) =>
-            mapProfileResponseToCard(p, shortlistedSet.has(p.id))
+            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id))
           )
           setProfiles(mapped)
         }

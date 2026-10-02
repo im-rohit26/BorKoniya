@@ -139,20 +139,18 @@ def get_received_interests(
     db: Session = Depends(get_db),
 ):
     query = (
-        db.query(Interest)
+        db.query(Interest, Profile, User)
+        .join(Profile, Profile.id == Interest.sender_profile_id)
+        .join(User, User.id == Profile.user_id)
         .filter(Interest.receiver_profile_id == current_profile.id)
     )
     if status_filter:
         query = query.filter(Interest.status == status_filter.upper())
     
-    interests = query.order_by(Interest.sent_at.desc()).all()
+    rows = query.order_by(Interest.sent_at.desc()).all()
     results = []
 
-    for item in interests:
-        sender = db.query(Profile).filter(Profile.id == item.sender_profile_id).first()
-        if not sender:
-            continue
-        user = db.query(User).filter(User.id == sender.user_id).first()
+    for item, sender, user in rows:
         formatted = format_profile_response(
             sender,
             user=user,
@@ -179,20 +177,18 @@ def get_sent_interests(
     db: Session = Depends(get_db),
 ):
     query = (
-        db.query(Interest)
+        db.query(Interest, Profile, User)
+        .join(Profile, Profile.id == Interest.receiver_profile_id)
+        .join(User, User.id == Profile.user_id)
         .filter(Interest.sender_profile_id == current_profile.id)
     )
     if status_filter:
         query = query.filter(Interest.status == status_filter.upper())
     
-    interests = query.order_by(Interest.sent_at.desc()).all()
+    rows = query.order_by(Interest.sent_at.desc()).all()
     results = []
 
-    for item in interests:
-        receiver = db.query(Profile).filter(Profile.id == item.receiver_profile_id).first()
-        if not receiver:
-            continue
-        user = db.query(User).filter(User.id == receiver.user_id).first()
+    for item, receiver, user in rows:
         formatted = format_profile_response(
             receiver,
             user=user,
@@ -210,6 +206,22 @@ def get_sent_interests(
             )
         )
     return results
+
+
+@router.get("/sent/ids", response_model=List[str])
+def get_sent_interest_ids(
+    current_profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(Interest.receiver_profile_id)
+        .filter(
+            Interest.sender_profile_id == current_profile.id,
+            Interest.status.in_(["SENT", "ACCEPTED"]),
+        )
+        .all()
+    )
+    return [r[0] for r in rows]
 
 
 @router.post("/{interest_id}/accept", response_model=InterestActionResponse)

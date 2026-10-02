@@ -16,8 +16,18 @@ import {
   ArrowLeft,
   Trash2,
   Sparkles,
+  Upload,
+  Plus,
+  Loader2,
 } from 'lucide-react'
 import { getMyProfile, updateMyProfile } from '../lib/authApi'
+import {
+  getMyPhotos,
+  uploadProfilePhoto,
+  deleteProfilePhoto,
+  setPrimaryPhoto,
+} from '../lib/profileApi'
+import { masterDataApi, type Community, type SubCommunity, type SelectOption } from '../lib/masterDataApi'
 
 export const ProfileWizardPage: React.FC = () => {
   const navigate = useNavigate()
@@ -89,11 +99,42 @@ export const ProfileWizardPage: React.FC = () => {
   })
 
   // Photo management state
-  const [photos, setPhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=600',
-  ])
-  const [primaryPhotoIndex, setPrimaryPhotoIndex] = useState(0)
+  interface WizardPhoto {
+    id?: string
+    url: string
+    isPrimary: boolean
+  }
+
+  const [photos, setPhotos] = useState<WizardPhoto[]>([])
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  const [heightOptions, setHeightOptions] = useState<SelectOption[]>([])
+  const [maritalStatuses, setMaritalStatuses] = useState<SelectOption[]>([])
+  const [motherTongues, setMotherTongues] = useState<string[]>([])
+  const [communities, setCommunities] = useState<Community[]>([])
+  const [subCommunities, setSubCommunities] = useState<SubCommunity[]>([])
+  const [states, setStates] = useState<SelectOption[]>([])
+  const [educationLevels, setEducationLevels] = useState<SelectOption[]>([])
+  const [incomeRanges, setIncomeRanges] = useState<SelectOption[]>([])
+  const [dietOptions, setDietOptions] = useState<SelectOption[]>([])
+
+  useEffect(() => {
+    masterDataApi.getHeightOptions().then(setHeightOptions).catch(() => {})
+    masterDataApi.getMaritalStatuses().then(setMaritalStatuses).catch(() => {})
+    masterDataApi.getMotherTongueOptions().then(setMotherTongues).catch(() => {})
+    masterDataApi.getCommunities().then(setCommunities).catch(() => {})
+    masterDataApi.getStates().then(setStates).catch(() => {})
+    masterDataApi.getEducationLevels().then(setEducationLevels).catch(() => {})
+    masterDataApi.getIncomeRanges().then(setIncomeRanges).catch(() => {})
+    masterDataApi.getDietOptions().then(setDietOptions).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const commId = communities.find(c => c.name === formData.community)?.id
+    masterDataApi.getSubCommunities(commId).then(setSubCommunities).catch(() => {})
+  }, [formData.community, communities])
 
   // Calculate dynamic completion percentage
   const calculateCompletion = () => {
@@ -109,28 +150,146 @@ export const ProfileWizardPage: React.FC = () => {
 
   const completionPct = calculateCompletion()
 
-  const handleAddSamplePhoto = () => {
-    const samples = [
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600',
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=600',
-    ]
-    const next = samples[photos.length % samples.length]
-    setPhotos([...photos, next])
-  }
+  const handleLocalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
 
-  const handleDeletePhoto = (index: number) => {
-    if (photos.length <= 1) return
-    const updated = photos.filter((_, i) => i !== index)
-    setPhotos(updated)
-    if (primaryPhotoIndex >= updated.length) {
-      setPrimaryPhotoIndex(0)
+    setPhotoError(null)
+    const file = files[0]
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Please select a valid image file (JPG, PNG, WEBP).')
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setPhotoError('Image size exceeds 10MB limit. Please choose a smaller file.')
+      return
+    }
+
+    if (photos.length >= 5) {
+      setPhotoError('You can upload up to 5 photos. Please remove an existing photo first.')
+      return
+    }
+
+    setIsUploadingPhoto(true)
+    const isFirstPhoto = photos.length === 0
+
+    try {
+      const uploaded = await uploadProfilePhoto(file, isFirstPhoto)
+      setPhotos((prev) => [
+        ...prev,
+        {
+          id: uploaded.id,
+          url: uploaded.storage_path,
+          isPrimary: uploaded.is_primary,
+        },
+      ])
+    } catch (err: any) {
+      console.warn('Backend photo upload error, reading as local preview:', err)
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setPhotos((prev) => [
+            ...prev,
+            {
+              url: reader.result as string,
+              isPrimary: isFirstPhoto,
+            },
+          ])
+        }
+      }
+      reader.readAsDataURL(file)
+    } finally {
+      setIsUploadingPhoto(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
+  const handleSetPrimaryPhoto = async (index: number) => {
+    const target = photos[index]
+    if (target?.id) {
+      try {
+        await setPrimaryPhoto(target.id)
+      } catch (e) {
+        console.error('Failed to set primary photo on backend:', e)
+      }
+    }
+    setPhotos((prev) =>
+      prev.map((p, idx) => ({
+        ...p,
+        isPrimary: idx === index,
+      }))
+    )
+  }
+
+  const handleDeletePhoto = async (index: number) => {
+    const target = photos[index]
+    if (target?.id) {
+      try {
+        await deleteProfilePhoto(target.id)
+      } catch (e) {
+        console.error('Failed to delete photo on backend:', e)
+      }
+    }
+    setPhotos((prev) => {
+      const updated = prev.filter((_, idx) => idx !== index)
+      if (target?.isPrimary && updated.length > 0) {
+        updated[0].isPrimary = true
+      }
+      return updated
+    })
+  }
+
+  const handleAddSamplePhoto = () => {
+    if (photos.length >= 5) {
+      setPhotoError('Maximum of 5 photos reached.')
+      return
+    }
+    const samples = [
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600',
+      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=600',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600',
+    ]
+    const next = samples[photos.length % samples.length]
+    setPhotos((prev) => [
+      ...prev,
+      {
+        url: next,
+        isPrimary: prev.length === 0,
+      },
+    ])
+  }
+
   useEffect(() => {
+    getMyPhotos()
+      .then((items) => {
+        if (items && items.length > 0) {
+          setPhotos(
+            items.map((it) => ({
+              id: it.id,
+              url: it.storage_path,
+              isPrimary: it.is_primary,
+            }))
+          )
+        }
+      })
+      .catch(() => {})
+
     getMyProfile()
       .then((p) => {
         if (p) {
+          if (p.photos && p.photos.length > 0) {
+            setPhotos(
+              p.photos.map((it: any) => ({
+                id: it.id,
+                url: it.storage_path,
+                isPrimary: it.is_primary,
+              }))
+            )
+          }
           setFormData((prev) => ({
             ...prev,
             profileFor: p.profile_for || prev.profileFor,
@@ -164,6 +323,7 @@ export const ProfileWizardPage: React.FC = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
       setIsSaving(true)
+      const primaryPhoto = photos.find((p) => p.isPrimary) || photos[0]
       try {
         await updateMyProfile({
           first_name: formData.firstName,
@@ -184,6 +344,7 @@ export const ProfileWizardPage: React.FC = () => {
           annual_income: formData.annualIncome,
           diet: formData.diet,
           about_me: formData.aboutMe,
+          photo_url: primaryPhoto?.url,
         })
       } catch (e) {
         console.error('Failed to save profile updates:', e)
@@ -371,19 +532,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, heightCm: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="152">5'0" (152 cm)</option>
-                    <option value="155">5'1" (155 cm)</option>
-                    <option value="157">5'2" (157 cm)</option>
-                    <option value="160">5'3" (160 cm)</option>
-                    <option value="163">5'4" (163 cm)</option>
-                    <option value="165">5'5" (165 cm)</option>
-                    <option value="168">5'6" (168 cm)</option>
-                    <option value="170">5'7" (170 cm)</option>
-                    <option value="173">5'8" (173 cm)</option>
-                    <option value="175">5'9" (175 cm)</option>
-                    <option value="178">5'10" (178 cm)</option>
-                    <option value="180">5'11" (180 cm)</option>
-                    <option value="183">6'0" (183 cm)</option>
+                    <option value="">{heightOptions.length > 0 ? 'Select Height' : 'Loading...'}</option>
+                    {heightOptions.map((h) => (
+                      <option key={h.value} value={h.value}>{h.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -396,10 +548,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, maritalStatus: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="NEVER_MARRIED">Never Married</option>
-                    <option value="DIVORCED">Divorced</option>
-                    <option value="WIDOWED">Widowed</option>
-                    <option value="AWAITING_DIVORCE">Awaiting Divorce</option>
+                    <option value="">{maritalStatuses.length > 0 ? 'Select Marital Status' : 'Loading...'}</option>
+                    {maritalStatuses.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -412,11 +564,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, motherTongue: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="Bengali">Bengali</option>
-                    <option value="Odia">Odia</option>
-                    <option value="Hindi">Hindi</option>
-                    <option value="English">English</option>
-                    <option value="Marathi">Marathi</option>
+                    <option value="">{motherTongues.length > 0 ? 'Select Mother Tongue' : 'Loading...'}</option>
+                    {motherTongues.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -446,8 +597,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, community: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="Sadgope">Sadgope</option>
-                    <option value="Gowala / Goala">Gowala / Goala</option>
+                    <option value="">{communities.length > 0 ? 'Select Community' : 'Loading...'}</option>
+                    {communities.map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -460,22 +613,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, subCommunity: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    {formData.community === 'Sadgope' ? (
-                      <>
-                        <option value="Kulin Sadgope">Kulin Sadgope</option>
-                        <option value="Ghosh">Ghosh</option>
-                        <option value="Pal">Pal</option>
-                        <option value="Sarkar">Sarkar</option>
-                        <option value="Mollik">Mollik</option>
-                        <option value="Other Sadgope">Other Sadgope</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="Ahir">Ahir</option>
-                        <option value="Gope">Gope</option>
-                        <option value="Gowala General">Gowala General</option>
-                      </>
-                    )}
+                    <option value="">{subCommunities.length > 0 ? 'Select Sub-Community' : 'Loading...'}</option>
+                    {subCommunities.map((s) => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -515,14 +656,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, currentState: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="West Bengal">West Bengal</option>
-                    <option value="Odisha">Odisha</option>
-                    <option value="Jharkhand">Jharkhand</option>
-                    <option value="Bihar">Bihar</option>
-                    <option value="Maharashtra">Maharashtra</option>
-                    <option value="Gujarat">Gujarat</option>
-                    <option value="Delhi / NCR">Delhi / NCR</option>
-                    <option value="Other">Other / NRI</option>
+                    <option value="">{states.length > 0 ? 'Select State' : 'Loading...'}</option>
+                    {states.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -568,18 +705,10 @@ export const ProfileWizardPage: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="M.Tech in Computer Science">M.Tech / M.E</option>
-                    <option value="B.Tech / B.E">B.Tech / B.E</option>
-                    <option value="MBA / PGDM">MBA / PGDM</option>
-                    <option value="Doctor / MBBS / MD">Doctor / MBBS / MD</option>
-                    <option value="Chartered Accountant (CA)">Chartered Accountant (CA)</option>
-                    <option value="Master’s Degree (MA/M.Sc/M.Com)">
-                      Master’s Degree (MA/M.Sc/M.Com)
-                    </option>
-                    <option value="Bachelor’s Degree (BA/B.Sc/B.Com)">
-                      Bachelor’s Degree (BA/B.Sc/B.Com)
-                    </option>
-                    <option value="Civil Services / Law / Other">Civil Services / Law / Other</option>
+                    <option value="">{educationLevels.length > 0 ? 'Select Qualification' : 'Loading...'}</option>
+                    {educationLevels.map((eL) => (
+                      <option key={eL.value} value={eL.value}>{eL.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -632,12 +761,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, annualIncome: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="₹3 – 5 Lakhs">₹3 – 5 Lakhs</option>
-                    <option value="₹5 – 10 Lakhs">₹5 – 10 Lakhs</option>
-                    <option value="₹10 – 15 Lakhs">₹10 – 15 Lakhs</option>
-                    <option value="₹15 – 25 Lakhs">₹15 – 25 Lakhs</option>
-                    <option value="₹25 – 50 Lakhs">₹25 – 50 Lakhs</option>
-                    <option value="₹50 Lakhs+">₹50 Lakhs+</option>
+                    <option value="">{incomeRanges.length > 0 ? 'Select Income Range' : 'Loading...'}</option>
+                    {incomeRanges.map((iR) => (
+                      <option key={iR.value} value={iR.value}>{iR.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -778,10 +905,10 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, diet: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
-                    <option value="NON_VEGETARIAN">Non-Vegetarian</option>
-                    <option value="VEGETARIAN">Vegetarian</option>
-                    <option value="EGGETARIAN">Eggetarian</option>
-                    <option value="JAIN">Jain</option>
+                    <option value="">{dietOptions.length > 0 ? 'Select Diet' : 'Loading...'}</option>
+                    {dietOptions.map((d) => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -961,69 +1088,147 @@ export const ProfileWizardPage: React.FC = () => {
                 </p>
               </div>
 
+              {/* Hidden Local File Input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleLocalFileUpload}
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                className="hidden"
+              />
+
               {/* Photo Upload & Gallery */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-slate-800">
-                    Uploaded Photos ({photos.length} / 5)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleAddSamplePhoto}
-                    className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Camera className="h-3.5 w-3.5 text-crimson-700" />
-                    <span>Upload New Photo</span>
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800">
+                      Uploaded Photos ({photos.length} / 5)
+                    </span>
+                    <span className="text-[11px] text-slate-500 ml-2">
+                      (Your primary photo will be shown on match cards)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingPhoto || photos.length >= 5}
+                      className="inline-flex items-center space-x-1.5 rounded-xl bg-crimson-700 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-crimson-800 disabled:opacity-50 transition-all shadow-xs"
+                    >
+                      {isUploadingPhoto ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      <span>{isUploadingPhoto ? 'Uploading Photo...' : 'Upload Photo from Device'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAddSamplePhoto}
+                      disabled={photos.length >= 5}
+                      className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      title="Add a sample photo for demo"
+                    >
+                      <Sparkles className="h-3 w-3 text-amber-600" />
+                      <span>Use Demo Sample</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {photos.map((url, idx) => (
-                    <div
-                      key={idx}
-                      className={`relative rounded-2xl overflow-hidden border-2 bg-slate-100 h-40 ${
-                        primaryPhotoIndex === idx
-                          ? 'border-crimson-700 ring-2 ring-crimson-200'
-                          : 'border-slate-200'
-                      }`}
+                {photoError && (
+                  <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-medium text-rose-700 flex items-center justify-between">
+                    <span>{photoError}</span>
+                    <button type="button" onClick={() => setPhotoError(null)} className="text-rose-500 hover:text-rose-700 font-bold ml-2">✕</button>
+                  </div>
+                )}
+
+                {/* Empty State / Dropzone when no photos uploaded */}
+                {photos.length === 0 ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-300 hover:border-crimson-500 rounded-3xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-slate-50/60 hover:bg-rose-50/20 group"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-white shadow-xs border border-slate-200 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform text-crimson-700">
+                      <Camera className="h-8 w-8" />
+                    </div>
+                    <p className="text-sm font-bold text-navy-950">
+                      Choose Photo from Your Computer or Phone
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                      Upload clear portrait photos. Supports JPG, PNG, WEBP (up to 10MB). Photos are protected with watermarks.
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-4 inline-flex items-center space-x-2 px-4 py-2 bg-crimson-700 hover:bg-crimson-800 text-white font-bold text-xs rounded-xl shadow-xs pointer-events-none"
                     >
-                      {/* Protected Photo Component with Watermark and Anti-Save Shield */}
-                      <ProtectedPhoto
-                        src={url}
-                        alt="Profile photo"
-                        profileId="BK-9941"
-                        className="h-full w-full"
-                      />
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>Browse Photo from Device</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {photos.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`relative rounded-2xl overflow-hidden border-2 bg-slate-100 h-44 ${
+                          item.isPrimary
+                            ? 'border-crimson-700 ring-2 ring-crimson-200'
+                            : 'border-slate-200'
+                        }`}
+                      >
+                        {/* Protected Photo Component with Watermark and Anti-Save Shield */}
+                        <ProtectedPhoto
+                          src={item.url}
+                          alt="Profile photo"
+                          profileId="BK-MEMBER"
+                          className="h-full w-full"
+                        />
 
-                      {/* Primary Badge */}
-                      {primaryPhotoIndex === idx && (
-                        <div className="absolute top-2 left-2 z-30 rounded-md bg-crimson-700 px-2 py-0.5 text-[9px] font-black text-white uppercase shadow-xs">
-                          Primary
-                        </div>
-                      )}
+                        {/* Primary Badge */}
+                        {item.isPrimary && (
+                          <div className="absolute top-2 left-2 z-30 rounded-md bg-crimson-700 px-2 py-0.5 text-[9px] font-black text-white uppercase shadow-xs">
+                            Primary Photo
+                          </div>
+                        )}
 
-                      {/* Controls on hover */}
-                      <div className="absolute bottom-2 left-2 right-2 z-30 flex items-center justify-between gap-1">
-                        {primaryPhotoIndex !== idx && (
+                        {/* Controls on hover */}
+                        <div className="absolute bottom-2 left-2 right-2 z-30 flex items-center justify-between gap-1">
+                          {!item.isPrimary && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimaryPhoto(idx)}
+                              className="rounded-lg bg-slate-900/80 px-2 py-1 text-[10px] font-bold text-white hover:bg-slate-900"
+                            >
+                              Set Primary
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => setPrimaryPhotoIndex(idx)}
-                            className="rounded-lg bg-slate-900/80 px-2 py-1 text-[10px] font-bold text-white hover:bg-slate-900"
+                            onClick={() => handleDeletePhoto(idx)}
+                            className="rounded-lg bg-rose-600/90 p-1 text-white hover:bg-rose-700 ml-auto"
+                            title="Delete photo"
                           >
-                            Set Primary
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePhoto(idx)}
-                          className="rounded-lg bg-rose-600/90 p-1 text-white hover:bg-rose-700 ml-auto"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+
+                    {/* Add More Tile */}
+                    {photos.length < 5 && (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-300 hover:border-crimson-500 rounded-2xl h-44 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-rose-50/20 text-slate-500 hover:text-crimson-700"
+                      >
+                        <Plus className="h-6 w-6 mb-1" />
+                        <span className="text-xs font-bold">Add Photo</span>
+                        <span className="text-[10px] text-slate-400">From device</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Anti-Download Shield Notice */}

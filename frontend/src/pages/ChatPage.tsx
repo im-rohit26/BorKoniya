@@ -33,17 +33,14 @@ import { ReportProfileModal } from '../components/safety/ReportProfileModal';
 import { Header } from '../components/common/Header';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 
-const MATRIMONIAL_ICEBREAKERS = [
-  'Namaste! Our family reviewed your profile with great interest.',
-  'Hello! I noticed our native place and family background align well.',
-  'Would your family be interested in having a brief introductory conversation?',
-  'Namaste, thank you for accepting my interest. How is your week going?',
-];
+import { masterDataApi } from '../lib/masterDataApi';
 
 export const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
   const [langModalOpen, setLangModalOpen] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [icebreakers, setIcebreakers] = useState<string[]>([]);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(conversationId || null);
@@ -104,6 +101,12 @@ export const ChatPage: React.FC = () => {
 
   useEffect(() => {
     fetchConversations();
+    masterDataApi.getIcebreakers().then(setIcebreakers).catch(() => {
+      setIcebreakers([
+        'নমস্কার! আপনার প্রোফাইল দেখে ভালো লাগলো।',
+        'Hello! Would love to know more about you.',
+      ]);
+    });
   }, []);
 
   // 2. Load Messages when active conversation changes
@@ -131,7 +134,7 @@ export const ChatPage: React.FC = () => {
     };
 
     fetchChatMessages();
-    const interval = setInterval(() => fetchChatMessages(true), 5000); // Polling fallback
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     // Supabase Realtime Channel
     let channel: any = null;
@@ -150,19 +153,27 @@ export const ChatPage: React.FC = () => {
             fetchChatMessages(true);
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            setWsConnected(true);
+          }
+        });
     } catch (e) {
       console.warn('Realtime channel error:', e);
     }
 
+    if (!wsConnected) {
+      pollInterval = setInterval(() => fetchChatMessages(true), 5000);
+    }
+
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (pollInterval) clearInterval(pollInterval);
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [activeConvId]);
+  }, [activeConvId, wsConnected]);
 
   // 3. Send message handler
   const handleSendMessage = async (textToSend?: string) => {
@@ -517,7 +528,7 @@ export const ChatPage: React.FC = () => {
                   <Sparkles className="w-3 h-3 text-crimson-700" />
                   Quick Greet:
                 </span>
-                {MATRIMONIAL_ICEBREAKERS.map((prompt, idx) => (
+                {icebreakers.map((prompt, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(prompt)}

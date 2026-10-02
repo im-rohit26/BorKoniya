@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Sparkles, Info, Check, X } from 'lucide-react'
 
 interface MatchScoreBadgeProps {
-  score: number
+  score: number | null
   breakdown?: string[]
 }
 
@@ -20,9 +20,9 @@ export const MatchScoreBadge: React.FC<MatchScoreBadgeProps> = ({
 
   // Color according to score using reference palette
   const badgeColor =
-    score >= 85
+    score !== null && score >= 85
       ? 'bg-crimson-50 text-crimson-800 border-crimson-200'
-      : score >= 70
+      : score !== null && score >= 70
       ? 'bg-navy-50 text-navy-800 border-navy-200'
       : 'bg-slate-100 text-slate-700 border-slate-300'
 
@@ -36,7 +36,7 @@ export const MatchScoreBadge: React.FC<MatchScoreBadgeProps> = ({
         className={`inline-flex items-center space-x-1.5 rounded-full border px-2.5 py-1 text-xs font-bold transition-all hover:shadow-xs active:scale-95 ${badgeColor}`}
       >
         <Sparkles className="h-3.5 w-3.5 text-crimson-700" />
-        <span>{score}% Match</span>
+        <span>{score !== null ? `${score}% Match` : '--'}</span>
         <Info className="h-3 w-3 text-slate-400 ml-0.5" />
       </button>
 

@@ -48,6 +48,8 @@ export const SubscriptionPage: React.FC = () => {
   // Active status
   const [userStatus, setUserStatus] = useState<SubscriptionStatus | null>(null);
 
+  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+
   // 1. Load plans and existing subscription status
   useEffect(() => {
     getSubscriptionPlans()
@@ -58,7 +60,8 @@ export const SubscriptionPage: React.FC = () => {
           setSelectedPlanId(pop ? pop.id : data[0].id);
         }
       })
-      .catch((err) => console.error('Failed to load plans:', err));
+      .catch((err) => console.error('Failed to load plans:', err))
+      .finally(() => setIsLoadingPlans(false));
 
     getSubscriptionStatus()
       .then((status) => {
@@ -67,14 +70,23 @@ export const SubscriptionPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  if (isLoadingPlans) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fbfbf9]">
+        <div className="text-slate-500 font-medium">Loading subscription plans...</div>
+      </div>
+    );
+  }
 
-  const selectedPlan = plans.find((p) => p.id === selectedPlanId) || {
-    id: 'monthly_premium',
-    name: 'Monthly Premium',
-    price_inr: 200,
-    duration_days: 30,
-    features: {},
-  };
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId);
+
+  if (!selectedPlan) {
+    return (
+      <div className="error-state min-h-screen flex items-center justify-center bg-[#fbfbf9]">
+        <p className="text-lg text-slate-600 font-semibold">Plan not found. Please go back and select a plan.</p>
+      </div>
+    );
+  }
 
   // 2. Handle Coupon Validation
   const handleApplyCoupon = async (e: React.FormEvent) => {

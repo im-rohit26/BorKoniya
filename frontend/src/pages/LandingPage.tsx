@@ -14,6 +14,7 @@ import {
   addToShortlist,
   removeFromShortlist,
   getShortlistedIds,
+  getSentInterestIds,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import {
@@ -64,14 +65,20 @@ export const LandingPage: React.FC = () => {
       try {
         const raw = await getRecommendedMatches(3)
         let sIds: string[] = []
+        let sentIds: string[] = []
         try {
-          sIds = await getShortlistedIds()
+          [sIds, sentIds] = await Promise.all([
+            getShortlistedIds().catch(() => []),
+            getSentInterestIds().catch(() => []),
+          ])
         } catch {
           sIds = []
+          sentIds = []
         }
         const sSet = new Set(sIds)
+        const sentSet = new Set(sentIds)
         const mapped = raw.slice(0, 3).map((p) =>
-          mapProfileResponseToCard(p, sSet.has(p.id))
+          mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id))
         )
         setProfiles(mapped)
       } catch (err) {

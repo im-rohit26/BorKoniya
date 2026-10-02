@@ -74,7 +74,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   }, [profile.isShortlisted])
 
   const handleInterest = () => {
-    setInterestSent(!interestSent)
+    if (interestSent) return
+    setInterestSent(true)
     if (onExpressInterest) onExpressInterest(profile.id)
   }
 
@@ -217,16 +218,17 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {/* Express Interest */}
               <button
                 onClick={handleInterest}
+                disabled={interestSent}
                 className={`flex-1 flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
                   interestSent
-                    ? 'bg-crimson-50 text-crimson-800 border border-crimson-200'
+                    ? 'bg-crimson-50 text-crimson-800 border border-crimson-200 cursor-default'
                     : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
                 }`}
               >
                 {interestSent ? (
                   <>
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Interest Sent</span>
+                    <Check className="h-3.5 w-3.5 text-crimson-700" />
+                    <span>Interested</span>
                   </>
                 ) : (
                   <>
@@ -415,16 +417,17 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {/* Express Interest */}
               <button
                 onClick={handleInterest}
+                disabled={interestSent}
                 className={`flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
                   interestSent
-                    ? 'bg-crimson-50 text-crimson-800 border border-crimson-200'
+                    ? 'bg-crimson-50 text-crimson-800 border border-crimson-200 cursor-default'
                     : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
                 }`}
               >
                 {interestSent ? (
                   <>
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Interest Sent</span>
+                    <Check className="h-3.5 w-3.5 text-crimson-700" />
+                    <span>Interested</span>
                   </>
                 ) : (
                   <>

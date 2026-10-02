@@ -20,6 +20,7 @@ import {
   addToShortlist,
   removeFromShortlist,
   getShortlistedIds,
+  getSentInterestIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
@@ -37,11 +38,11 @@ export const DashboardPage: React.FC = () => {
   const [matches, setMatches] = useState<ProfileCardData[]>([])
   const [loadingMatches, setLoadingMatches] = useState(true)
   const [interestsSummary, setInterestsSummary] = useState({
-    received_pending: 1,
-    sent_pending: 1,
-    total_active_connections: 1,
+    received_pending: 0,
+    sent_pending: 0,
+    total_active_connections: 0,
   })
-  const [shortlistCount, setShortlistCount] = useState(1)
+  const [shortlistCount, setShortlistCount] = useState(0)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -63,30 +64,45 @@ export const DashboardPage: React.FC = () => {
       .then((list) => setShortlistCount(list.length))
       .catch((err) => console.log('Shortlist error:', err))
 
+    let isCancelled = false;
+
     // Fetch real top 3 matches from Supabase
     const fetchMatches = async () => {
       setLoadingMatches(true)
       try {
         const raw = await getRecommendedMatches(3)
         let sIds: string[] = []
+        let sentIds: string[] = []
         try {
-          sIds = await getShortlistedIds()
+          [sIds, sentIds] = await Promise.all([
+            getShortlistedIds().catch(() => []),
+            getSentInterestIds().catch(() => []),
+          ])
         } catch {
           sIds = []
+          sentIds = []
         }
-        const sSet = new Set(sIds)
-        const mapped = raw.slice(0, 3).map((p) =>
-          mapProfileResponseToCard(p, sSet.has(p.id))
-        )
-        setMatches(mapped)
+        if (!isCancelled) {
+          const sSet = new Set(sIds)
+          const sentSet = new Set(sentIds)
+          const mapped = raw.slice(0, 3).map((p) =>
+            mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id))
+          )
+          setMatches(mapped)
+        }
       } catch (err) {
-        console.error('Failed to load dashboard matches:', err)
+        if (!isCancelled) {
+          console.error('Failed to load dashboard matches:', err)
+        }
       } finally {
-        setLoadingMatches(false)
+        if (!isCancelled) {
+          setLoadingMatches(false)
+        }
       }
     }
 
     fetchMatches()
+    return () => { isCancelled = true; }
   }, [])
 
   const handleInterest = async (id: string, name: string) => {
@@ -140,10 +156,10 @@ export const DashboardPage: React.FC = () => {
     }
   }
 
-  const completionPct = 85
+  const completionPct = (user as any)?.profile_completion_pct || 0
   const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Valued Member'
   const communityDisplay = user?.community ? `${user.community} Community` : 'Sadgope / Gowala Community'
-  const profileIdDisplay = `BK-${(user?.profile_id || user?.user_id || '7492').slice(0, 6).toUpperCase()}`
+  const profileIdDisplay = `BK-${(user?.profile_id || '0000').slice(-4).toUpperCase()}`
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfbf9]">

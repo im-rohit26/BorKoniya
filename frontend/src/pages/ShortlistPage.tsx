@@ -16,6 +16,7 @@ import {
   getShortlist,
   removeFromShortlist,
   sendInterest,
+  getSentInterestIds,
 } from '../lib/interactionApi';
 import type { ShortlistItem } from '../lib/interactionApi';
 import { ProtectedPhoto } from '../components/security/ProtectedPhoto';
@@ -36,8 +37,12 @@ export const ShortlistPage: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const items = await getShortlist();
+      const [items, sentIds] = await Promise.all([
+        getShortlist(),
+        getSentInterestIds().catch(() => []),
+      ]);
       setShortlist(items);
+      setSentInterests(new Set(sentIds));
     } catch (err) {
       console.error('Failed to load shortlist:', err);
     } finally {
@@ -243,7 +248,7 @@ export const ShortlistPage: React.FC = () => {
                       }`}
                     >
                       <Heart className={`w-3.5 h-3.5 ${hasSentInterest ? 'fill-emerald-600' : ''}`} />
-                      <span>{hasSentInterest ? 'Interest Sent' : 'Express Interest'}</span>
+                      <span>{hasSentInterest ? 'Interested' : 'Express Interest'}</span>
                     </button>
                   </div>
                 </div>

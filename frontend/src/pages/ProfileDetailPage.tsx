@@ -34,6 +34,7 @@ import {
   startOrGetConversation,
   blockProfile,
   getShortlistedIds,
+  getSentInterestIds,
 } from '../lib/interactionApi'
 import { getProfileById, formatHeight, type ProfileResponse } from '../lib/profileApi'
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
@@ -68,16 +69,14 @@ export const ProfileDetailPage: React.FC = () => {
       setLoading(true)
       setError(null)
       try {
-        const data = await getProfileById(id)
+        const [data, shortlistedIds, sentInterestIds] = await Promise.all([
+          getProfileById(id),
+          getShortlistedIds().catch((): string[] => []),
+          getSentInterestIds().catch((): string[] => []),
+        ])
         setProfile(data)
-
-        let shortlistedIds: string[] = []
-        try {
-          shortlistedIds = await getShortlistedIds()
-        } catch {
-          shortlistedIds = []
-        }
-        setIsShortlisted(shortlistedIds.includes(data.id))
+        setIsShortlisted((shortlistedIds as string[]).includes(data.id))
+        setInterestSent((sentInterestIds as string[]).includes(data.id))
       } catch (err: any) {
         console.error('Failed to load profile:', err)
         setError(err.message || 'Profile could not be loaded.')
@@ -95,7 +94,7 @@ export const ProfileDetailPage: React.FC = () => {
   }
 
   const handleInterest = async () => {
-    if (!profile) return
+    if (!profile || interestSent) return
     try {
       await sendInterest(profile.id)
       setInterestSent(true)
@@ -231,7 +230,7 @@ export const ProfileDetailPage: React.FC = () => {
                         Height: {displayHeight} • Profile ID: BK-{profile.id.slice(0, 8).toUpperCase()} • {displayGender}
                       </p>
                     </div>
-                    <MatchScoreBadge score={profile.match_score || 92} breakdown={profile.match_breakdown} />
+                    <MatchScoreBadge score={profile.match_score ?? null} breakdown={profile.match_breakdown} />
                   </div>
 
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
@@ -256,14 +255,15 @@ export const ProfileDetailPage: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3 border-t border-slate-100">
                     <button
                       onClick={handleInterest}
+                      disabled={interestSent}
                       className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
                         interestSent
-                          ? 'bg-crimson-50 text-crimson-700 border border-crimson-200'
+                          ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
                           : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
                       }`}
                     >
-                      {interestSent ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-                      <span>{interestSent ? 'Interest Sent' : 'Express Interest'}</span>
+                      {interestSent ? <Check className="h-4 w-4 text-crimson-700" /> : <Heart className="h-4 w-4" />}
+                      <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
                     </button>
 
                     <button

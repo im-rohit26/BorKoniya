@@ -1,31 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  --color-crimson-50: #fdf2f4;
-  --color-crimson-100: #fce7ea;
-  --color-crimson-200: #f8d0d6;
-  --color-crimson-300: #f1a9b5;
-  --color-crimson-400: #e37488;
-  --color-crimson-500: #d04661;
-  --color-crimson-600: #b52945;
-  --color-crimson-700: #981b2e;
-  --color-crimson-800: #801627;
-  --color-crimson-900: #6c1624;
-  --color-crimson-950: #3f0710;
-  --color-crimson: #981b2e;
+  --color-crimson-50: #fef4f4;
+  --color-crimson-100: #fee8e8;
+  --color-crimson-200: #fdcecf;
+  --color-crimson-300: #f99c9d;
+  --color-crimson-400: #f36466;
+  --color-crimson-500: #e82e30;
+  --color-crimson-600: #d71b1d;
+  --color-crimson-700: #c40d0f; /* Exact User Brand Red: rgba(196, 13, 15) */
+  --color-crimson-800: #a80a0c; /* Deep Red Hover */
+  --color-crimson-900: #800809;
+  --color-crimson-950: #470405;
+  --color-crimson: #c40d0f;
 
-  --color-navy-50: #f0f5fa;
-  --color-navy-100: #dceaf4;
-  --color-navy-200: #bdd7ec;
-  --color-navy-300: #8ebcdd;
-  --color-navy-400: #579dc8;
-  --color-navy-500: #3381b1;
-  --color-navy-600: #246795;
-  --color-navy-700: #1d537a;
-  --color-navy-800: #0e3860;
-  --color-navy-900: #0b2d4f;
-  --color-navy-950: #071c33;
-  --color-navy: #0e3860;
+  --color-navy-50: #f0f7ff;
+  --color-navy-100: #dfeefe;
+  --color-navy-200: #bcdbfb;
+  --color-navy-300: #8abdf3;
+  --color-navy-400: #5199e7;
+  --color-navy-500: #2278da;
+  --color-navy-600: #0d5ebc;
+  --color-navy-700: #024796;
+  --color-navy-800: #003572; /* Exact User Brand Blue: rgba(0, 53, 114) */
+  --color-navy-900: #002958;
+  --color-navy-950: #001b3a; /* Deep Navy */
+  --color-navy: #003572;
 }
 
 @layer base {
@@ -36,19 +36,19 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 351 70% 35%; /* #981b2e Heritage Crimson */
+    --primary: 359 88% 41%; /* #c40d0f Exact Red */
     --primary-foreground: 0 0% 100%;
-    --secondary: 209 75% 22%; /* #0e3860 Heritage Navy */
+    --secondary: 212 100% 22%; /* #003572 Exact Blue */
     --secondary-foreground: 0 0% 100%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 351 100% 97%;
-    --accent-foreground: 351 70% 35%;
+    --accent: 359 88% 97%;
+    --accent-foreground: 359 88% 41%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 351 70% 35%;
+    --ring: 359 88% 41%;
     --radius: 0.75rem;
   }
 }
@@ -97,7 +97,7 @@ html, body {
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
-  background: radial-gradient(circle, transparent 60%, rgba(15, 41, 66, 0.2) 100%);
+  background: radial-gradient(circle, transparent 60%, rgba(0, 53, 114, 0.2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -134,10 +134,10 @@ html, body {
     text-align: center !important;
     font-size: 18pt !important;
     font-weight: bold !important;
-    color: #b91c1c !important;
-    background: #fef2f2 !important;
+    color: #c40d0f !important;
+    background: #fef4f4 !important;
     padding: 24pt !important;
-    border: 2pt solid #b91c1c !important;
+    border: 2pt solid #c40d0f !important;
     border-radius: 12pt !important;
   }
 }

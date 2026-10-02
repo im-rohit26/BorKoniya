@@ -104,12 +104,25 @@ def get_blocked_profiles(
         .all()
     )
 
+    if not blocked_records:
+        return []
+        
+    blocked_ids = [rec.blocked_profile_id for rec in blocked_records]
+    
+    profiles_users = (
+        db.query(Profile, User)
+        .join(User, User.id == Profile.user_id)
+        .filter(Profile.id.in_(blocked_ids))
+        .all()
+    )
+    
+    pu_map = {p.id: (p, u) for p, u in profiles_users}
+
     results = []
     for rec in blocked_records:
-        target = db.query(Profile).filter(Profile.id == rec.blocked_profile_id).first()
-        if not target:
+        if rec.blocked_profile_id not in pu_map:
             continue
-        user = db.query(User).filter(User.id == target.user_id).first()
+        target, user = pu_map[rec.blocked_profile_id]
         formatted = format_profile_response(target, user=user)
         results.append(
             BlockedProfileResponse(

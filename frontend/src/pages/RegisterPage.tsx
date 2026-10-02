@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import {
   Users,
@@ -11,13 +10,13 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { sendOtp, verifyOtp } from '../lib/authApi';
+import { masterDataApi } from '../lib/masterDataApi';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 import logoImg from '../assets/logo.jpeg';
 
 export const RegisterPage: React.FC = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { register } = useAuth();
   const [langModalOpen, setLangModalOpen] = useState(false);
@@ -47,15 +46,16 @@ export const RegisterPage: React.FC = () => {
   const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const profileForOptions = [
-    { id: 'MYSELF', label: t('onboarding.myself', 'Myself') },
-    { id: 'SON', label: t('onboarding.son', 'My Son') },
-    { id: 'DAUGHTER', label: t('onboarding.daughter', 'My Daughter') },
-    { id: 'BROTHER', label: t('onboarding.brother', 'My Brother') },
-    { id: 'SISTER', label: t('onboarding.sister', 'My Sister') },
-    { id: 'RELATIVE', label: t('onboarding.relative', 'Relative') },
-    { id: 'OTHER', label: t('onboarding.other', 'Other') },
-  ];
+  const [profileForOptions, setProfileForOptions] = useState<any[]>([]);
+  const [communities, setCommunities] = useState<any[]>([]);
+
+  useEffect(() => {
+    masterDataApi.getProfileForOptions().then(res => {
+      setProfileForOptions(res);
+      if (res.length > 0) setProfileFor(res[0].value);
+    }).catch(() => {});
+    masterDataApi.getCommunities().then(setCommunities).catch(() => {});
+  }, []);
 
   const handleSelectWhoFor = (val: string) => {
     setProfileFor(val);
@@ -247,10 +247,10 @@ export const RegisterPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2.5 pt-2">
                   {profileForOptions.map((opt) => (
                     <button
-                      key={opt.id}
-                      onClick={() => handleSelectWhoFor(opt.id)}
+                      key={opt.value}
+                      onClick={() => handleSelectWhoFor(opt.value)}
                       className={`flex items-center justify-between p-4 rounded-2xl border text-sm font-semibold transition-all ${
-                        profileFor === opt.id
+                        profileFor === opt.value
                           ? 'border-crimson-700 bg-crimson-50 text-crimson-950 shadow-xs'
                           : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white'
                       }`}
@@ -339,8 +339,10 @@ export const RegisterPage: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, community: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
-                      <option value="Sadgope">Sadgope</option>
-                      <option value="Gowala / Goala">Gowala / Goala</option>
+                      <option value="">{communities.length > 0 ? 'Select Community' : 'Loading...'}</option>
+                      {communities.map((c) => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>

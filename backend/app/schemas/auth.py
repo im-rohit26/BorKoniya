@@ -17,6 +17,7 @@ def validate_digits_only_phone(v: str) -> str:
 class SendOtpRequest(BaseModel):
     phone_number: str = Field(..., min_length=10, max_length=15)
     phone_country_code: str = "+91"
+    email: Optional[EmailStr] = None
 
     @field_validator("phone_number")
     def check_phone_digits(cls, v: str) -> str:
@@ -26,7 +27,6 @@ class SendOtpRequest(BaseModel):
 class SendOtpResponse(BaseModel):
     message: str
     phone_number: str
-    demo_otp: Optional[str] = None  # Included in development mode for easy testing
 
 
 class VerifyOtpRequest(BaseModel):
@@ -58,7 +58,6 @@ class RegisterRequest(BaseModel):
         return validate_digits_only_phone(v)
 
 
-
 class LoginRequest(BaseModel):
     phone_or_email: str
     password: str
@@ -71,6 +70,11 @@ class TokenResponse(BaseModel):
     profile_id: Optional[str] = None
     first_name: Optional[str] = None
     profile_status: str = "ACTIVE"
+    refresh_token: Optional[str] = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class ForgotPasswordRequest(BaseModel):

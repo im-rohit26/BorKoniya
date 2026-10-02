@@ -17,6 +17,7 @@ import { ChatPage } from './pages/ChatPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LanguageSelectorModal } from './components/common/LanguageSelectorModal'
 import { ScreenCaptureProtection } from './components/security/ScreenCaptureProtection'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { MobileBottomNav } from './components/common/MobileBottomNav'
 
 export default function App() {
@@ -31,7 +32,8 @@ export default function App() {
   }, [])
 
   return (
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <AuthProvider>
         {/* Global Anti-Screenshot & Download Shield */}
         <ScreenCaptureProtection />
@@ -144,6 +146,7 @@ export default function App() {
         {/* Persistent App-Like Mobile Bottom Navigation Bar */}
         <MobileBottomNav />
       </AuthProvider>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

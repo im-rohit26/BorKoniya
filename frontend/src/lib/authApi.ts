@@ -18,6 +18,7 @@ export interface TokenResponse {
   access_token: string;
   token_type: string;
   user_id: string;
+  refresh_token?: string;
   profile_id?: string;
   first_name?: string;
   profile_status: string;
@@ -47,8 +48,39 @@ export function setAuthToken(token: string) {
   localStorage.setItem('borkonya_token', token);
 }
 
+export function getRefreshToken(): string | null {
+  return localStorage.getItem('borkonya_refresh_token');
+}
+
+export function setRefreshToken(token: string) {
+  localStorage.setItem('borkonya_refresh_token', token);
+}
+
+export function removeRefreshToken() {
+  localStorage.removeItem('borkonya_refresh_token');
+}
+
 export function removeAuthToken() {
   localStorage.removeItem('borkonya_token');
+  removeRefreshToken();
+}
+
+export async function refreshAccessToken(): Promise<string> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) throw new Error('No refresh token available');
+  const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!res.ok) {
+    removeAuthToken();
+    throw new Error('Session expired. Please log in again.');
+  }
+  const data: TokenResponse = await res.json();
+  setAuthToken(data.access_token);
+  if (data.refresh_token) setRefreshToken(data.refresh_token);
+  return data.access_token;
 }
 
 export function getAuthHeaders(): Record<string, string> {
@@ -103,7 +135,9 @@ export async function registerUser(payload: RegisterPayload): Promise<TokenRespo
     }
     throw new Error(msg || 'Registration failed. Please check the form.');
   }
-  return res.json();
+  const data: TokenResponse = await res.json();
+  if (data.refresh_token) setRefreshToken(data.refresh_token);
+  return data;
 }
 
 // 4. Login
@@ -124,7 +158,9 @@ export async function loginUser(phoneOrEmail: string, password: string): Promise
     }
     throw new Error(msg || 'Invalid email/mobile number or password.');
   }
-  return res.json();
+  const data: TokenResponse = await res.json();
+  if (data.refresh_token) setRefreshToken(data.refresh_token);
+  return data;
 }
 
 // 5. Get Current User (/auth/me)

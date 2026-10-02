@@ -11,8 +11,12 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Text,
+    Index,
+    UniqueConstraint,
+    JSON
 )
 from sqlalchemy.orm import relationship
+from datetime import timedelta
 from app.core.database import Base
 
 
@@ -104,6 +108,8 @@ class Profile(Base):
     photos = relationship("ProfilePhoto", back_populates="profile", cascade="all, delete-orphan")
     privacy = relationship("ProfilePrivacy", back_populates="profile", uselist=False, cascade="all, delete-orphan")
 
+    __table_args__ = (Index('ix_profiles_current_state', 'current_state'), Index('ix_profiles_user_id', 'user_id'),)
+
 
 class ProfilePhoto(Base):
     __tablename__ = "profile_photos"
@@ -115,6 +121,8 @@ class ProfilePhoto(Base):
     privacy = Column(String(30), default="REGISTERED_ONLY")  # PUBLIC, REGISTERED_ONLY, PROTECTED
 
     profile = relationship("Profile", back_populates="photos")
+
+    __table_args__ = (Index('ix_profile_photos_profile_id', 'profile_id'),)
 
 
 class ProfilePrivacy(Base):
@@ -143,6 +151,12 @@ class Interest(Base):
     sender_profile = relationship("Profile", foreign_keys=[sender_profile_id])
     receiver_profile = relationship("Profile", foreign_keys=[receiver_profile_id])
 
+    __table_args__ = (
+        UniqueConstraint('sender_profile_id', 'receiver_profile_id', name='uq_interest_sender_receiver'),
+        Index('ix_interests_sender_profile_id', 'sender_profile_id'),
+        Index('ix_interests_receiver_profile_id', 'receiver_profile_id'),
+    )
+
 
 class Shortlist(Base):
     __tablename__ = "shortlists"
@@ -154,6 +168,11 @@ class Shortlist(Base):
 
     user_profile = relationship("Profile", foreign_keys=[user_profile_id])
     target_profile = relationship("Profile", foreign_keys=[target_profile_id])
+
+    __table_args__ = (
+        UniqueConstraint('user_profile_id', 'target_profile_id', name='uq_shortlist_user_target'),
+        Index('ix_shortlists_user_profile_id', 'user_profile_id'),
+    )
 
 
 class Conversation(Base):
@@ -177,6 +196,8 @@ class ConversationMember(Base):
     conversation = relationship("Conversation", back_populates="members")
     profile = relationship("Profile")
 
+    __table_args__ = (Index('ix_conv_members_profile_id', 'profile_id'),)
+
 
 class Message(Base):
     __tablename__ = "messages"
@@ -191,6 +212,8 @@ class Message(Base):
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("Profile")
+
+    __table_args__ = (Index('ix_messages_conversation_id', 'conversation_id'),)
 
 
 class BlockedUser(Base):
@@ -226,7 +249,7 @@ class SubscriptionPlan(Base):
     name = Column(String(100), nullable=False)
     price_inr = Column(Numeric(10, 2), default=200.00, nullable=False)
     duration_days = Column(Integer, default=30)
-    features_json = Column(Text, default='{"unlimited_chat": true, "view_contacts": true}')
+    features_json = Column(JSON, default={})
     is_active = Column(Boolean, default=True)
 
 
@@ -272,5 +295,38 @@ class SavedSearch(Base):
     search_name = Column(String(100), default="My Search")
     criteria_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (Index('ix_saved_searches_user_id', 'user_id'),)
+
+
+class OTPStore(Base):
+    __tablename__ = "otp_store"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    identifier = Column(String(255), nullable=False, index=True)  # phone or email
+    otp_code = Column(String(10), nullable=False)
+    purpose = Column(String(30), default="VERIFY")  # VERIFY, RESET_PASSWORD
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class MatchScore(Base):
+    __tablename__ = "match_scores"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    profile_a_id = Column(String(36), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    profile_b_id = Column(String(36), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    score = Column(SmallInteger, nullable=False, default=0)
+    computed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    profile_a = relationship("Profile", foreign_keys=[profile_a_id])
+    profile_b = relationship("Profile", foreign_keys=[profile_b_id])
+
+    __table_args__ = (
+        UniqueConstraint('profile_a_id', 'profile_b_id', name='uq_match_score_pair'),
+        Index('ix_match_scores_profile_a_id', 'profile_a_id'),
+        Index('ix_match_scores_profile_b_id', 'profile_b_id'),
+    )
 
 
