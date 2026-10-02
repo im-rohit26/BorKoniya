@@ -15,8 +15,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return (
       <div className="min-h-screen bg-[#fbfbf9] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center space-y-4">
-          <div className="h-12 w-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shadow-sm animate-pulse">
-            <RefreshCw className="h-6 w-6 animate-spin text-amber-600" />
+          <div className="h-12 w-12 rounded-2xl bg-crimson-50 border border-crimson-200 flex items-center justify-center text-crimson-700 shadow-sm animate-pulse">
+            <RefreshCw className="h-6 w-6 animate-spin text-crimson-700" />
           </div>
           <p className="text-sm font-semibold text-slate-600">Verifying session...</p>
         </div>

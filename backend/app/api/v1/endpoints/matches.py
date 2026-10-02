@@ -21,6 +21,8 @@ def get_blocked_ids(profile_id: Optional[str], db: Session) -> Set[str]:
 
 @router.get("/recommended", response_model=List[ProfileResponse])
 def get_recommended_matches(
+    limit: int = 3,
+    gender: Optional[str] = None,
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
@@ -36,11 +38,19 @@ def get_recommended_matches(
     if blocked_ids:
         query = query.filter(~Profile.id.in_(blocked_ids))
 
+    # Opposite-gender filtering rule
+    if my_profile and my_profile.gender:
+        if my_profile.gender.upper() == "FEMALE":
+            query = query.filter(Profile.gender == "MALE")
+        elif my_profile.gender.upper() == "MALE":
+            query = query.filter(Profile.gender == "FEMALE")
+    elif gender:
+        query = query.filter(Profile.gender == gender.upper())
+
     profiles = query.limit(30).all()
     results = []
 
     ref_profile = my_profile if my_profile else (profiles[0] if profiles else None)
-
 
     for p in profiles:
         user = db.query(User).filter(User.id == p.user_id).first()
@@ -61,15 +71,40 @@ def get_recommended_matches(
 
         results.append(res)
 
-    return sorted(results, key=lambda x: x.match_score or 0, reverse=True)
+    sorted_results = sorted(results, key=lambda x: x.match_score or 0, reverse=True)
+    return sorted_results[:limit]
 
 
 @router.get("/new", response_model=List[ProfileResponse])
-def get_new_matches(db: Session = Depends(get_db)):
+def get_new_matches(
+    limit: int = 3,
+    gender: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
     """Recently registered compatible profiles."""
+    my_profile = None
+    blocked_ids = set()
+    if current_user:
+        my_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if my_profile:
+            blocked_ids.add(my_profile.id)
+            blocked_ids = blocked_ids.union(get_blocked_ids(my_profile.id, db))
+
+    query = db.query(Profile).filter(Profile.status == "ACTIVE")
+    if blocked_ids:
+        query = query.filter(~Profile.id.in_(blocked_ids))
+
+    if my_profile and my_profile.gender:
+        if my_profile.gender.upper() == "FEMALE":
+            query = query.filter(Profile.gender == "MALE")
+        elif my_profile.gender.upper() == "MALE":
+            query = query.filter(Profile.gender == "FEMALE")
+    elif gender:
+        query = query.filter(Profile.gender == gender.upper())
+
     profiles = (
-        db.query(Profile)
-        .filter(Profile.status == "ACTIVE")
+        query
         .order_by(Profile.created_at.desc())
         .limit(20)
         .all()
@@ -85,22 +120,43 @@ def get_new_matches(db: Session = Depends(get_db)):
             f"Community: {p.community}",
         ]
         results.append(res)
-    return results
+    return results[:limit]
 
 
 @router.get("/near-you", response_model=List[ProfileResponse])
 def get_near_you_matches(
     state: str = "West Bengal",
+    limit: int = 3,
+    gender: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """Profiles geographically close to candidate."""
-    profiles = (
+    my_profile = None
+    blocked_ids = set()
+    if current_user:
+        my_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if my_profile:
+            blocked_ids.add(my_profile.id)
+            blocked_ids = blocked_ids.union(get_blocked_ids(my_profile.id, db))
+
+    query = (
         db.query(Profile)
         .filter(Profile.status == "ACTIVE")
         .filter(Profile.current_state.ilike(f"%{state}%"))
-        .limit(20)
-        .all()
     )
+    if blocked_ids:
+        query = query.filter(~Profile.id.in_(blocked_ids))
+
+    if my_profile and my_profile.gender:
+        if my_profile.gender.upper() == "FEMALE":
+            query = query.filter(Profile.gender == "MALE")
+        elif my_profile.gender.upper() == "MALE":
+            query = query.filter(Profile.gender == "FEMALE")
+    elif gender:
+        query = query.filter(Profile.gender == gender.upper())
+
+    profiles = query.limit(20).all()
     results = []
     for p in profiles:
         user = db.query(User).filter(User.id == p.user_id).first()
@@ -108,17 +164,41 @@ def get_near_you_matches(
         res.match_score = 92
         res.match_breakdown = [
             f"Living in nearby region: {p.current_city}, {p.current_state}",
-            f"Native Place connects: {p.native_place or p.current_state}",
-            f"Community: {p.community}",
+            "Regional community belt",
         ]
         results.append(res)
-    return results
+    return results[:limit]
 
 
 @router.get("/visitors", response_model=List[ProfileResponse])
-def get_profile_visitors(db: Session = Depends(get_db)):
+def get_profile_visitors(
+    limit: int = 3,
+    gender: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
     """Members who recently visited user's profile."""
-    profiles = db.query(Profile).filter(Profile.status == "ACTIVE").limit(10).all()
+    my_profile = None
+    blocked_ids = set()
+    if current_user:
+        my_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if my_profile:
+            blocked_ids.add(my_profile.id)
+            blocked_ids = blocked_ids.union(get_blocked_ids(my_profile.id, db))
+
+    query = db.query(Profile).filter(Profile.status == "ACTIVE")
+    if blocked_ids:
+        query = query.filter(~Profile.id.in_(blocked_ids))
+
+    if my_profile and my_profile.gender:
+        if my_profile.gender.upper() == "FEMALE":
+            query = query.filter(Profile.gender == "MALE")
+        elif my_profile.gender.upper() == "MALE":
+            query = query.filter(Profile.gender == "FEMALE")
+    elif gender:
+        query = query.filter(Profile.gender == gender.upper())
+
+    profiles = query.limit(10).all()
     results = []
     for p in profiles:
         user = db.query(User).filter(User.id == p.user_id).first()
@@ -130,4 +210,4 @@ def get_profile_visitors(db: Session = Depends(get_db)):
             f"Education: {p.highest_qualification}",
         ]
         results.append(res)
-    return results
+    return results[:limit]

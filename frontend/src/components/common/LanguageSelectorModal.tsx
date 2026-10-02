@@ -33,12 +33,12 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-2xl border border-amber-100">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-crimson-100 max-h-[90vh] overflow-y-auto">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-crimson-50 text-crimson-700 border border-crimson-200">
             <Globe className="h-7 w-7" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-2xl font-bold tracking-tight text-navy-900 font-serif">
             {t('language.selectTitle', 'Choose your language')}
           </h2>
           <p className="mt-2 text-sm text-slate-600 leading-relaxed">
@@ -55,8 +55,8 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
                 onClick={() => handleSelectLanguage(lang.code)}
                 className={`flex w-full items-center justify-between rounded-xl px-4 py-3.5 text-left text-sm font-medium transition-all ${
                   isSelected
-                    ? 'bg-slate-900 text-white shadow-md'
-                    : 'bg-slate-50 text-slate-800 hover:bg-amber-50/80 hover:text-slate-900 border border-slate-200/70'
+                    ? 'bg-crimson-700 text-white shadow-md'
+                    : 'bg-slate-50 text-slate-800 hover:bg-crimson-50/70 hover:text-navy-900 border border-slate-200/70'
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -65,12 +65,12 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
                   </span>
                   <div>
                     <span className="block font-semibold text-base">{lang.native}</span>
-                    <span className={`text-xs ${isSelected ? 'text-amber-200' : 'text-slate-500'}`}>
+                    <span className={`text-xs ${isSelected ? 'text-crimson-100' : 'text-slate-500'}`}>
                       {lang.label}
                     </span>
                   </div>
                 </div>
-                {isSelected && <Check className="h-5 w-5 text-amber-400" />}
+                {isSelected && <Check className="h-5 w-5 text-white" />}
               </button>
             )
           })}

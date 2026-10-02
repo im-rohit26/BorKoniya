@@ -91,12 +91,12 @@ export const ScreenCaptureProtection: React.FC = () => {
 
   return (
     <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className="flex items-center space-x-3 rounded-2xl bg-slate-900/95 px-5 py-3 text-white shadow-2xl border border-amber-500/40 backdrop-blur-md">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
+      <div className="flex items-center space-x-3 rounded-2xl bg-navy-950/95 px-5 py-3 text-white shadow-2xl border border-crimson-600/40 backdrop-blur-md">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-crimson-700/20 text-crimson-300">
           <ShieldAlert className="h-5 w-5" />
         </div>
         <div>
-          <h4 className="text-xs font-bold text-amber-400">Privacy Shield Active</h4>
+          <h4 className="text-xs font-bold text-crimson-300">Privacy Shield Active</h4>
           <p className="text-xs text-slate-200">{warningMessage}</p>
         </div>
         <button

@@ -30,6 +30,12 @@ def add_to_shortlist(
             detail="Target profile not found.",
         )
 
+    if current_profile.gender and target.gender and current_profile.gender.upper() == target.gender.upper():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only shortlist profiles of the opposite gender.",
+        )
+
     existing = (
         db.query(Shortlist)
         .filter(

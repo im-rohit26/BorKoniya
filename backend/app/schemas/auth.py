@@ -1,10 +1,26 @@
-from pydantic import BaseModel, EmailStr, Field
+import re
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
+
+
+def validate_digits_only_phone(v: str) -> str:
+    cleaned = v.strip().replace(" ", "").replace("-", "")
+    if cleaned.startswith("+91"):
+        cleaned = cleaned[3:]
+    if not cleaned.isdigit():
+        raise ValueError("Mobile number must contain numbers only.")
+    if len(cleaned) < 10 or len(cleaned) > 15:
+        raise ValueError("Mobile number must be between 10 and 15 digits.")
+    return cleaned
 
 
 class SendOtpRequest(BaseModel):
     phone_number: str = Field(..., min_length=10, max_length=15)
     phone_country_code: str = "+91"
+
+    @field_validator("phone_number")
+    def check_phone_digits(cls, v: str) -> str:
+        return validate_digits_only_phone(v)
 
 
 class SendOtpResponse(BaseModel):
@@ -16,6 +32,10 @@ class SendOtpResponse(BaseModel):
 class VerifyOtpRequest(BaseModel):
     phone_number: str
     otp_code: str = Field(..., min_length=4, max_length=6)
+
+    @field_validator("phone_number")
+    def check_phone_digits(cls, v: str) -> str:
+        return validate_digits_only_phone(v)
 
 
 class RegisterRequest(BaseModel):
@@ -32,6 +52,11 @@ class RegisterRequest(BaseModel):
     current_state: str = "West Bengal"
     current_city: str = "Kolkata"
     email: Optional[EmailStr] = None
+
+    @field_validator("phone_number")
+    def check_phone_digits(cls, v: str) -> str:
+        return validate_digits_only_phone(v)
+
 
 
 class LoginRequest(BaseModel):

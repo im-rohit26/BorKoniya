@@ -72,31 +72,27 @@ export const MobileBottomNav: React.FC = () => {
               to={item.path}
               className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 active:scale-95 ${
                 isActive
-                  ? 'text-amber-600 font-semibold'
-                  : 'text-slate-500 hover:text-slate-900 font-medium'
+                  ? 'text-crimson-700 font-bold'
+                  : 'text-slate-500 hover:text-navy-900 font-medium'
               }`}
             >
               <div className="relative">
                 <div
                   className={`p-1 rounded-lg transition-colors ${
-                    isActive ? 'bg-amber-50 text-amber-600' : ''
+                    isActive ? 'bg-crimson-50 text-crimson-700' : ''
                   }`}
                 >
                   <Icon
                     className={`h-5 w-5 transition-transform ${
                       isActive ? 'scale-110' : ''
-                    } ${item.isPremium && !isActive ? 'text-amber-500' : ''}`}
+                    } ${item.isPremium && !isActive ? 'text-crimson-700' : ''}`}
                   />
                 </div>
 
                 {/* Optional notification or coupon badge */}
                 {item.badge && (
                   <span
-                    className={`absolute -top-1 -right-2 px-1.5 py-0.2 text-[9px] font-bold rounded-full text-white shadow-xs ${
-                      item.isPremium
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 ring-1 ring-white'
-                        : 'bg-rose-500 ring-1 ring-white'
-                    }`}
+                    className="absolute -top-1 -right-2 px-1.5 py-0.2 text-[9px] font-bold rounded-full text-white shadow-xs bg-crimson-700 ring-1 ring-white"
                   >
                     {item.badge}
                   </span>
@@ -109,7 +105,7 @@ export const MobileBottomNav: React.FC = () => {
 
               {/* Active Indicator Dot */}
               {isActive && (
-                <span className="w-1 h-1 bg-amber-600 rounded-full mt-0.5" />
+                <span className="w-1.5 h-1.5 bg-crimson-700 rounded-full mt-0.5" />
               )}
             </Link>
           )

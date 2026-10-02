@@ -157,6 +157,160 @@ def test_search_profiles(client):
         assert p["revealed_email"] is None
         assert "••••" in p["contact_phone_masked"]
 
+    res_m = client.get("/api/v1/search?gender=MALE")
+    assert res_m.status_code == 200
+    for p in res_m.json():
+        assert p["gender"] == "MALE"
+
+
+def test_female_user_sees_only_males(client, auth_headers):
+    """Priyanka (FEMALE) must only see male profiles across search and all match endpoints."""
+    # 1. Search (even if omitting gender or asking for female)
+    search_res = client.get("/api/v1/search", headers=auth_headers)
+    assert search_res.status_code == 200
+    search_profiles = search_res.json()
+    assert len(search_profiles) > 0
+    for p in search_profiles:
+        assert p["gender"] == "MALE"
+
+    search_override = client.get("/api/v1/search?gender=FEMALE", headers=auth_headers)
+    assert search_override.status_code == 200
+    for p in search_override.json():
+        assert p["gender"] == "MALE"
+
+    # 2. Recommended matches
+    rec_res = client.get("/api/v1/matches/recommended", headers=auth_headers)
+    assert rec_res.status_code == 200
+    rec_matches = rec_res.json()
+    assert len(rec_matches) > 0
+    for p in rec_matches:
+        assert p["gender"] == "MALE"
+
+    # 3. New matches
+    new_res = client.get("/api/v1/matches/new", headers=auth_headers)
+    assert new_res.status_code == 200
+    for p in new_res.json():
+        assert p["gender"] == "MALE"
+
+    # 4. Near-you matches
+    near_res = client.get("/api/v1/matches/near-you", headers=auth_headers)
+    assert near_res.status_code == 200
+    for p in near_res.json():
+        assert p["gender"] == "MALE"
+
+    # 5. Visitors
+    vis_res = client.get("/api/v1/matches/visitors", headers=auth_headers)
+    assert vis_res.status_code == 200
+    for p in vis_res.json():
+        assert p["gender"] == "MALE"
+
+
+def test_male_user_sees_only_females(client, user2_auth_headers):
+    """Subham (MALE) must only see female profiles across search and all match endpoints."""
+    # 1. Search (even if omitting gender or asking for male)
+    search_res = client.get("/api/v1/search", headers=user2_auth_headers)
+    assert search_res.status_code == 200
+    search_profiles = search_res.json()
+    assert len(search_profiles) > 0
+    for p in search_profiles:
+        assert p["gender"] == "FEMALE"
+
+    search_override = client.get("/api/v1/search?gender=MALE", headers=user2_auth_headers)
+    assert search_override.status_code == 200
+    for p in search_override.json():
+        assert p["gender"] == "FEMALE"
+
+    # 2. Recommended matches
+    rec_res = client.get("/api/v1/matches/recommended", headers=user2_auth_headers)
+    assert rec_res.status_code == 200
+    rec_matches = rec_res.json()
+    assert len(rec_matches) > 0
+    for p in rec_matches:
+        assert p["gender"] == "FEMALE"
+
+    # 3. New matches
+    new_res = client.get("/api/v1/matches/new", headers=user2_auth_headers)
+    assert new_res.status_code == 200
+    for p in new_res.json():
+        assert p["gender"] == "FEMALE"
+
+    # 4. Near-you matches
+    near_res = client.get("/api/v1/matches/near-you", headers=user2_auth_headers)
+    assert near_res.status_code == 200
+    for p in near_res.json():
+        assert p["gender"] == "FEMALE"
+
+    # 5. Visitors
+    vis_res = client.get("/api/v1/matches/visitors", headers=user2_auth_headers)
+    assert vis_res.status_code == 200
+    for p in vis_res.json():
+        assert p["gender"] == "FEMALE"
+
+
+def test_opposite_gender_access_control(client, auth_headers, user2_auth_headers):
+    """Users cannot view profiles of the same gender unless it is their own profile."""
+    priyanka_profile = client.get("/api/v1/profile/me", headers=auth_headers).json()
+    subham_profile = client.get("/api/v1/profile/me", headers=user2_auth_headers).json()
+
+    priyanka_id = priyanka_profile["id"]
+    subham_id = subham_profile["id"]
+
+    assert priyanka_profile["gender"] == "FEMALE"
+    assert subham_profile["gender"] == "MALE"
+
+    # Female viewing Male -> Allowed (200)
+    res_fm = client.get(f"/api/v1/profile/{subham_id}", headers=auth_headers)
+    assert res_fm.status_code == 200
+    assert res_fm.json()["gender"] == "MALE"
+
+    # Male viewing Female -> Allowed (200)
+    res_mf = client.get(f"/api/v1/profile/{priyanka_id}", headers=user2_auth_headers)
+    assert res_mf.status_code == 200
+    assert res_mf.json()["gender"] == "FEMALE"
+
+    # Female viewing own profile by ID -> Allowed (200)
+    res_own = client.get(f"/api/v1/profile/{priyanka_id}", headers=auth_headers)
+    assert res_own.status_code == 200
+    assert res_own.json()["gender"] == "FEMALE"
+
+    # Find another female profile (Ananya)
+    all_females = client.get("/api/v1/search?gender=FEMALE").json()
+    other_females = [f for f in all_females if f["id"] != priyanka_id]
+    if other_females:
+        ananya_id = other_females[0]["id"]
+        # Female viewing Female -> Blocked (403)
+        res_ff = client.get(f"/api/v1/profile/{ananya_id}", headers=auth_headers)
+        assert res_ff.status_code == 403
+        assert "Access restricted" in res_ff.json()["detail"]
+
+    # Find another male profile (Debjit)
+    all_males = client.get("/api/v1/search?gender=MALE").json()
+    other_males = [m for m in all_males if m["id"] != subham_id]
+    if other_males:
+        debjit_id = other_males[0]["id"]
+        # Male viewing Male -> Blocked (403)
+        res_mm = client.get(f"/api/v1/profile/{debjit_id}", headers=user2_auth_headers)
+        assert res_mm.status_code == 403
+        assert "Access restricted" in res_mm.json()["detail"]
+
+
+def test_cannot_interact_with_same_gender(client, auth_headers):
+    """Users cannot send interest or shortlist someone of the same gender."""
+    priyanka_profile = client.get("/api/v1/profile/me", headers=auth_headers).json()
+    all_females = client.get("/api/v1/search?gender=FEMALE").json()
+    other_females = [f for f in all_females if f["id"] != priyanka_profile["id"]]
+    if other_females:
+        ananya_id = other_females[0]["id"]
+        # Attempt to express interest in another female
+        interest_res = client.post("/api/v1/interests", json={"receiver_profile_id": ananya_id}, headers=auth_headers)
+        assert interest_res.status_code == 400
+        assert "opposite gender" in interest_res.json()["detail"]
+
+        # Attempt to shortlist another female
+        shortlist_res = client.post(f"/api/v1/shortlist/{ananya_id}", headers=auth_headers)
+        assert shortlist_res.status_code == 400
+        assert "opposite gender" in shortlist_res.json()["detail"]
+
 
 def test_recommended_matches(client):
     res = client.get("/api/v1/matches/recommended")
@@ -202,7 +356,7 @@ def test_saved_searches_lifecycle(client, auth_headers):
 
 
 def test_interests_lifecycle(client, auth_headers):
-    matches = client.get("/api/v1/matches/recommended").json()
+    matches = client.get("/api/v1/matches/recommended", headers=auth_headers).json()
     assert len(matches) > 1
     target = matches[1]
 
@@ -225,7 +379,7 @@ def test_interests_lifecycle(client, auth_headers):
 
 
 def test_shortlist_lifecycle(client, auth_headers):
-    matches = client.get("/api/v1/matches/recommended").json()
+    matches = client.get("/api/v1/matches/recommended", headers=auth_headers).json()
     assert len(matches) > 1
     target_id = matches[1]["id"]
 
@@ -272,7 +426,7 @@ def test_conversations_and_messaging(client, auth_headers):
 
 
 def test_safety_block_and_report(client, auth_headers):
-    matches = client.get("/api/v1/matches/recommended").json()
+    matches = client.get("/api/v1/matches/recommended", headers=auth_headers).json()
     assert len(matches) > 1
     target_id = matches[1]["id"]
 
@@ -341,7 +495,7 @@ def test_payment_initiate_and_verification(client, auth_headers):
     assert status_data["days_remaining"] >= 29
     assert len(status_data["recent_transactions"]) > 0
 
-    matches = client.get("/api/v1/matches/recommended").json()
+    matches = client.get("/api/v1/matches/recommended", headers=auth_headers).json()
     assert len(matches) > 1
     candidate_id = matches[1]["id"]
     prof_res = client.get(f"/api/v1/profile/{candidate_id}", headers=auth_headers)

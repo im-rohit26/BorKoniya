@@ -2,23 +2,40 @@ import React, { useState, useEffect } from 'react'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
-import { ProfileCard } from '../components/cards/ProfileCard'
-import { DEMO_PROFILES } from '../data/mockProfiles'
+import { ProfileCard, type ProfileCardData } from '../components/cards/ProfileCard'
 import {
   Sparkles,
   Heart,
   Star,
   MessageSquare,
   ArrowRight,
+  CheckCircle,
+  Loader2,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getInterestsSummary, getShortlist } from '../lib/interactionApi'
+import {
+  getInterestsSummary,
+  getShortlist,
+  sendInterest,
+  addToShortlist,
+  removeFromShortlist,
+  getShortlistedIds,
+  startOrGetConversation,
+} from '../lib/interactionApi'
+import { getSubscriptionStatus } from '../lib/subscriptionApi'
+import { getRecommendedMatches, mapProfileResponseToCard } from '../lib/profileApi'
+import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [isPremiumUser, setIsPremiumUser] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [matches, setMatches] = useState<ProfileCardData[]>([])
+  const [loadingMatches, setLoadingMatches] = useState(true)
   const [interestsSummary, setInterestsSummary] = useState({
     received_pending: 1,
     sent_pending: 1,
@@ -26,7 +43,18 @@ export const DashboardPage: React.FC = () => {
   })
   const [shortlistCount, setShortlistCount] = useState(1)
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3500)
+  }
+
   useEffect(() => {
+    getSubscriptionStatus()
+      .then((status) => {
+        if (status.is_active) setIsPremiumUser(true)
+      })
+      .catch(() => {})
+
     getInterestsSummary()
       .then((s) => setInterestsSummary(s))
       .catch((err) => console.log('Summary error:', err))
@@ -34,7 +62,83 @@ export const DashboardPage: React.FC = () => {
     getShortlist()
       .then((list) => setShortlistCount(list.length))
       .catch((err) => console.log('Shortlist error:', err))
+
+    // Fetch real top 3 matches from Supabase
+    const fetchMatches = async () => {
+      setLoadingMatches(true)
+      try {
+        const raw = await getRecommendedMatches(3)
+        let sIds: string[] = []
+        try {
+          sIds = await getShortlistedIds()
+        } catch {
+          sIds = []
+        }
+        const sSet = new Set(sIds)
+        const mapped = raw.slice(0, 3).map((p) =>
+          mapProfileResponseToCard(p, sSet.has(p.id))
+        )
+        setMatches(mapped)
+      } catch (err) {
+        console.error('Failed to load dashboard matches:', err)
+      } finally {
+        setLoadingMatches(false)
+      }
+    }
+
+    fetchMatches()
   }, [])
+
+  const handleInterest = async (id: string, name: string) => {
+    try {
+      await sendInterest(id)
+      setMatches((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
+      )
+      showToast(`Express Interest sent to ${name}!`)
+    } catch (err: any) {
+      showToast(err.message || 'Interest sent successfully!')
+    }
+  }
+
+  const handleToggleShortlist = async (id: string, name: string, isCurrentlyShortlisted?: boolean) => {
+    try {
+      if (isCurrentlyShortlisted) {
+        await removeFromShortlist(id)
+        setMatches((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
+        )
+        setShortlistCount((prev) => Math.max(0, prev - 1))
+        showToast(`${name} removed from shortlist.`)
+      } else {
+        await addToShortlist(id)
+        setMatches((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
+        )
+        setShortlistCount((prev) => prev + 1)
+        showToast(`${name} added to shortlist!`)
+      }
+    } catch (err: any) {
+      console.error(err)
+    }
+  }
+
+  const handleStartMessage = async (profileId: string) => {
+    if (!isPremiumUser) {
+      setUpgradeModalOpen(true)
+      return
+    }
+    try {
+      const res = await startOrGetConversation(profileId)
+      if (res?.conversation_id) {
+        navigate(`/messages/${res.conversation_id}`)
+      } else {
+        navigate('/messages')
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Chat unlocks when mutual interest is accepted.')
+    }
+  }
 
   const completionPct = 85
   const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Valued Member'
@@ -47,10 +151,10 @@ export const DashboardPage: React.FC = () => {
 
       <div className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 w-full">
         {/* Welcome Banner & Profile Completion Meter */}
-        <div className="rounded-3xl bg-gradient-to-r from-slate-900 to-indigo-950 p-6 sm:p-8 text-white shadow-md mb-8">
+        <div className="rounded-3xl bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 p-6 sm:p-8 text-white shadow-md mb-8 border border-navy-800">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="space-y-1 text-center md:text-left">
-              <span className="text-xs font-semibold text-amber-400">Welcome Back 👋</span>
+              <span className="text-xs font-semibold text-crimson-400">Welcome Back 👋</span>
               <h1 className="text-2xl sm:text-3xl font-bold font-serif">
                 {displayName}
               </h1>
@@ -63,17 +167,17 @@ export const DashboardPage: React.FC = () => {
             <div className="rounded-2xl bg-white/10 backdrop-blur-md p-4 sm:p-5 border border-white/10 w-full md:w-80">
               <div className="flex items-center justify-between text-xs font-bold mb-2">
                 <span>Profile Completion</span>
-                <span className="text-amber-400">{completionPct}%</span>
+                <span className="text-crimson-300">{completionPct}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-white/20 overflow-hidden mb-2">
                 <div
-                  className="h-full bg-gradient-to-r from-amber-400 to-emerald-400"
+                  className="h-full bg-gradient-to-r from-crimson-600 to-crimson-400"
                   style={{ width: `${completionPct}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-300">
                 <span>Add Family Horoscope (+15%)</span>
-                <Link to="/profile/edit" className="text-amber-400 font-semibold underline">
+                <Link to="/profile/edit" className="text-crimson-300 font-semibold underline hover:text-white">
                   Complete Now
                 </Link>
               </div>
@@ -85,85 +189,107 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div
             onClick={() => navigate('/matches')}
-            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-amber-50/50 hover:border-amber-300 transition-all shadow-xs group"
+            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-crimson-50/50 hover:border-crimson-300 transition-all shadow-xs group"
           >
             <div className="flex items-center justify-between text-slate-500 mb-1">
               <span className="text-xs font-semibold">Recommended</span>
-              <Sparkles className="h-4 w-4 text-amber-600 group-hover:scale-110 transition-transform" />
+              <Sparkles className="h-4 w-4 text-crimson-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{DEMO_PROFILES.length}</div>
-            <p className="text-[11px] text-amber-700 font-medium mt-1">Explore Matches &rarr;</p>
+            <div className="text-2xl font-black text-navy-950">{matches.length}</div>
+            <p className="text-[11px] text-crimson-700 font-medium mt-1">Explore Matches &rarr;</p>
           </div>
 
           <div
             onClick={() => navigate('/interests')}
-            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-rose-50/50 hover:border-rose-300 transition-all shadow-xs group"
+            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-crimson-50/50 hover:border-crimson-300 transition-all shadow-xs group"
           >
             <div className="flex items-center justify-between text-slate-500 mb-1">
               <span className="text-xs font-semibold">Interests</span>
-              <Heart className="h-4 w-4 text-rose-500 group-hover:scale-110 transition-transform" />
+              <Heart className="h-4 w-4 text-crimson-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-slate-900">
+            <div className="text-2xl font-black text-navy-950">
               {interestsSummary.received_pending + interestsSummary.sent_pending}
             </div>
-            <p className="text-[11px] text-rose-600 font-medium mt-1">Manage Requests &rarr;</p>
+            <p className="text-[11px] text-crimson-700 font-medium mt-1">Manage Requests &rarr;</p>
           </div>
 
           <div
             onClick={() => navigate('/shortlist')}
-            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-amber-50/50 hover:border-amber-300 transition-all shadow-xs group"
+            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-navy-50/50 hover:border-navy-300 transition-all shadow-xs group"
           >
             <div className="flex items-center justify-between text-slate-500 mb-1">
               <span className="text-xs font-semibold">Shortlisted</span>
-              <Star className="h-4 w-4 text-amber-500 group-hover:scale-110 transition-transform" />
+              <Star className="h-4 w-4 text-navy-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{shortlistCount}</div>
-            <p className="text-[11px] text-amber-700 font-medium mt-1">View Saved Profiles &rarr;</p>
+            <div className="text-2xl font-black text-navy-950">{shortlistCount}</div>
+            <p className="text-[11px] text-navy-800 font-medium mt-1">View Saved Profiles &rarr;</p>
           </div>
 
           <div
             onClick={() => navigate('/messages')}
-            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-indigo-50/50 hover:border-indigo-300 transition-all shadow-xs group"
+            className="cursor-pointer rounded-2xl p-4 border border-slate-200 bg-white hover:bg-navy-50/50 hover:border-navy-300 transition-all shadow-xs group"
           >
             <div className="flex items-center justify-between text-slate-500 mb-1">
               <span className="text-xs font-semibold">Messages</span>
-              <MessageSquare className="h-4 w-4 text-indigo-500 group-hover:scale-110 transition-transform" />
+              <MessageSquare className="h-4 w-4 text-navy-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{interestsSummary.total_active_connections}</div>
-            <p className="text-[11px] text-indigo-600 font-medium mt-1">Open Chat &rarr;</p>
+            <div className="text-2xl font-black text-navy-950">{interestsSummary.total_active_connections}</div>
+            <p className="text-[11px] text-navy-800 font-medium mt-1">Open Chat &rarr;</p>
           </div>
         </div>
 
         {/* Top Matches Preview */}
         <div className="space-y-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h2 className="text-lg font-bold text-slate-900 font-serif">
+            <h2 className="text-lg font-bold text-navy-950 font-serif">
               Top Recommended Matches for You
             </h2>
             <Link
               to="/matches"
-              className="text-xs font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1"
+              className="text-xs font-bold text-crimson-700 hover:text-crimson-800 flex items-center gap-1"
             >
               <span>View All Matches</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {DEMO_PROFILES.slice(0, 2).map((profile) => (
-              <ProfileCard
-                key={profile.id}
-                profile={profile}
-                onMessage={() => navigate('/messages')}
-              />
-            ))}
-          </div>
+          {loadingMatches ? (
+            <div className="flex flex-col items-center justify-center p-12 text-slate-500 bg-white rounded-2xl border border-slate-200">
+              <Loader2 className="w-8 h-8 animate-spin text-crimson-700 mb-3" />
+              <p className="text-sm font-medium">Loading recommendations from Supabase...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {matches.slice(0, 3).map((profile) => (
+                <ProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  layout="vertical"
+                  onExpressInterest={() => handleInterest(profile.id, profile.name)}
+                  onToggleShortlist={() => handleToggleShortlist(profile.id, profile.name, profile.isShortlisted)}
+                  onMessage={() => handleStartMessage(profile.id)}
+                />
+              ))}
+            </div>
+          )}
 
         </div>
       </div>
 
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">{toastMessage}</span>
+        </div>
+      )}
+
       <Footer />
       <LanguageSelectorModal isOpen={langModalOpen} onClose={() => setLangModalOpen(false)} />
+      <UpgradeToPrimeModal
+        isOpen={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        featureName="Direct Family Messaging"
+      />
     </div>
   )
 }

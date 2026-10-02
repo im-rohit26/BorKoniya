@@ -99,18 +99,18 @@ export const ShortlistPage: React.FC = () => {
 
       <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-12 w-full space-y-6">
         {/* Banner */}
-        <div className="bg-gradient-to-r from-amber-800 via-amber-700 to-rose-800 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-crimson-900 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden border border-navy-800">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-medium mb-2">
-                <Bookmark className="w-3.5 h-3.5 fill-amber-200 text-amber-200" />
+                <Bookmark className="w-3.5 h-3.5 fill-crimson-200 text-crimson-200" />
                 <span>Saved & Shortlisted Profiles</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-serif font-bold">
                 Your Saved Prospective Matches
               </h1>
-              <p className="text-sm text-amber-100 mt-1 max-w-xl">
+              <p className="text-sm text-slate-200 mt-1 max-w-xl">
                 Keep track of verified profiles you and your family are considering. Express interest or initiate conversation whenever you are ready.
               </p>
             </div>
@@ -133,21 +133,21 @@ export const ShortlistPage: React.FC = () => {
         {/* List Content */}
         {isLoading ? (
           <div className="py-20 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-amber-700 mx-auto" />
+            <RefreshCw className="w-8 h-8 animate-spin text-crimson-700 mx-auto" />
             <p className="text-sm text-gray-500 font-medium">Loading your shortlisted profiles...</p>
           </div>
         ) : shortlist.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-gray-200/80 shadow-sm space-y-4">
-            <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-full bg-crimson-50 text-crimson-700 flex items-center justify-center mx-auto">
               <Bookmark className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900">Your Shortlist is Empty</h3>
+            <h3 className="text-lg font-bold text-navy-950 font-serif">Your Shortlist is Empty</h3>
             <p className="text-sm text-gray-500 max-w-md mx-auto">
               While exploring recommended matches or searching community candidates, click the bookmark icon on any profile to save it here for family discussion.
             </p>
             <button
               onClick={() => navigate('/matches')}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-red-700 hover:bg-red-800 text-white text-sm font-semibold rounded-xl shadow-md transition-all"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-crimson-700 hover:bg-crimson-800 text-white text-sm font-semibold rounded-xl shadow-md transition-all"
             >
               <span>Explore Compatible Matches</span>
               <ArrowRight className="w-4 h-4" />
@@ -193,9 +193,9 @@ export const ShortlistPage: React.FC = () => {
                     {/* Details */}
                     <div className="p-5 space-y-3">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">{formattedName}</h3>
-                        <p className="text-xs text-red-700 font-semibold flex items-center gap-1 mt-0.5">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <h3 className="text-lg font-bold text-navy-950 font-serif">{formattedName}</h3>
+                        <p className="text-xs text-crimson-700 font-semibold flex items-center gap-1 mt-0.5">
+                          <Sparkles className="w-3.5 h-3.5 text-crimson-700" />
                           <span>{p.community} {p.sub_community ? `(${p.sub_community})` : ''}</span>
                         </p>
                       </div>
@@ -228,7 +228,7 @@ export const ShortlistPage: React.FC = () => {
                   <div className="p-5 pt-0 grid grid-cols-2 gap-2">
                     <button
                       onClick={() => navigate(`/profile/${p.id}`)}
-                      className="px-3 py-2 text-xs font-semibold text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors text-center"
+                      className="px-3 py-2 text-xs font-semibold text-gray-700 hover:text-navy-950 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors text-center"
                     >
                       View Profile
                     </button>
@@ -239,7 +239,7 @@ export const ShortlistPage: React.FC = () => {
                       className={`px-3 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm ${
                         hasSentInterest
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                          : 'bg-red-700 hover:bg-red-800 text-white'
+                          : 'bg-crimson-700 hover:bg-crimson-800 text-white'
                       }`}
                     >
                       <Heart className={`w-3.5 h-3.5 ${hasSentInterest ? 'fill-emerald-600' : ''}`} />

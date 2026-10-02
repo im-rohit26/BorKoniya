@@ -86,7 +86,7 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
       {/* Protected Blur Overlay */}
       {isProtected && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/40 p-4 text-center backdrop-blur-xs">
-          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/90 text-slate-950 shadow-md">
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-crimson-700/90 text-white shadow-md">
             <Lock className="h-5 w-5" />
           </div>
           <span className="text-xs font-bold text-white shadow-xs">
@@ -99,8 +99,8 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
       )}
 
       {/* Privacy Badge */}
-      <div className="absolute bottom-2 right-2 z-20 flex items-center space-x-1 rounded-full bg-slate-900/75 backdrop-blur-xs px-2 py-0.5 text-[9px] font-bold text-amber-300 pointer-events-none border border-white/10">
-        <Shield className="h-2.5 w-2.5 text-amber-400" />
+      <div className="absolute bottom-2 right-2 z-20 flex items-center space-x-1 rounded-full bg-navy-950/85 backdrop-blur-xs px-2 py-0.5 text-[9px] font-bold text-crimson-200 pointer-events-none border border-crimson-500/20">
+        <Shield className="h-2.5 w-2.5 text-crimson-300" />
         <span>Anti-Save Protected</span>
       </div>
     </div>

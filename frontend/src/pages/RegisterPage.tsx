@@ -14,6 +14,7 @@ import { sendOtp, verifyOtp } from '../lib/authApi';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
+import logoImg from '../assets/logo.jpeg';
 
 export const RegisterPage: React.FC = () => {
   const { t } = useTranslation();
@@ -172,7 +173,18 @@ export const RegisterPage: React.FC = () => {
 
       <main className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-lg">
-          <div className="rounded-3xl bg-white p-6 sm:p-10 shadow-xl border border-amber-100">
+          <div className="rounded-3xl bg-white p-6 sm:p-10 shadow-xl border border-slate-200">
+            {/* Brand Logo Header */}
+            <div className="text-center mb-6">
+              <Link to="/" className="inline-block hover:opacity-95 transition-opacity">
+                <img
+                  src={logoImg}
+                  alt="BorKoniya"
+                  className="mx-auto h-12 w-auto object-contain"
+                />
+              </Link>
+            </div>
+
             {/* Step Progress Bar */}
             <div className="mb-6">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -182,7 +194,7 @@ export const RegisterPage: React.FC = () => {
                   {step === 'otp_verification' && 'Step 3 of 3: Phone Verification'}
                   {step === 'success' && 'Account Created!'}
                 </span>
-                <span className="text-amber-700 font-semibold">
+                <span className="text-crimson-700 font-semibold">
                   {step === 'who_for' && '33%'}
                   {step === 'basic_details' && '66%'}
                   {step === 'otp_verification' && '90%'}
@@ -191,7 +203,7 @@ export const RegisterPage: React.FC = () => {
               </div>
               <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-indigo-900 transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-crimson-600 to-navy-900 transition-all duration-300"
                   style={{
                     width:
                       step === 'who_for'
@@ -221,10 +233,10 @@ export const RegisterPage: React.FC = () => {
             {step === 'who_for' && (
               <div className="space-y-6 animate-in fade-in">
                 <div className="text-center">
-                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 shadow-xs">
+                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-crimson-50 text-crimson-700 border border-crimson-200 shadow-xs">
                     <Users className="h-7 w-7" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-900 font-serif">
+                  <h2 className="text-2xl font-bold text-navy-950 font-serif">
                     Who are you creating this profile for?
                   </h2>
                   <p className="mt-1 text-xs text-slate-500">
@@ -239,19 +251,19 @@ export const RegisterPage: React.FC = () => {
                       onClick={() => handleSelectWhoFor(opt.id)}
                       className={`flex items-center justify-between p-4 rounded-2xl border text-sm font-semibold transition-all ${
                         profileFor === opt.id
-                          ? 'border-amber-600 bg-amber-50 text-amber-950 shadow-xs'
+                          ? 'border-crimson-700 bg-crimson-50 text-crimson-950 shadow-xs'
                           : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white'
                       }`}
                     >
                       <span>{opt.label}</span>
-                      <ArrowRight className="h-4 w-4 text-amber-600" />
+                      <ArrowRight className="h-4 w-4 text-crimson-700" />
                     </button>
                   ))}
                 </div>
 
                 <div className="text-center pt-4 border-t border-slate-100 text-xs text-slate-500">
                   Already have an account?{' '}
-                  <Link to="/login" className="font-bold text-amber-700 hover:underline">
+                  <Link to="/login" className="font-bold text-crimson-700 hover:underline">
                     Log in here
                   </Link>
                 </div>
@@ -262,7 +274,7 @@ export const RegisterPage: React.FC = () => {
             {step === 'basic_details' && (
               <form onSubmit={handleSendOtp} className="space-y-4 animate-in fade-in">
                 <div className="text-center mb-2">
-                  <h2 className="text-xl font-bold text-slate-900 font-serif">
+                  <h2 className="text-xl font-bold text-navy-950 font-serif">
                     Basic & Contact Information
                   </h2>
                   <p className="text-xs text-slate-500">
@@ -279,7 +291,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="e.g. Subham"
                       value={formData.firstName}
                       onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                   <div>
@@ -290,7 +302,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="e.g. Pal"
                       value={formData.lastName}
                       onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -301,7 +313,7 @@ export const RegisterPage: React.FC = () => {
                     <select
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="FEMALE">Female (Bride)</option>
                       <option value="MALE">Male (Groom)</option>
@@ -314,7 +326,7 @@ export const RegisterPage: React.FC = () => {
                       required
                       value={formData.dob}
                       onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -325,7 +337,7 @@ export const RegisterPage: React.FC = () => {
                     <select
                       value={formData.community}
                       onChange={(e) => setFormData({ ...formData, community: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="Sadgope">Sadgope</option>
                       <option value="Gowala / Goala">Gowala / Goala</option>
@@ -338,7 +350,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="e.g. Bardhaman, Medinipur"
                       value={formData.nativePlace}
                       onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -356,8 +368,23 @@ export const RegisterPage: React.FC = () => {
                         maxLength={10}
                         placeholder="9876543210"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full rounded-r-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                        onKeyDown={(e) => {
+                          if (
+                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key) ||
+                            e.ctrlKey ||
+                            e.metaKey
+                          ) {
+                            return;
+                          }
+                          if (!/^\d$/.test(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(e) => {
+                          const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setFormData({ ...formData, phone: digitsOnly });
+                        }}
+                        className="w-full rounded-r-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -368,7 +395,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="your.email@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -382,7 +409,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="At least 8 characters"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                   <div>
@@ -393,7 +420,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="Re-enter password"
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -409,10 +436,10 @@ export const RegisterPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition-all disabled:opacity-60"
+                    className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
                   >
                     <span>{isSubmitting ? 'Sending OTP...' : 'Send Verification OTP'}</span>
-                    <ArrowRight className="h-4 w-4 text-amber-400" />
+                    <ArrowRight className="h-4 w-4 text-white" />
                   </button>
                 </div>
               </form>
@@ -425,7 +452,7 @@ export const RegisterPage: React.FC = () => {
                   <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <Smartphone className="h-7 w-7" />
                   </div>
-                  <h2 className="text-xl font-bold text-slate-900 font-serif">
+                  <h2 className="text-xl font-bold text-navy-950 font-serif">
                     Verify Mobile Number
                   </h2>
                   <p className="text-xs text-slate-500 mt-1">
@@ -434,9 +461,9 @@ export const RegisterPage: React.FC = () => {
                   </p>
 
                   {demoOtp && (
-                    <div className="mt-3 inline-block rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-900 border border-amber-200">
+                    <div className="mt-3 inline-block rounded-lg bg-crimson-50 px-3 py-1.5 text-xs text-crimson-900 border border-crimson-200">
                       Demo Verification Code:{' '}
-                      <span className="font-mono font-bold text-amber-700">{demoOtp}</span>
+                      <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
                     </div>
                   )}
                 </div>
@@ -450,7 +477,7 @@ export const RegisterPage: React.FC = () => {
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      className="h-12 w-11 rounded-xl border border-slate-300 text-center text-lg font-bold text-slate-900 focus:border-amber-600 focus:ring-2 focus:ring-amber-200 focus:outline-none shadow-xs"
+                      className="h-12 w-11 rounded-xl border border-slate-300 text-center text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
                     />
                   ))}
                 </div>
@@ -466,7 +493,7 @@ export const RegisterPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 py-3 text-xs font-bold text-white shadow-md hover:from-amber-700 hover:to-amber-800 transition-all disabled:opacity-60"
+                    className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
                   >
                     <ShieldCheck className="h-4 w-4" />
                     <span>{isSubmitting ? 'Verifying & Registering...' : 'Verify & Create Account'}</span>
@@ -481,7 +508,7 @@ export const RegisterPage: React.FC = () => {
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 border border-emerald-300 shadow-md">
                   <CheckCircle className="h-9 w-9" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900 font-serif">
+                <h2 className="text-2xl font-bold text-navy-950 font-serif">
                   Welcome to BorKonya!
                 </h2>
                 <p className="text-sm text-slate-600 max-w-sm mx-auto">

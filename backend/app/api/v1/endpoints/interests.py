@@ -42,6 +42,13 @@ def send_interest(
             detail="Recipient profile not found.",
         )
 
+    # Opposite-gender restriction
+    if current_profile.gender and receiver.gender and current_profile.gender.upper() == receiver.gender.upper():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only express interest in profiles of the opposite gender.",
+        )
+
     # Check for blocking
     is_blocked = (
         db.query(BlockedUser)

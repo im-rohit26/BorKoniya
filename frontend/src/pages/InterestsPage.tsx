@@ -191,18 +191,18 @@ export const InterestsPage: React.FC = () => {
 
       <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-12 w-full space-y-6">
         {/* Page Banner / Header */}
-        <div className="bg-gradient-to-r from-red-700 via-rose-700 to-amber-700 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="bg-gradient-to-r from-crimson-800 via-crimson-700 to-navy-900 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-medium mb-2">
-                <Heart className="w-3.5 h-3.5 fill-rose-300 text-rose-300" />
+                <Heart className="w-3.5 h-3.5 fill-crimson-200 text-crimson-200" />
                 <span>Express Interest Center</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-serif font-bold">
                 Connect & Respond to Compatible Matches
               </h1>
-              <p className="text-sm text-red-100 mt-1 max-w-xl">
+              <p className="text-sm text-crimson-100 mt-1 max-w-xl">
                 Express interest respectfully with verified Sadgope and Gowala community members. Mutual acceptance unlocks private in-app conversation.
               </p>
             </div>
@@ -220,15 +220,15 @@ export const InterestsPage: React.FC = () => {
           <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/20">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 text-center">
               <span className="text-2xl font-bold">{pendingReceivedCount}</span>
-              <p className="text-xs text-red-100">Pending Received</p>
+              <p className="text-xs text-crimson-100">Pending Received</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 text-center">
               <span className="text-2xl font-bold">{acceptedCount}</span>
-              <p className="text-xs text-red-100">Mutual Connections</p>
+              <p className="text-xs text-crimson-100">Mutual Connections</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 text-center">
               <span className="text-2xl font-bold">{pendingSentCount}</span>
-              <p className="text-xs text-red-100">Awaiting Response</p>
+              <p className="text-xs text-crimson-100">Awaiting Response</p>
             </div>
           </div>
         </div>
@@ -239,7 +239,7 @@ export const InterestsPage: React.FC = () => {
             onClick={() => setActiveTab('RECEIVED')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
               activeTab === 'RECEIVED'
-                ? 'bg-red-700 text-white shadow-md'
+                ? 'bg-crimson-700 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -247,7 +247,7 @@ export const InterestsPage: React.FC = () => {
             <span>Received Interests</span>
             {pendingReceivedCount > 0 && (
               <span className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'RECEIVED' ? 'bg-white text-red-700 font-bold' : 'bg-red-100 text-red-700 font-bold'
+                activeTab === 'RECEIVED' ? 'bg-white text-crimson-700 font-bold' : 'bg-crimson-100 text-crimson-800 font-bold'
               }`}>
                 {pendingReceivedCount}
               </span>
@@ -258,7 +258,7 @@ export const InterestsPage: React.FC = () => {
             onClick={() => setActiveTab('ACCEPTED')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
               activeTab === 'ACCEPTED'
-                ? 'bg-red-700 text-white shadow-md'
+                ? 'bg-crimson-700 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -266,7 +266,7 @@ export const InterestsPage: React.FC = () => {
             <span>Connected & Accepted</span>
             {acceptedCount > 0 && (
               <span className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'ACCEPTED' ? 'bg-white text-red-700 font-bold' : 'bg-emerald-100 text-emerald-700 font-bold'
+                activeTab === 'ACCEPTED' ? 'bg-white text-crimson-700 font-bold' : 'bg-navy-100 text-navy-800 font-bold'
               }`}>
                 {acceptedCount}
               </span>
@@ -277,7 +277,7 @@ export const InterestsPage: React.FC = () => {
             onClick={() => setActiveTab('SENT')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
               activeTab === 'SENT'
-                ? 'bg-red-700 text-white shadow-md'
+                ? 'bg-crimson-700 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -285,7 +285,7 @@ export const InterestsPage: React.FC = () => {
             <span>Sent Interests</span>
             {pendingSentCount > 0 && (
               <span className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === 'SENT' ? 'bg-white text-red-700 font-bold' : 'bg-gray-200 text-gray-700'
+                activeTab === 'SENT' ? 'bg-white text-crimson-700 font-bold' : 'bg-gray-200 text-gray-700'
               }`}>
                 {pendingSentCount}
               </span>
@@ -296,7 +296,7 @@ export const InterestsPage: React.FC = () => {
             onClick={() => setActiveTab('DECLINED')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
               activeTab === 'DECLINED'
-                ? 'bg-red-700 text-white shadow-md'
+                ? 'bg-crimson-700 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -308,15 +308,15 @@ export const InterestsPage: React.FC = () => {
         {/* List Content */}
         {isLoading ? (
           <div className="py-20 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-red-700 mx-auto" />
+            <RefreshCw className="w-8 h-8 animate-spin text-crimson-700 mx-auto" />
             <p className="text-sm text-gray-500 font-medium">Loading your matrimonial interests...</p>
           </div>
         ) : displayedItems.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-gray-200/80 shadow-sm space-y-4">
-            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-full bg-crimson-50 text-crimson-700 flex items-center justify-center mx-auto">
               <Heart className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900">
+            <h3 className="text-lg font-bold text-navy-950 font-serif">
               {activeTab === 'RECEIVED' && 'No Pending Interests Received'}
               {activeTab === 'SENT' && 'No Pending Sent Interests'}
               {activeTab === 'ACCEPTED' && 'No Mutual Connections Yet'}
@@ -330,7 +330,7 @@ export const InterestsPage: React.FC = () => {
             </p>
             <button
               onClick={() => navigate('/matches')}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-red-700 hover:bg-red-800 text-white text-sm font-semibold rounded-xl shadow-md transition-all"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-crimson-700 hover:bg-crimson-800 text-white text-sm font-semibold rounded-xl shadow-md transition-all"
             >
               <span>Explore Verified Matches</span>
               <ArrowRight className="w-4 h-4" />
@@ -361,8 +361,8 @@ export const InterestsPage: React.FC = () => {
                     {/* Profile Details */}
                     <div className="flex-1 space-y-2.5 text-center sm:text-left">
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <h3 className="text-lg font-bold text-gray-900">{formattedName}</h3>
-                        <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-xs font-semibold">
+                        <h3 className="text-lg font-bold text-navy-950 font-serif">{formattedName}</h3>
+                        <span className="px-2 py-0.5 rounded-full bg-crimson-50 text-crimson-700 text-xs font-semibold">
                           {p.age} yrs • {p.height_cm} cm
                         </span>
                         {item.status === 'ACCEPTED' && (
@@ -374,8 +374,8 @@ export const InterestsPage: React.FC = () => {
                       </div>
 
                       <div className="text-xs text-gray-600 space-y-1">
-                        <div className="flex items-center justify-center sm:justify-start gap-1.5 font-medium text-red-900">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                        <div className="flex items-center justify-center sm:justify-start gap-1.5 font-medium text-crimson-900">
+                          <Sparkles className="w-3.5 h-3.5 text-crimson-700 flex-shrink-0" />
                           <span>{p.community} {p.sub_community ? `(${p.sub_community})` : ''}</span>
                         </div>
                         <div className="flex items-center justify-center sm:justify-start gap-1.5">
@@ -409,7 +409,7 @@ export const InterestsPage: React.FC = () => {
                     <div className="flex items-center gap-1 text-xs text-gray-500">
                       <button
                         onClick={() => setReportModalData({ id: p.id, name: formattedName })}
-                        className="p-1.5 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
+                        className="p-1.5 hover:text-crimson-700 hover:bg-crimson-50 rounded-lg transition-colors flex items-center gap-1"
                         title="Report this profile"
                       >
                         <ShieldAlert className="w-3.5 h-3.5" />
@@ -417,7 +417,7 @@ export const InterestsPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleBlock(p.id, formattedName)}
-                        className="p-1.5 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
+                        className="p-1.5 hover:text-navy-950 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
                         title="Block member"
                       >
                         <Ban className="w-3.5 h-3.5" />
@@ -429,7 +429,7 @@ export const InterestsPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => navigate(`/profile/${p.id}`)}
-                        className="px-3 py-1.5 text-xs font-semibold text-gray-700 hover:text-gray-900 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm"
+                        className="px-3 py-1.5 text-xs font-semibold text-gray-700 hover:text-navy-950 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm"
                       >
                         Full Profile
                       </button>
@@ -439,13 +439,13 @@ export const InterestsPage: React.FC = () => {
                         <>
                           <button
                             onClick={() => handleDecline(item.id)}
-                            className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-red-700 bg-white border border-gray-200 rounded-xl hover:bg-red-50"
+                            className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-crimson-700 bg-white border border-gray-200 rounded-xl hover:bg-crimson-50"
                           >
                             Decline
                           </button>
                           <button
                             onClick={() => handleAccept(item.id, formattedName)}
-                            className="px-4 py-1.5 text-xs font-semibold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm flex items-center gap-1.5"
+                            className="px-4 py-1.5 text-xs font-semibold text-white bg-crimson-700 hover:bg-crimson-800 rounded-xl shadow-sm flex items-center gap-1.5"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             Accept Interest
@@ -457,7 +457,7 @@ export const InterestsPage: React.FC = () => {
                       {activeTab === 'SENT' && (
                         <button
                           onClick={() => handleCancel(item.id)}
-                          className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-red-700 bg-white border border-gray-200 rounded-xl hover:bg-red-50"
+                          className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-crimson-700 bg-white border border-gray-200 rounded-xl hover:bg-crimson-50"
                         >
                           Cancel Interest
                         </button>
@@ -467,7 +467,7 @@ export const InterestsPage: React.FC = () => {
                       {item.status === 'ACCEPTED' && (
                         <button
                           onClick={() => handleStartMessage(p.id)}
-                          className="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm flex items-center gap-1.5"
+                          className="px-4 py-1.5 text-xs font-semibold text-white bg-crimson-700 hover:bg-crimson-800 rounded-xl shadow-sm flex items-center gap-1.5"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
                           Message Member

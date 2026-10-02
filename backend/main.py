@@ -7,6 +7,7 @@ from app.core.database import engine, Base, SessionLocal
 from app.models.entities import User, Profile, ProfilePrivacy, Community, SubCommunity, Coupon
 from app.core.security import get_password_hash
 from app.api.v1.router import api_router
+from app.seeds.seed_interactions import seed_interactions_and_more_profiles
 
 
 def init_db_and_seed():
@@ -132,6 +133,11 @@ def init_db_and_seed():
         print(f"Startup seed error: {e}")
     finally:
         db.close()
+
+    try:
+        seed_interactions_and_more_profiles()
+    except Exception as e:
+        print(f"Interactions seed error: {e}")
 
 
 @asynccontextmanager

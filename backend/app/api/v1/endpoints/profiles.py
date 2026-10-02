@@ -42,6 +42,35 @@ def format_profile_response(
 
     age = matching_service.calculate_age(profile.date_of_birth)
     
+    # Profile gender display logic: true gender is always preserved
+    display_gender = profile.gender
+
+    # Curated portrait photos matching profile gender
+    photo_url = None
+    if hasattr(profile, "photos") and profile.photos:
+        primary_photo = next((p for p in profile.photos if p.is_primary), profile.photos[0])
+        photo_url = primary_photo.storage_path
+
+    if not photo_url:
+        female_photos = [
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600",
+            "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=600",
+            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600",
+            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=600",
+        ]
+        male_photos = [
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600",
+            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=600",
+            "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=600",
+            "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=600",
+        ]
+        if profile.gender.upper() == "FEMALE":
+            idx = abs(hash(str(profile.id))) % len(female_photos)
+            photo_url = female_photos[idx]
+        else:
+            idx = abs(hash(str(profile.id))) % len(male_photos)
+            photo_url = male_photos[idx]
+
     # Mask contact information unless authorized (owner or active premium member)
     phone_raw = user.phone_number if user else "+91 9876543210"
     email_raw = user.email if (user and user.email) else "candidate@borkonya.com"
@@ -56,7 +85,7 @@ def format_profile_response(
         user_id=profile.user_id,
         first_name=profile.first_name,
         last_name=profile.last_name if (is_owner or can_view_contact) else f"{profile.last_name[0]}.",
-        gender=profile.gender,
+        gender=display_gender,
         date_of_birth=profile.date_of_birth,
         age=age,
         height_cm=profile.height_cm,
@@ -85,6 +114,7 @@ def format_profile_response(
             f"State / Location aligns: {profile.current_state}",
             f"Education criteria met: {profile.highest_qualification}",
         ],
+        photo_url=photo_url,
         contact_phone_masked=masked_phone,
         contact_email_masked=masked_email,
         is_contact_revealed=can_view_contact,
@@ -146,6 +176,15 @@ def get_profile_by_id(
 
     user = db.query(User).filter(User.id == profile.user_id).first()
     is_owner = (current_user and current_user.id == profile.user_id)
+    if current_user and not is_owner:
+        viewer_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if viewer_profile and viewer_profile.gender and profile.gender:
+            if viewer_profile.gender.upper() == profile.gender.upper():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access restricted. You can only view profiles of the opposite gender.",
+                )
+
     is_premium = is_user_premium(current_user.id, db) if current_user else False
 
     return format_profile_response(profile, user=user, is_owner=is_owner, is_premium=is_premium)

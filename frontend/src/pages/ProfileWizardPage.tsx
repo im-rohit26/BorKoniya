@@ -220,13 +220,13 @@ export const ProfileWizardPage: React.FC = () => {
         <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
-              <span className="inline-flex items-center space-x-1 text-xs font-bold text-amber-700 uppercase tracking-wider">
+              <span className="inline-flex items-center space-x-1 text-xs font-bold text-crimson-700 uppercase tracking-wider">
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>
                   Step {currentStep} of {totalSteps}: {stepTitles[currentStep - 1]}
                 </span>
               </span>
-              <h1 className="text-2xl font-black text-slate-900 font-serif mt-0.5">
+              <h1 className="text-2xl font-black text-navy-950 font-serif mt-0.5">
                 Complete Your Matrimonial Profile
               </h1>
             </div>
@@ -234,7 +234,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="sm:text-right">
               <div className="text-xs font-bold text-slate-600">
                 Profile Completion:{' '}
-                <span className="text-amber-600 text-sm font-black">{completionPct}%</span>
+                <span className="text-crimson-700 text-sm font-black">{completionPct}%</span>
               </div>
               <p className="text-[11px] text-slate-400">
                 Profiles above 80% receive 4x more interests
@@ -245,7 +245,7 @@ export const ProfileWizardPage: React.FC = () => {
           {/* Progress Bar */}
           <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-amber-500 via-amber-600 to-emerald-500 transition-all duration-300"
+              className="h-full bg-gradient-to-r from-crimson-600 via-crimson-700 to-navy-900 transition-all duration-300"
               style={{ width: `${(currentStep / totalSteps) * 100}%` }}
             />
           </div>
@@ -261,9 +261,9 @@ export const ProfileWizardPage: React.FC = () => {
                   onClick={() => setCurrentStep(idx + 1)}
                   className={`cursor-pointer py-1.5 px-1 rounded-lg transition-all truncate ${
                     isCurrent
-                      ? 'bg-slate-900 text-white shadow-xs'
+                      ? 'bg-crimson-700 text-white shadow-xs'
                       : isPast
-                      ? 'bg-emerald-50 text-emerald-800'
+                      ? 'bg-navy-50 text-navy-900 font-bold'
                       : 'text-slate-400 hover:text-slate-700'
                   }`}
                 >
@@ -281,7 +281,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-100 pb-3">
                 <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                  <User className="h-5 w-5 text-amber-600" />
+                  <User className="h-5 w-5 text-crimson-700" />
                   <span>1. Basic Personal Information</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
@@ -297,7 +297,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.profileFor}
                     onChange={(e) => setFormData({ ...formData, profileFor: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="MYSELF">Myself</option>
                     <option value="SON">My Son</option>
@@ -316,7 +316,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="FEMALE">Female (Bride)</option>
                     <option value="MALE">Male (Groom)</option>
@@ -332,7 +332,7 @@ export const ProfileWizardPage: React.FC = () => {
                     required
                     value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -345,7 +345,7 @@ export const ProfileWizardPage: React.FC = () => {
                     required
                     value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -358,7 +358,7 @@ export const ProfileWizardPage: React.FC = () => {
                     required
                     value={formData.dob}
                     onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -369,7 +369,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.heightCm}
                     onChange={(e) => setFormData({ ...formData, heightCm: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="152">5'0" (152 cm)</option>
                     <option value="155">5'1" (155 cm)</option>
@@ -394,7 +394,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.maritalStatus}
                     onChange={(e) => setFormData({ ...formData, maritalStatus: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="NEVER_MARRIED">Never Married</option>
                     <option value="DIVORCED">Divorced</option>
@@ -410,7 +410,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.motherTongue}
                     onChange={(e) => setFormData({ ...formData, motherTongue: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="Bengali">Bengali</option>
                     <option value="Odia">Odia</option>
@@ -428,7 +428,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-100 pb-3">
                 <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-amber-600" />
+                  <Users className="h-5 w-5 text-crimson-700" />
                   <span>2. Community, Native Place & Roots</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
@@ -444,7 +444,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.community}
                     onChange={(e) => setFormData({ ...formData, community: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="Sadgope">Sadgope</option>
                     <option value="Gowala / Goala">Gowala / Goala</option>
@@ -458,7 +458,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.subCommunity}
                     onChange={(e) => setFormData({ ...formData, subCommunity: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     {formData.community === 'Sadgope' ? (
                       <>
@@ -489,7 +489,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Bardhaman, Medinipur, Balasore, Ranchi"
                     value={formData.nativePlace}
                     onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -502,7 +502,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Kashyapa, Sandilya, Alambayana"
                     value={formData.gotra}
                     onChange={(e) => setFormData({ ...formData, gotra: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -513,7 +513,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.currentState}
                     onChange={(e) => setFormData({ ...formData, currentState: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="West Bengal">West Bengal</option>
                     <option value="Odisha">Odisha</option>
@@ -536,7 +536,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Kolkata, Bhubaneswar, Ranchi"
                     value={formData.currentCity}
                     onChange={(e) => setFormData({ ...formData, currentCity: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
               </div>
@@ -548,7 +548,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-100 pb-3">
                 <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                  <GraduationCap className="h-5 w-5 text-amber-600" />
+                  <GraduationCap className="h-5 w-5 text-crimson-700" />
                   <span>3. Education & Professional Career</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
@@ -566,7 +566,7 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, highestQualification: e.target.value })
                     }
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="M.Tech in Computer Science">M.Tech / M.E</option>
                     <option value="B.Tech / B.E">B.Tech / B.E</option>
@@ -592,7 +592,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Jadavpur University, Calcutta University"
                     value={formData.college}
                     onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -606,7 +606,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Senior Software Engineer, Govt Teacher"
                     value={formData.occupation}
                     onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -619,7 +619,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Tata Consultancy Services, Public Sector"
                     value={formData.company}
                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -630,7 +630,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.annualIncome}
                     onChange={(e) => setFormData({ ...formData, annualIncome: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="₹3 – 5 Lakhs">₹3 – 5 Lakhs</option>
                     <option value="₹5 – 10 Lakhs">₹5 – 10 Lakhs</option>
@@ -650,7 +650,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Kolkata, Bangalore, Mumbai, Remote"
                     value={formData.workLocation}
                     onChange={(e) => setFormData({ ...formData, workLocation: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
               </div>
@@ -662,7 +662,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-100 pb-3">
                 <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-amber-600" />
+                  <Users className="h-5 w-5 text-crimson-700" />
                   <span>4. Family Background & Values</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
@@ -680,7 +680,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Retired Govt Officer, Businessman"
                     value={formData.fatherOccupation}
                     onChange={(e) => setFormData({ ...formData, fatherOccupation: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -693,7 +693,7 @@ export const ProfileWizardPage: React.FC = () => {
                     placeholder="e.g. Homemaker, Teacher, Bank Official"
                     value={formData.motherOccupation}
                     onChange={(e) => setFormData({ ...formData, motherOccupation: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -704,7 +704,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.familyType}
                     onChange={(e) => setFormData({ ...formData, familyType: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="NUCLEAR">Nuclear Family</option>
                     <option value="JOINT">Joint Family</option>
@@ -718,7 +718,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.familyValues}
                     onChange={(e) => setFormData({ ...formData, familyValues: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="TRADITIONAL">Traditional & Cultured</option>
                     <option value="MODERATE">Moderate Progressive</option>
@@ -736,7 +736,7 @@ export const ProfileWizardPage: React.FC = () => {
                     max="10"
                     value={formData.brothersCount}
                     onChange={(e) => setFormData({ ...formData, brothersCount: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
 
@@ -750,7 +750,7 @@ export const ProfileWizardPage: React.FC = () => {
                     max="10"
                     value={formData.sistersCount}
                     onChange={(e) => setFormData({ ...formData, sistersCount: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
               </div>
@@ -762,7 +762,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-100 pb-3">
                 <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                  <Heart className="h-5 w-5 text-amber-600" />
+                  <Heart className="h-5 w-5 text-crimson-700" />
                   <span>5. Lifestyle & "About Me"</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
@@ -776,7 +776,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.diet}
                     onChange={(e) => setFormData({ ...formData, diet: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="NON_VEGETARIAN">Non-Vegetarian</option>
                     <option value="VEGETARIAN">Vegetarian</option>
@@ -790,7 +790,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.smoking}
                     onChange={(e) => setFormData({ ...formData, smoking: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="NO">No</option>
                     <option value="OCCASIONALLY">Occasionally</option>
@@ -802,7 +802,7 @@ export const ProfileWizardPage: React.FC = () => {
                   <select
                     value={formData.drinking}
                     onChange={(e) => setFormData({ ...formData, drinking: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                   >
                     <option value="NO">No</option>
                     <option value="OCCASIONALLY">Occasionally</option>
@@ -822,9 +822,9 @@ export const ProfileWizardPage: React.FC = () => {
                 </div>
 
                 {/* Prompt Assistance Box */}
-                <div className="rounded-xl bg-amber-50/70 p-3 mb-2.5 border border-amber-200/80 text-xs text-amber-950 space-y-1">
+                <div className="rounded-xl bg-navy-50/70 p-3 mb-2.5 border border-navy-200/80 text-xs text-navy-950 space-y-1">
                   <span className="font-bold flex items-center space-x-1">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-700" />
+                    <Sparkles className="h-3.5 w-3.5 text-crimson-700" />
                     <span>Helpful writing tips:</span>
                   </span>
                   <p className="text-[11px] text-slate-600">
@@ -842,7 +842,7 @@ export const ProfileWizardPage: React.FC = () => {
                   value={formData.aboutMe}
                   onChange={(e) => setFormData({ ...formData, aboutMe: e.target.value })}
                   placeholder="Share a heartfelt description about yourself, your aspirations, and your partner expectations..."
-                  className="w-full rounded-2xl border border-slate-200 p-3.5 text-xs leading-relaxed text-slate-800 focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-2xl border border-slate-200 p-3.5 text-xs leading-relaxed text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
             </div>
@@ -854,7 +854,7 @@ export const ProfileWizardPage: React.FC = () => {
               <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                    <Moon className="h-5 w-5 text-amber-600" />
+                    <Moon className="h-5 w-5 text-crimson-700" />
                     <span>6. Horoscope / Kundali (Optional)</span>
                   </h2>
                   <p className="text-xs text-slate-500 mt-1">
@@ -869,7 +869,7 @@ export const ProfileWizardPage: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, includeHoroscope: e.target.checked })
                     }
-                    className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                    className="h-4 w-4 rounded border-slate-300 text-crimson-700 focus:ring-crimson-500"
                   />
                   <span className="text-xs font-bold text-slate-800">Include Horoscope</span>
                 </label>
@@ -885,7 +885,7 @@ export const ProfileWizardPage: React.FC = () => {
                       type="time"
                       value={formData.timeOfBirth}
                       onChange={(e) => setFormData({ ...formData, timeOfBirth: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
 
@@ -898,7 +898,7 @@ export const ProfileWizardPage: React.FC = () => {
                       placeholder="e.g. Bardhaman, Kolkata"
                       value={formData.placeOfBirth}
                       onChange={(e) => setFormData({ ...formData, placeOfBirth: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
 
@@ -907,7 +907,7 @@ export const ProfileWizardPage: React.FC = () => {
                     <select
                       value={formData.rashi}
                       onChange={(e) => setFormData({ ...formData, rashi: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="Mesh (Aries)">Mesh (Aries)</option>
                       <option value="Brish (Taurus)">Brish (Taurus)</option>
@@ -931,7 +931,7 @@ export const ProfileWizardPage: React.FC = () => {
                     <select
                       value={formData.isManglik}
                       onChange={(e) => setFormData({ ...formData, isManglik: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="NO">No (Non-Manglik)</option>
                       <option value="YES">Yes (Manglik)</option>
@@ -953,7 +953,7 @@ export const ProfileWizardPage: React.FC = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-100 pb-3">
                 <h2 className="text-xl font-bold text-slate-900 font-serif flex items-center space-x-2">
-                  <Camera className="h-5 w-5 text-amber-600" />
+                  <Camera className="h-5 w-5 text-crimson-700" />
                   <span>7. Profile Photos & Privacy Protection Shield</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
@@ -972,7 +972,7 @@ export const ProfileWizardPage: React.FC = () => {
                     onClick={handleAddSamplePhoto}
                     className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    <Camera className="h-3.5 w-3.5 text-amber-600" />
+                    <Camera className="h-3.5 w-3.5 text-crimson-700" />
                     <span>Upload New Photo</span>
                   </button>
                 </div>
@@ -983,7 +983,7 @@ export const ProfileWizardPage: React.FC = () => {
                       key={idx}
                       className={`relative rounded-2xl overflow-hidden border-2 bg-slate-100 h-40 ${
                         primaryPhotoIndex === idx
-                          ? 'border-amber-500 ring-2 ring-amber-200'
+                          ? 'border-crimson-700 ring-2 ring-crimson-200'
                           : 'border-slate-200'
                       }`}
                     >
@@ -997,7 +997,7 @@ export const ProfileWizardPage: React.FC = () => {
 
                       {/* Primary Badge */}
                       {primaryPhotoIndex === idx && (
-                        <div className="absolute top-2 left-2 z-30 rounded-md bg-amber-500 px-2 py-0.5 text-[9px] font-black text-slate-950 uppercase shadow-xs">
+                        <div className="absolute top-2 left-2 z-30 rounded-md bg-crimson-700 px-2 py-0.5 text-[9px] font-black text-white uppercase shadow-xs">
                           Primary
                         </div>
                       )}
@@ -1027,11 +1027,11 @@ export const ProfileWizardPage: React.FC = () => {
               </div>
 
               {/* Anti-Download Shield Notice */}
-              <div className="rounded-2xl bg-amber-50/80 p-4 border border-amber-200 flex items-start space-x-3 text-xs text-amber-950">
-                <ShieldCheck className="h-5 w-5 text-amber-700 flex-shrink-0 mt-0.5" />
+              <div className="rounded-2xl bg-navy-50/80 p-4 border border-navy-200 flex items-start space-x-3 text-xs text-navy-950">
+                <ShieldCheck className="h-5 w-5 text-crimson-700 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="font-bold">Anti-Download & Screenshot Shield Active</h4>
-                  <p className="text-[11px] text-amber-900/80 leading-relaxed">
+                  <p className="text-[11px] text-navy-900/80 leading-relaxed">
                     All photos uploaded to BorKonya are served with dynamic copyright watermarks, right-click context menu prevention, and browser drag-and-drop restrictions.
                   </p>
                 </div>
@@ -1053,7 +1053,7 @@ export const ProfileWizardPage: React.FC = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, photoPrivacy: e.target.value })
                       }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="REGISTERED_ONLY">Registered Members Only</option>
                       <option value="PUBLIC">Visible to All</option>
@@ -1070,7 +1070,7 @@ export const ProfileWizardPage: React.FC = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, phonePrivacy: e.target.value })
                       }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="PREMIUM_ONLY">Premium Members Only</option>
                       <option value="ON_INTEREST">On Mutual Accepted Interest Only</option>
@@ -1087,7 +1087,7 @@ export const ProfileWizardPage: React.FC = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, nameDisplay: e.target.value })
                       }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="FIRST_NAME_ONLY">First Name Only (e.g. Priyanka G.)</option>
                       <option value="FULL_NAME">Full Name (Priyanka Ghosh)</option>
@@ -1118,10 +1118,10 @@ export const ProfileWizardPage: React.FC = () => {
               type="button"
               onClick={handleNext}
               disabled={isSaving}
-              className="inline-flex items-center space-x-2 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-98 disabled:opacity-50"
+              className="inline-flex items-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-98 disabled:opacity-50"
             >
               <span>{isSaving ? 'Saving Profile...' : currentStep === totalSteps ? 'Finish & Save Profile' : 'Save & Continue'}</span>
-              <ArrowRight className="h-4 w-4 text-amber-400" />
+              <ArrowRight className="h-4 w-4 text-white" />
             </button>
           </div>
         </div>

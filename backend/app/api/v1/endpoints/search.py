@@ -34,6 +34,7 @@ def search_profiles(
     age_min: Optional[int] = Query(None, ge=18, le=70),
     age_max: Optional[int] = Query(None, ge=18, le=70),
     sort_by: Optional[str] = Query("match_score"),  # match_score, newest, age_asc, age_desc
+    limit: int = Query(3, ge=1, le=50),
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
@@ -51,9 +52,15 @@ def search_profiles(
     if blocked_ids:
         query = query.filter(~Profile.id.in_(blocked_ids))
 
-
-    if gender:
-        query = query.filter(Profile.gender == gender)
+    # Opposite-gender profile visibility rule:
+    # Females should see ONLY males, Males should see ONLY females.
+    if my_profile and my_profile.gender:
+        if my_profile.gender.upper() == "FEMALE":
+            query = query.filter(Profile.gender == "MALE")
+        elif my_profile.gender.upper() == "MALE":
+            query = query.filter(Profile.gender == "FEMALE")
+    elif gender:
+        query = query.filter(Profile.gender == gender.upper())
     if community and community.upper() != "ALL":
         query = query.filter(Profile.community.ilike(f"%{community}%"))
     if sub_community and sub_community.upper() != "ALL":
@@ -119,7 +126,7 @@ def search_profiles(
     else:  # match_score default
         results = sorted(results, key=lambda x: x.match_score or 0, reverse=True)
 
-    return results
+    return results[:limit]
 
 
 @router.post("/saved")

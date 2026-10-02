@@ -248,10 +248,10 @@ export const ChatPage: React.FC = () => {
             <div className="p-4 border-b border-gray-200 bg-white space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-red-50 text-red-700 rounded-xl">
+                  <div className="p-2 bg-crimson-50 text-crimson-700 rounded-xl">
                     <MessageSquare className="w-5 h-5" />
                   </div>
-                  <h2 className="font-serif font-bold text-gray-900 text-lg">Family Messages</h2>
+                  <h2 className="font-serif font-bold text-navy-950 text-lg">Family Messages</h2>
                 </div>
                 <button
                   onClick={fetchConversations}
@@ -270,7 +270,7 @@ export const ChatPage: React.FC = () => {
                   placeholder="Search conversations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-xs pl-9 pr-3 py-2 bg-gray-100 border border-transparent rounded-xl focus:bg-white focus:border-red-500 focus:outline-none transition-all"
+                  className="w-full text-xs pl-9 pr-3 py-2 bg-gray-100 border border-transparent rounded-xl focus:bg-white focus:border-crimson-700 focus:outline-none transition-all"
                 />
               </div>
             </div>
@@ -279,12 +279,12 @@ export const ChatPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
               {isLoadingConvs ? (
                 <div className="p-8 text-center space-y-2">
-                  <RefreshCw className="w-6 h-6 animate-spin text-red-700 mx-auto" />
+                  <RefreshCw className="w-6 h-6 animate-spin text-crimson-700 mx-auto" />
                   <p className="text-xs text-gray-400">Loading conversations...</p>
                 </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="p-8 text-center space-y-3">
-                  <div className="w-12 h-12 bg-red-50 text-red-700 rounded-full flex items-center justify-center mx-auto">
+                  <div className="w-12 h-12 bg-crimson-50 text-crimson-700 rounded-full flex items-center justify-center mx-auto">
                     <MessageSquare className="w-6 h-6" />
                   </div>
                   <p className="text-xs font-semibold text-gray-700">No Conversations Yet</p>
@@ -293,7 +293,7 @@ export const ChatPage: React.FC = () => {
                   </p>
                   <button
                     onClick={() => navigate('/interests')}
-                    className="text-xs font-bold text-red-700 hover:underline inline-block pt-1"
+                    className="text-xs font-bold text-crimson-700 hover:underline inline-block pt-1"
                   >
                     View Accepted Interests &rarr;
                   </button>
@@ -309,7 +309,7 @@ export const ChatPage: React.FC = () => {
                       onClick={() => setActiveConvId(c.id)}
                       className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors ${
                         isActive
-                          ? 'bg-red-50/80 border-r-4 border-red-700'
+                          ? 'bg-crimson-50/80 border-r-4 border-crimson-700'
                           : 'hover:bg-gray-100/60'
                       }`}
                     >
@@ -329,12 +329,12 @@ export const ChatPage: React.FC = () => {
                       {/* Snippet */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-bold text-gray-900 truncate">{name}</h4>
+                          <h4 className="text-sm font-bold text-navy-950 font-serif truncate">{name}</h4>
                           <span className="text-[10px] text-gray-400 font-medium">
                             {c.last_message_time ? 'Active' : ''}
                           </span>
                         </div>
-                        <p className="text-xs text-red-900/80 font-medium truncate">
+                        <p className="text-xs text-crimson-900/80 font-medium truncate">
                           {c.other_profile.community} • {c.other_profile.current_city}
                         </p>
                         <p className="text-xs text-gray-500 truncate mt-0.5">
@@ -344,7 +344,7 @@ export const ChatPage: React.FC = () => {
 
                       {/* Unread badge */}
                       {c.unread_count > 0 && (
-                        <div className="w-5 h-5 bg-red-700 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        <div className="w-5 h-5 bg-crimson-700 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
                           {c.unread_count}
                         </div>
                       )}
@@ -383,12 +383,12 @@ export const ChatPage: React.FC = () => {
 
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                      <h3 className="font-bold text-navy-950 font-serif text-sm sm:text-base">
                         {activeConv.other_profile.first_name} {activeConv.other_profile.last_name}
                       </h3>
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       {activeConv.other_profile.community} • {activeConv.other_profile.occupation}
                     </p>
                   </div>
@@ -398,7 +398,7 @@ export const ChatPage: React.FC = () => {
                 <div className="flex items-center gap-1 sm:gap-2">
                   <button
                     onClick={() => navigate(`/profile/${activeConv.other_profile.profile_id}`)}
-                    className="p-2 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors text-xs font-semibold flex items-center gap-1"
+                    className="p-2 text-slate-600 hover:text-crimson-700 hover:bg-crimson-50 rounded-xl transition-colors text-xs font-semibold flex items-center gap-1"
                     title="View Full Profile"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -412,7 +412,7 @@ export const ChatPage: React.FC = () => {
                         name: `${activeConv.other_profile.first_name} ${activeConv.other_profile.last_name}`,
                       })
                     }
-                    className="p-2 text-gray-400 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors text-xs flex items-center gap-1"
+                    className="p-2 text-slate-400 hover:text-crimson-700 hover:bg-crimson-50 rounded-xl transition-colors text-xs flex items-center gap-1"
                     title="Report profile"
                   >
                     <ShieldAlert className="w-4 h-4" />
@@ -426,7 +426,7 @@ export const ChatPage: React.FC = () => {
                         `${activeConv.other_profile.first_name} ${activeConv.other_profile.last_name}`
                       )
                     }
-                    className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors text-xs flex items-center gap-1"
+                    className="p-2 text-slate-400 hover:text-navy-950 hover:bg-gray-100 rounded-xl transition-colors text-xs flex items-center gap-1"
                     title="Block member"
                   >
                     <Ban className="w-4 h-4" />
@@ -437,14 +437,14 @@ export const ChatPage: React.FC = () => {
 
               {/* Error Banner */}
               {errorBanner && (
-                <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-xs text-red-700 flex items-center justify-between">
+                <div className="bg-crimson-50 border-b border-crimson-200 px-4 py-2 text-xs text-crimson-700 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span>{errorBanner}</span>
                   </div>
                   <button
                     onClick={() => setErrorBanner(null)}
-                    className="text-red-700 font-bold hover:underline"
+                    className="text-crimson-700 font-bold hover:underline"
                   >
                     Dismiss
                   </button>
@@ -454,7 +454,7 @@ export const ChatPage: React.FC = () => {
               {/* Messages Body */}
               <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gradient-to-b from-slate-50 to-white">
                 <div className="text-center my-2">
-                  <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-medium rounded-full shadow-sm">
+                  <span className="px-3 py-1 bg-navy-50/80 border border-navy-200 text-navy-900 text-[11px] font-medium rounded-full shadow-xs">
                     🔒 Protected Matrimonial Conversation • Screenshots & Downloads Restricted
                   </span>
                 </div>
@@ -463,10 +463,10 @@ export const ChatPage: React.FC = () => {
                   <div className="py-12 text-center text-xs text-gray-400">Loading chat history...</div>
                 ) : messages.length === 0 ? (
                   <div className="py-12 text-center space-y-3">
-                    <div className="w-12 h-12 bg-red-50 text-red-700 rounded-full flex items-center justify-center mx-auto">
+                    <div className="w-12 h-12 bg-crimson-50 text-crimson-700 rounded-full flex items-center justify-center mx-auto">
                       <Sparkles className="w-6 h-6" />
                     </div>
-                    <p className="text-sm font-bold text-gray-800">Start the Matrimonial Dialogue</p>
+                    <p className="text-sm font-bold text-navy-950 font-serif">Start the Matrimonial Dialogue</p>
                     <p className="text-xs text-gray-500 max-w-sm mx-auto">
                       Send a warm and respectful introductory greeting to {activeConv.other_profile.first_name} and their family.
                     </p>
@@ -480,14 +480,14 @@ export const ChatPage: React.FC = () => {
                       <div
                         className={`max-w-[85%] sm:max-w-[70%] rounded-2xl p-3.5 shadow-sm text-sm ${
                           m.is_mine
-                            ? 'bg-red-700 text-white rounded-br-sm'
+                            ? 'bg-crimson-700 text-white rounded-br-sm'
                             : 'bg-white border border-gray-200 text-gray-900 rounded-bl-sm'
                         }`}
                       >
                         <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
                         <div
                           className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${
-                            m.is_mine ? 'text-red-200' : 'text-gray-400'
+                            m.is_mine ? 'text-crimson-100' : 'text-gray-400'
                           }`}
                         >
                           <span>
@@ -498,7 +498,7 @@ export const ChatPage: React.FC = () => {
                           </span>
                           {m.is_mine && (
                             m.is_read ? (
-                              <CheckCheck className="w-3.5 h-3.5 text-rose-200" />
+                              <CheckCheck className="w-3.5 h-3.5 text-crimson-200" />
                             ) : (
                               <Check className="w-3.5 h-3.5" />
                             )
@@ -514,14 +514,14 @@ export const ChatPage: React.FC = () => {
               {/* Matrimonial Icebreaker Suggestions */}
               <div className="px-4 py-2 border-t border-gray-100 bg-slate-50 flex items-center gap-2 overflow-x-auto">
                 <span className="text-[11px] font-semibold text-gray-500 flex items-center gap-1 whitespace-nowrap">
-                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <Sparkles className="w-3 h-3 text-crimson-700" />
                   Quick Greet:
                 </span>
                 {MATRIMONIAL_ICEBREAKERS.map((prompt, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(prompt)}
-                    className="px-3 py-1 bg-white hover:bg-red-50 hover:text-red-700 border border-gray-200 hover:border-red-200 rounded-full text-xs text-gray-700 whitespace-nowrap transition-colors shadow-2xs"
+                    className="px-3 py-1 bg-white hover:bg-crimson-50 hover:text-crimson-700 border border-gray-200 hover:border-crimson-200 rounded-full text-xs text-gray-700 whitespace-nowrap transition-colors shadow-2xs"
                   >
                     {prompt}
                   </button>
@@ -536,15 +536,15 @@ export const ChatPage: React.FC = () => {
                 </div>
               )}
               {!canChat && !isBlocked && (
-                <div className="bg-amber-50 border-t border-amber-200 px-4 py-3 text-xs text-amber-900 flex items-center justify-between gap-3">
+                <div className="bg-navy-50 border-t border-navy-200 px-4 py-3 text-xs text-navy-950 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 text-crimson-700 flex-shrink-0" />
                     <span>Direct chat is locked. Chat unlocks when mutual interest is accepted, or upgrade to Premium.</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => navigate('/subscription')}
-                    className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-xs flex-shrink-0 transition-colors shadow-xs"
+                    className="px-3 py-1 bg-crimson-700 hover:bg-crimson-800 text-white font-semibold rounded-lg text-xs flex-shrink-0 transition-colors shadow-xs"
                   >
                     Upgrade Now
                   </button>
@@ -571,12 +571,12 @@ export const ChatPage: React.FC = () => {
                       ? 'Chat unlocks on accepted interest or Premium upgrade'
                       : `Write a respectful message to ${activeConv.other_profile.first_name}...`
                   }
-                  className="flex-1 text-sm px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:border-red-600 focus:outline-none transition-all shadow-inner disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="flex-1 text-sm px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:border-crimson-700 focus:outline-none transition-all shadow-inner disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
                 <button
                   type="submit"
                   disabled={!inputText.trim() || isSending || isBlocked || !canChat}
-                  className="px-5 py-3 bg-red-700 hover:bg-red-800 disabled:opacity-40 text-white font-semibold rounded-2xl shadow-md transition-all flex items-center gap-2 flex-shrink-0"
+                  className="px-5 py-3 bg-crimson-700 hover:bg-crimson-800 disabled:opacity-40 text-white font-semibold rounded-2xl shadow-md transition-all flex items-center gap-2 flex-shrink-0"
                 >
                   <Send className="w-4 h-4" />
                   <span className="hidden sm:inline">Send</span>
@@ -587,10 +587,10 @@ export const ChatPage: React.FC = () => {
             /* Empty State when no conversation is selected */
             <div className="hidden md:flex flex-1 items-center justify-center bg-slate-50 p-8 text-center">
               <div className="max-w-md space-y-4">
-                <div className="w-16 h-16 rounded-full bg-red-100 text-red-700 flex items-center justify-center mx-auto shadow-inner">
+                <div className="w-16 h-16 rounded-full bg-crimson-50 text-crimson-700 flex items-center justify-center mx-auto shadow-inner">
                   <MessageSquare className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-bold font-serif text-gray-900">
+                <h3 className="text-xl font-bold font-serif text-navy-950">
                   Select a Conversation
                 </h3>
                 <p className="text-sm text-gray-500">

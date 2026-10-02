@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Heart, Sparkles, Lock, Phone, Eye, EyeOff, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, Lock, Phone, Eye, EyeOff, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
+import logoImg from '../assets/logo.jpeg';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -73,13 +74,17 @@ export const LoginPage: React.FC = () => {
       <main className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-6">
           {/* Card Container */}
-          <div className="rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-amber-100/80 transition-all">
+          <div className="rounded-3xl bg-white p-8 sm:p-10 shadow-xl border border-slate-200 transition-all">
             {/* Header Brand & Title */}
             <div className="text-center space-y-2 mb-8">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-amber-400 shadow-md">
-                <Heart className="h-7 w-7 fill-amber-400/20 text-amber-400" />
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-serif tracking-tight">
+              <Link to="/" className="inline-block hover:opacity-95 transition-opacity mb-2">
+                <img
+                  src={logoImg}
+                  alt="BorKoniya"
+                  className="mx-auto h-12 sm:h-14 w-auto object-contain"
+                />
+              </Link>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-navy-950 font-serif tracking-tight">
                 Welcome Back
               </h1>
               <p className="text-xs sm:text-sm text-slate-500">
@@ -105,7 +110,7 @@ export const LoginPage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
                   Mobile Number or Email
                 </label>
-                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-amber-600 focus-within:ring-1 focus-within:ring-amber-600 transition-all shadow-xs">
+                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-crimson-700 focus-within:ring-1 focus-within:ring-crimson-700 transition-all shadow-xs">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                     <Phone className="h-4 w-4 text-slate-400" />
                   </div>
@@ -131,12 +136,12 @@ export const LoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setForgotModalOpen(true)}
-                    className="text-xs font-bold text-amber-700 hover:text-amber-800 transition-colors"
+                    className="text-xs font-bold text-crimson-700 hover:text-crimson-800 transition-colors"
                   >
                     Forgot Password?
                   </button>
                 </div>
-                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-amber-600 focus-within:ring-1 focus-within:ring-amber-600 transition-all shadow-xs">
+                <div className="relative rounded-xl border border-slate-200 bg-white focus-within:border-crimson-700 focus-within:ring-1 focus-within:ring-crimson-700 transition-all shadow-xs">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                     <Lock className="h-4 w-4 text-slate-400" />
                   </div>
@@ -162,7 +167,7 @@ export const LoginPage: React.FC = () => {
               </div>
 
               {/* Quick Demo Credentials Tip */}
-              <div className="rounded-xl bg-amber-50/70 p-2.5 border border-amber-200/80 text-[11px] text-amber-900 flex items-center justify-between">
+              <div className="rounded-xl bg-navy-50/70 p-2.5 border border-navy-200/80 text-[11px] text-navy-950 flex items-center justify-between">
                 <span>Demo: <span className="font-semibold">9876543210</span> / <span className="font-semibold">borkonya123</span></span>
                 <button
                   type="button"
@@ -170,7 +175,7 @@ export const LoginPage: React.FC = () => {
                     setPhoneOrEmail('9876543210');
                     setPassword('borkonya123');
                   }}
-                  className="font-bold text-amber-800 hover:underline"
+                  className="font-bold text-crimson-700 hover:underline"
                 >
                   Auto-fill
                 </button>
@@ -180,10 +185,10 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-4 flex items-center justify-center space-x-2 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 py-3.5 text-sm font-bold text-white shadow-md hover:from-slate-800 hover:to-indigo-900 transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
+                className="w-full mt-4 flex items-center justify-center space-x-2 rounded-2xl bg-crimson-700 hover:bg-crimson-800 py-3.5 text-sm font-bold text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
               >
                 <span>{isLoading ? 'Logging in...' : 'Login to Account'}</span>
-                {!isLoading && <ArrowRight className="h-4 w-4 text-amber-400" />}
+                {!isLoading && <ArrowRight className="h-4 w-4 text-white" />}
               </button>
             </form>
 
@@ -200,9 +205,9 @@ export const LoginPage: React.FC = () => {
             {/* Register CTA */}
             <Link
               to="/register"
-              className="w-full flex items-center justify-center space-x-2 rounded-2xl border-2 border-slate-200 hover:border-amber-600 bg-white py-3 text-xs font-bold text-slate-800 hover:text-amber-800 hover:bg-amber-50/30 transition-all"
+              className="w-full flex items-center justify-center space-x-2 rounded-2xl border-2 border-slate-200 hover:border-navy-900 bg-white py-3 text-xs font-bold text-slate-800 hover:text-navy-950 hover:bg-navy-50/30 transition-all"
             >
-              <Sparkles className="h-4 w-4 text-amber-600" />
+              <Sparkles className="h-4 w-4 text-crimson-700" />
               <span>Create Free Matrimonial Profile</span>
             </Link>
 
