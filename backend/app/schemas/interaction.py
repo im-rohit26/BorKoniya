@@ -90,8 +90,12 @@ class MessageItemResponse(BaseModel):
     reply_to_message_id: Optional[str] = None
     reply_to: Optional[ReplySnippetResponse] = None
     is_forwarded: bool = False
+    forwarded_from_message_id: Optional[str] = None
     message_type: Optional[str] = "text"
     media_url: Optional[str] = None
+    deleted_for_everyone: bool = False
+    deleted_at: Optional[datetime] = None
+    can_delete_for_everyone: bool = False
 
 
 class ForwardMessagesRequest(BaseModel):
@@ -102,6 +106,10 @@ class ForwardMessagesRequest(BaseModel):
 
 class BatchDeleteMessagesRequest(BaseModel):
     message_ids: List[str]
+
+
+class DeleteMessageRequest(BaseModel):
+    delete_type: str = "for_me"  # "for_me" or "for_everyone"
 
 
 class StartConversationRequest(BaseModel):

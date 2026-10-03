@@ -61,8 +61,12 @@ export interface MessageItem {
   reply_to_message_id?: string;
   reply_to?: ReplySnippet | null;
   is_forwarded?: boolean;
+  forwarded_from_message_id?: string;
   message_type?: string;
   media_url?: string;
+  deleted_for_everyone?: boolean;
+  deleted_at?: string;
+  can_delete_for_everyone?: boolean;
 }
 
 export interface InterestsSummary {
@@ -318,14 +322,45 @@ export async function forwardMessages(
   return res.json();
 }
 
-export async function deleteMessage(conversationId: string, messageId: string) {
-  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}`, {
+export async function deleteMessage(
+  conversationId: string,
+  messageId: string,
+  deleteType: 'for_me' | 'for_everyone' = 'for_me'
+) {
+  const res = await fetch(
+    `${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}?delete_type=${deleteType}`,
+    {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete message' }));
+    throw new Error(err.detail || 'Failed to delete message');
+  }
+  return res.json();
+}
+
+export async function deleteConversationForMe(conversationId: string) {
+  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
     method: 'DELETE',
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Failed to delete message' }));
-    throw new Error(err.detail || 'Failed to delete message');
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete conversation' }));
+    throw new Error(err.detail || 'Failed to delete conversation');
+  }
+  return res.json();
+}
+
+export async function clearConversation(conversationId: string) {
+  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/clear`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to clear conversation' }));
+    throw new Error(err.detail || 'Failed to clear conversation');
   }
   return res.json();
 }

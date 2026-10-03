@@ -192,6 +192,8 @@ class ConversationMember(Base):
     conversation_id = Column(String(36), ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True)
     profile_id = Column(String(36), ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True)
     joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    is_hidden = Column(Boolean, default=False)
+    cleared_at = Column(DateTime, nullable=True)
 
     conversation = relationship("Conversation", back_populates="members")
     profile = relationship("Profile")
@@ -211,9 +213,15 @@ class Message(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     reply_to_message_id = Column(String(36), ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
+    forwarded_from_message_id = Column(String(36), nullable=True)
     is_forwarded = Column(Boolean, default=False)
     message_type = Column(String(20), default="text")
     media_url = Column(String(500), nullable=True)
+
+    is_deleted_for_sender = Column(Boolean, default=False)
+    is_deleted_for_receiver = Column(Boolean, default=False)
+    deleted_for_everyone = Column(Boolean, default=False)
+    deleted_at = Column(DateTime, nullable=True)
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("Profile")

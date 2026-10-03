@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from app.core.database import get_db
 from app.api.deps import get_current_profile, get_current_user
@@ -23,6 +23,7 @@ from app.schemas.interaction import (
     ForwardMessagesRequest,
     BatchDeleteMessagesRequest,
     ReplySnippetResponse,
+    DeleteMessageRequest,
 )
 from app.models.entities import ProfilePhoto
 
@@ -81,29 +82,66 @@ def get_conversations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    from sqlalchemy import func, and_, or_
+    from sqlalchemy import func, and_, or_, case
 
-    my_convs = db.query(ConversationMember.conversation_id).filter(
-        ConversationMember.profile_id == current_profile.id
-    ).subquery()
+    # Filter out conversations that this member marked as hidden ("Delete chat for me")
+    my_member_records = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.profile_id == current_profile.id,
+            ConversationMember.is_hidden == False
+        )
+        .all()
+    )
+    my_conv_ids = [m.conversation_id for m in my_member_records]
+    cleared_at_map = {m.conversation_id: m.cleared_at for m in my_member_records}
 
+    if not my_conv_ids:
+        return []
+
+    # Unread messages count for current user
+    # (Exclude deleted messages and messages before cleared_at)
     unread_subq = (
         db.query(
             Message.conversation_id,
             func.count(Message.id).label("unread_count")
         )
         .filter(
+            Message.conversation_id.in_(my_conv_ids),
             Message.sender_profile_id != current_profile.id,
-            Message.is_read == False
+            Message.is_read == False,
+            Message.is_deleted_for_receiver == False,
+            Message.deleted_for_everyone == False,
         )
         .group_by(Message.conversation_id)
         .subquery()
+    )
+
+    # Last message query per conversation visible to current user
+    # Message visible to current user if:
+    # not deleted_for_everyone AND
+    # if sender == current_profile -> not is_deleted_for_sender
+    # if sender != current_profile -> not is_deleted_for_receiver
+    visible_filter = or_(
+        Message.deleted_for_everyone == True,
+        and_(
+            Message.sender_profile_id == current_profile.id,
+            Message.is_deleted_for_sender == False
+        ),
+        and_(
+            Message.sender_profile_id != current_profile.id,
+            Message.is_deleted_for_receiver == False
+        )
     )
 
     last_msg_time_subq = (
         db.query(
             Message.conversation_id,
             func.max(Message.created_at).label("max_time")
+        )
+        .filter(
+            Message.conversation_id.in_(my_conv_ids),
+            visible_filter
         )
         .group_by(Message.conversation_id)
         .subquery()
@@ -112,7 +150,10 @@ def get_conversations(
     last_msg_subq = (
         db.query(
             Message.conversation_id,
-            Message.content,
+            case(
+                (Message.deleted_for_everyone == True, "This message was deleted"),
+                else_=Message.content
+            ).label("content"),
             Message.created_at
         )
         .join(
@@ -138,7 +179,7 @@ def get_conversations(
         .outerjoin(last_msg_subq, last_msg_subq.c.conversation_id == Conversation.id)
         .outerjoin(unread_subq, unread_subq.c.conversation_id == Conversation.id)
         .filter(
-            Conversation.id.in_(my_convs),
+            Conversation.id.in_(my_conv_ids),
             ConversationMember.profile_id != current_profile.id
         )
         .order_by(Conversation.updated_at.desc())
@@ -309,8 +350,10 @@ def get_messages(
     current_profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import and_, or_
+
     # Verify membership
-    is_member = (
+    my_member = (
         db.query(ConversationMember)
         .filter(
             ConversationMember.conversation_id == conversation_id,
@@ -318,11 +361,16 @@ def get_messages(
         )
         .first()
     )
-    if not is_member:
+    if not my_member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a participant in this conversation.",
         )
+
+    # Unhide conversation if it was hidden
+    if my_member.is_hidden:
+        my_member.is_hidden = False
+        db.commit()
 
     # Mark incoming unread messages as read
     incoming_unread = (
@@ -331,6 +379,8 @@ def get_messages(
             Message.conversation_id == conversation_id,
             Message.sender_profile_id != current_profile.id,
             Message.is_read == False,
+            Message.is_deleted_for_receiver == False,
+            Message.deleted_for_everyone == False,
         )
         .all()
     )
@@ -341,15 +391,30 @@ def get_messages(
     if incoming_unread:
         db.commit()
 
-    messages = (
-        db.query(Message)
-        .filter(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
-        .all()
+    query = db.query(Message).filter(Message.conversation_id == conversation_id)
+
+    # If chat was cleared previously by this user, only show messages created after cleared_at
+    if my_member.cleared_at:
+        query = query.filter(Message.created_at >= my_member.cleared_at)
+
+    # Visibility filter for current_profile:
+    # 1. If deleted_for_everyone is True, still show as deleted placeholder ("This message was deleted")
+    # 2. If sender is current_profile, must NOT have is_deleted_for_sender == True
+    # 3. If receiver is current_profile, must NOT have is_deleted_for_receiver == True
+    visibility_filter = or_(
+        Message.deleted_for_everyone == True,
+        and_(
+            Message.sender_profile_id == current_profile.id,
+            Message.is_deleted_for_sender == False,
+        ),
+        and_(
+            Message.sender_profile_id != current_profile.id,
+            Message.is_deleted_for_receiver == False,
+        )
     )
+    messages = query.filter(visibility_filter).order_by(Message.created_at.asc()).all()
 
     results = []
-    # Cache sender profiles in conversation to minimize redundant queries
     sender_cache: dict = {}
 
     for msg in messages:
@@ -360,13 +425,24 @@ def get_messages(
         reply_info = None
         if msg.reply_to_message_id and msg.reply_to:
             rep_sender = db.query(Profile).filter(Profile.id == msg.reply_to.sender_profile_id).first()
+            rep_content = "This message was deleted" if msg.reply_to.deleted_for_everyone else msg.reply_to.content
             reply_info = ReplySnippetResponse(
                 id=msg.reply_to.id,
                 sender_name=rep_sender.first_name if rep_sender else "Member",
-                content=msg.reply_to.content,
+                content=rep_content,
                 message_type=msg.reply_to.message_type or "text",
-                media_url=msg.reply_to.media_url,
+                media_url=None if msg.reply_to.deleted_for_everyone else msg.reply_to.media_url,
             )
+
+        is_mine = (msg.sender_profile_id == current_profile.id)
+        # 24-hour limit check for delete for everyone
+        msg_created = msg.created_at
+        if msg_created.tzinfo is None:
+            msg_created = msg_created.replace(tzinfo=timezone.utc)
+        age_in_hours = (now - msg_created).total_seconds() / 3600.0
+        can_del_everyone = is_mine and (not msg.deleted_for_everyone) and (age_in_hours <= 24.0)
+
+        displayed_content = "This message was deleted" if msg.deleted_for_everyone else msg.content
 
         results.append(
             MessageItemResponse(
@@ -375,15 +451,19 @@ def get_messages(
                 sender_profile_id=msg.sender_profile_id,
                 sender_name=sender_prof.first_name if sender_prof else "Member",
                 sender_gender=sender_prof.gender if sender_prof else None,
-                content=msg.content,
-                is_mine=(msg.sender_profile_id == current_profile.id),
+                content=displayed_content,
+                is_mine=is_mine,
                 is_read=msg.is_read,
                 created_at=msg.created_at,
                 reply_to_message_id=msg.reply_to_message_id,
                 reply_to=reply_info,
                 is_forwarded=bool(msg.is_forwarded),
+                forwarded_from_message_id=msg.forwarded_from_message_id,
                 message_type=msg.message_type or "text",
-                media_url=msg.media_url,
+                media_url=None if msg.deleted_for_everyone else msg.media_url,
+                deleted_for_everyone=bool(msg.deleted_for_everyone),
+                deleted_at=msg.deleted_at,
+                can_delete_for_everyone=can_del_everyone,
             )
         )
 
@@ -595,6 +675,7 @@ def forward_messages(
                 sender_profile_id=current_profile.id,
                 content=orig.content,
                 is_forwarded=True,
+                forwarded_from_message_id=orig.id,
                 message_type=orig.message_type or "text",
                 media_url=orig.media_url,
                 created_at=now,
@@ -622,25 +703,31 @@ def batch_delete_messages(
     if not payload.message_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No messages selected for deletion.")
 
-    messages_to_delete = (
+    messages = (
         db.query(Message)
+        .join(ConversationMember, ConversationMember.conversation_id == Message.conversation_id)
         .filter(
             Message.id.in_(payload.message_ids),
-            Message.sender_profile_id == current_profile.id,
+            ConversationMember.profile_id == current_profile.id,
         )
         .all()
     )
 
-    deleted_count = len(messages_to_delete)
-    for m in messages_to_delete:
-        db.delete(m)
+    deleted_count = 0
+    for m in messages:
+        if m.sender_profile_id == current_profile.id:
+            m.is_deleted_for_sender = True
+            deleted_count += 1
+        else:
+            m.is_deleted_for_receiver = True
+            deleted_count += 1
 
     db.commit()
 
     return {
         "status": "SUCCESS",
         "deleted_count": deleted_count,
-        "message": f"Deleted {deleted_count} message(s).",
+        "message": f"Deleted {deleted_count} message(s) for you.",
     }
 
 
@@ -684,6 +771,7 @@ def mark_conversation_read(
 def delete_message(
     conversation_id: str,
     message_id: str,
+    delete_type: str = "for_me",  # query param: "for_me" or "for_everyone"
     current_profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
@@ -703,9 +791,109 @@ def delete_message(
     msg = db.query(Message).filter(Message.id == message_id, Message.conversation_id == conversation_id).first()
     if not msg:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
-    if msg.sender_profile_id != current_profile.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own messages.")
-    db.delete(msg)
+
+    now = datetime.now(timezone.utc)
+
+    if delete_type == "for_everyone":
+        # Security validation: Only sender can delete for everyone
+        if msg.sender_profile_id != current_profile.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only delete your own messages for everyone."
+            )
+
+        # Security validation: Strict 24-hour limit
+        msg_created = msg.created_at
+        if msg_created.tzinfo is None:
+            msg_created = msg_created.replace(tzinfo=timezone.utc)
+        time_elapsed = now - msg_created
+        if time_elapsed.total_seconds() > 24 * 3600:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Messages can only be deleted for everyone within 24 hours of sending."
+            )
+
+        msg.deleted_for_everyone = True
+        msg.deleted_at = now
+        db.commit()
+        return {
+            "status": "SUCCESS",
+            "message": "Message deleted for everyone.",
+            "message_id": message_id,
+            "deleted_for_everyone": True,
+        }
+
+    else:
+        # Delete for me
+        if msg.sender_profile_id == current_profile.id:
+            msg.is_deleted_for_sender = True
+        else:
+            msg.is_deleted_for_receiver = True
+        db.commit()
+        return {
+            "status": "SUCCESS",
+            "message": "Message deleted for you.",
+            "message_id": message_id,
+            "deleted_for_everyone": False,
+        }
+
+
+@router.delete("/{conversation_id}")
+def delete_conversation_for_me(
+    conversation_id: str,
+    current_profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """
+    Hides the conversation from the current user's chat list ("Delete chat for me")
+    without removing it for the other user.
+    """
+    member = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.profile_id == current_profile.id,
+        )
+        .first()
+    )
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found or you are not a member.",
+        )
+
+    member.is_hidden = True
+    member.cleared_at = datetime.now(timezone.utc)
     db.commit()
-    return {"status": "SUCCESS", "message": "Message deleted."}
+    return {"status": "SUCCESS", "message": "Conversation removed from your chat list."}
+
+
+@router.post("/{conversation_id}/clear")
+def clear_conversation(
+    conversation_id: str,
+    current_profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """
+    Clears all messages in the conversation for the current user ("Clear chat")
+    without affecting the other user.
+    """
+    member = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.profile_id == current_profile.id,
+        )
+        .first()
+    )
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found or you are not a member.",
+        )
+
+    member.cleared_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "SUCCESS", "message": "Chat cleared successfully."}
+
 
