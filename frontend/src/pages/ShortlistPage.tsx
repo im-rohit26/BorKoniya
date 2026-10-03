@@ -175,6 +175,7 @@ export const ShortlistPage: React.FC = () => {
                     <div className="relative h-60 w-full overflow-hidden bg-gray-100">
                       <ProtectedPhoto
                         photoUrl={p.photo_url}
+                        gender={p.gender}
                         altText={formattedName}
                         profileId={p.id}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

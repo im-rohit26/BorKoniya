@@ -137,10 +137,18 @@ export const InterestsPage: React.FC = () => {
       return sentList.filter((i) => i.status === 'SENT');
     }
     if (activeTab === 'ACCEPTED') {
-      // Include accepted from either side
-      const recAccepted = receivedList.filter((i) => i.status === 'ACCEPTED');
-      const sentAccepted = sentList.filter((i) => i.status === 'ACCEPTED');
-      return [...recAccepted, ...sentAccepted];
+      // Include accepted from either side, deduplicated by the other member's profile id
+      const combined = [
+        ...receivedList.filter((i) => i.status === 'ACCEPTED'),
+        ...sentList.filter((i) => i.status === 'ACCEPTED'),
+      ];
+      const seenProfileIds = new Set<string>();
+      return combined.filter((item) => {
+        const otherId = item.profile?.id;
+        if (!otherId || seenProfileIds.has(otherId)) return false;
+        seenProfileIds.add(otherId);
+        return true;
+      });
     }
     if (activeTab === 'DECLINED') {
       return receivedList.filter((i) => i.status === 'DECLINED' || i.status === 'CANCELLED');
@@ -150,9 +158,16 @@ export const InterestsPage: React.FC = () => {
 
   const pendingReceivedCount = receivedList.filter((i) => i.status === 'SENT').length;
   const pendingSentCount = sentList.filter((i) => i.status === 'SENT').length;
-  const acceptedCount =
-    receivedList.filter((i) => i.status === 'ACCEPTED').length +
-    sentList.filter((i) => i.status === 'ACCEPTED').length;
+  
+  // Calculate unique accepted profile count
+  const allAcceptedCombined = [
+    ...receivedList.filter((i) => i.status === 'ACCEPTED'),
+    ...sentList.filter((i) => i.status === 'ACCEPTED'),
+  ];
+  const uniqueAcceptedProfileIds = new Set(
+    allAcceptedCombined.map((i) => i.profile?.id).filter(Boolean)
+  );
+  const acceptedCount = uniqueAcceptedProfileIds.size;
 
   const displayedItems = getDisplayedItems();
 
@@ -352,6 +367,7 @@ export const InterestsPage: React.FC = () => {
                     <div className="w-28 h-36 sm:w-32 sm:h-40 flex-shrink-0 mx-auto sm:mx-0 rounded-2xl overflow-hidden shadow-inner border border-gray-200">
                       <ProtectedPhoto
                         photoUrl={p.photo_url}
+                        gender={p.gender}
                         altText={formattedName}
                         profileId={p.id}
                         className="w-full h-full object-cover"

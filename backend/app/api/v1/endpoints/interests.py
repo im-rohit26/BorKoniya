@@ -64,7 +64,66 @@ def send_interest(
             detail="Unable to send interest to this profile.",
         )
 
-    # Check existing interest
+    # Check if receiver already sent an interest to current profile
+    reverse = (
+        db.query(Interest)
+        .filter(
+            Interest.sender_profile_id == receiver.id,
+            Interest.receiver_profile_id == current_profile.id,
+        )
+        .first()
+    )
+    if reverse:
+        if reverse.status == "ACCEPTED":
+            return InterestActionResponse(
+                id=reverse.id,
+                sender_profile_id=reverse.sender_profile_id,
+                receiver_profile_id=reverse.receiver_profile_id,
+                status=reverse.status,
+                sent_at=reverse.sent_at,
+                responded_at=reverse.responded_at,
+                message="You and this member have already connected!",
+            )
+        elif reverse.status == "SENT":
+            # Auto accept the pending interest from the other user!
+            reverse.status = "ACCEPTED"
+            reverse.responded_at = datetime.now(timezone.utc)
+
+            # Ensure conversation exists
+            c1 = (
+                db.query(ConversationMember.conversation_id)
+                .filter(ConversationMember.profile_id == reverse.sender_profile_id)
+                .subquery()
+            )
+            shared_conv = (
+                db.query(Conversation)
+                .join(ConversationMember)
+                .filter(
+                    ConversationMember.profile_id == reverse.receiver_profile_id,
+                    Conversation.id.in_(c1),
+                )
+                .first()
+            )
+            if not shared_conv:
+                new_conv = Conversation()
+                db.add(new_conv)
+                db.flush()
+                db.add(ConversationMember(conversation_id=new_conv.id, profile_id=reverse.sender_profile_id))
+                db.add(ConversationMember(conversation_id=new_conv.id, profile_id=reverse.receiver_profile_id))
+
+            db.commit()
+            db.refresh(reverse)
+            return InterestActionResponse(
+                id=reverse.id,
+                sender_profile_id=reverse.sender_profile_id,
+                receiver_profile_id=reverse.receiver_profile_id,
+                status=reverse.status,
+                sent_at=reverse.sent_at,
+                responded_at=reverse.responded_at,
+                message=f"Mutual match! Interest from {receiver.first_name} accepted. You can now chat!",
+            )
+
+    # Check existing interest from current profile to receiver
     existing = (
         db.query(Interest)
         .filter(

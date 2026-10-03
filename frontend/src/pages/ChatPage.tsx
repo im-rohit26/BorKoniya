@@ -34,7 +34,6 @@ import {
   UserPlus,
   ChevronRight,
   Bell,
-  Heart,
   Eraser,
   MessageCircleOff,
   ChevronDown,
@@ -62,6 +61,7 @@ import { ReportProfileModal } from '../components/safety/ReportProfileModal';
 import { Header } from '../components/common/Header';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 import { masterDataApi } from '../lib/masterDataApi';
+import { useAuth } from '../context/AuthContext';
 
 /*
   THEME (BorKonya reference design)
@@ -86,6 +86,7 @@ const BLUE_BUBBLE = 'bg-gradient-to-br from-[#0a56e0] to-[#0a3fc0] text-white sh
 export const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [langModalOpen, setLangModalOpen] = useState(false);
   const wsConnectedRef = useRef(false);
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
@@ -1110,20 +1111,19 @@ export const ChatPage: React.FC = () => {
           {/* ================= RIGHT: CHAT WINDOW ================= */}
           {activeConv ? (
             <section className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-gradient-to-br from-[#f3f6fd] via-[#fbf1f6] to-[#fde4ec]">
-              {/* Theme romantic wallpaper background (2nd image) */}
+              {/* Theme romantic wallpaper background (couple at bottom-left, ribbon heart top-right) */}
               <div
-                className="absolute inset-0 bg-cover bg-bottom bg-no-repeat pointer-events-none select-none opacity-45"
-                style={{ backgroundImage: `url('/chat-couple-bg.png')` }}
+                className="absolute inset-0 bg-no-repeat pointer-events-none select-none z-0"
+                style={{
+                  backgroundImage: `url('/chat-couple-bg.png')`,
+                  backgroundPosition: 'left bottom',
+                  backgroundSize: 'cover',
+                  opacity: 0.95,
+                }}
               />
 
-              {/* Decorative hearts */}
-              <Heart
-                className="absolute top-28 right-6 w-40 h-40 text-[#f8c9d6]/40 pointer-events-none"
-                strokeWidth={1}
-              />
-              <Heart className="absolute top-44 right-56 w-6 h-6 text-[#f6a6bb] fill-[#f6a6bb]/60 pointer-events-none" />
-              <Heart className="absolute top-80 left-1/3 w-4 h-4 text-[#e0102f] fill-[#e0102f]/50 pointer-events-none" />
-              <Heart className="absolute top-60 right-24 w-5 h-5 text-[#f6a6bb] fill-[#f6a6bb]/50 pointer-events-none" />
+              {/* Gentle overlay to keep messages readable while showing full theme illustration */}
+              <div className="absolute inset-0 bg-white/20 pointer-events-none z-0" />
 
               {/* Chat header or Multi-select Action Bar */}
               {isSelectMode ? (
@@ -1671,8 +1671,14 @@ export const ChatPage: React.FC = () => {
 
                           {/* My avatar (right) */}
                           {m.is_mine && (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0a56e0] to-[#0a3fc0] border-2 border-white shadow-md flex items-center justify-center flex-shrink-0 mb-0.5">
-                              <User className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0 mb-0.5">
+                              <ProtectedPhoto
+                                photoUrl={currentUser?.photo_url || undefined}
+                                gender={currentUser?.gender}
+                                altText={currentUser?.first_name || 'My Photo'}
+                                profileId={currentUser?.profile_id || 'ME'}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                           )}
                         </div>

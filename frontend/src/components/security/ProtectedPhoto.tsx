@@ -1,5 +1,5 @@
 import React from 'react'
-import { Shield, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { getDefaultAvatar } from '../../lib/utils'
 
 interface ProtectedPhotoProps {
@@ -22,12 +22,10 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
   alt,
   altText,
   gender,
-  profileId = 'BK-MEMBER',
   isProtected = false,
   className = '',
   imgClassName = '',
   objectFit = 'cover',
-  watermarkText,
 }) => {
   const imageSource = src || photoUrl || getDefaultAvatar(gender)
   const imageAlt = alt || altText || 'Member Photo'
@@ -43,9 +41,6 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
     e.stopPropagation()
     return false
   }
-
-  const displayWatermark =
-    watermarkText || `BorKonya Protected • ${profileId}`
 
   return (
     <div
@@ -86,13 +81,6 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
         onDragStart={handleDragStart}
       />
 
-      {/* Dynamic Security Watermark */}
-      <div className="photo-watermark-overlay z-20 pointer-events-none">
-        <span className="photo-watermark-text select-none">
-          {displayWatermark}
-        </span>
-      </div>
-
       {/* Protected Blur Overlay */}
       {isProtected && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/40 p-4 text-center backdrop-blur-xs">
@@ -107,12 +95,6 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
           </span>
         </div>
       )}
-
-      {/* Privacy Badge */}
-      <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center space-x-1 rounded-full bg-slate-900/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-medium text-white/90 pointer-events-none border border-white/20 shadow-xs">
-        <Shield className="h-3 w-3 text-emerald-300" />
-        <span className="tracking-wide">Protected</span>
-      </div>
     </div>
   )
 }
