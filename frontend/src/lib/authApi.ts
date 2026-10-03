@@ -10,6 +10,7 @@ export interface UserMe {
   last_name?: string;
   gender?: string;
   community?: string;
+  photo_url?: string | null;
   profile_status: string;
   is_premium: boolean;
 }

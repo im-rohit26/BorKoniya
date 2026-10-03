@@ -25,6 +25,7 @@ export interface ConversationSummary {
     profile_id: string;
     first_name: string;
     last_name: string;
+    gender?: string;
     photo_url?: string;
     community?: string;
     current_city?: string;
@@ -39,15 +40,29 @@ export interface ConversationSummary {
   created_at: string;
 }
 
+export interface ReplySnippet {
+  id: string;
+  sender_name: string;
+  content: string;
+  message_type?: string;
+  media_url?: string;
+}
+
 export interface MessageItem {
   id: string;
   conversation_id: string;
   sender_profile_id: string;
   sender_name: string;
+  sender_gender?: string;
   content: string;
   is_mine: boolean;
   is_read: boolean;
   created_at: string;
+  reply_to_message_id?: string;
+  reply_to?: ReplySnippet | null;
+  is_forwarded?: boolean;
+  message_type?: string;
+  media_url?: string;
 }
 
 export interface InterestsSummary {
@@ -254,18 +269,79 @@ export async function getMessages(conversationId: string): Promise<MessageItem[]
   return res.json();
 }
 
-export async function sendMessage(conversationId: string, content: string): Promise<MessageItem> {
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  options?: { replyToMessageId?: string; mediaUrl?: string; messageType?: string }
+): Promise<MessageItem> {
   const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({
+      content,
+      reply_to_message_id: options?.replyToMessageId,
+      media_url: options?.mediaUrl,
+      message_type: options?.messageType || 'text',
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to send message' }));
     throw new Error(err.detail || 'Failed to send message');
+  }
+  return res.json();
+}
+
+export async function forwardMessages(
+  messageIds: string[],
+  targetConversationIds?: string[],
+  targetProfileIds?: string[]
+) {
+  const res = await fetch(`${API_BASE_URL}/conversations/forward`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({
+      message_ids: messageIds,
+      target_conversation_ids: targetConversationIds,
+      target_profile_ids: targetProfileIds,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to forward messages' }));
+    throw new Error(err.detail || 'Failed to forward messages');
+  }
+  return res.json();
+}
+
+export async function deleteMessage(conversationId: string, messageId: string) {
+  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete message' }));
+    throw new Error(err.detail || 'Failed to delete message');
+  }
+  return res.json();
+}
+
+export async function batchDeleteMessages(messageIds: string[]) {
+  const res = await fetch(`${API_BASE_URL}/conversations/batch-delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ message_ids: messageIds }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete messages' }));
+    throw new Error(err.detail || 'Failed to delete messages');
   }
   return res.json();
 }

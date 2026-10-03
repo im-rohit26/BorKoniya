@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Globe, Menu, X, Sparkles, User as UserIcon, LogOut, ChevronDown } from 'lucide-react'
+import { Globe, Menu, X, Sparkles, LogOut, ChevronDown } from 'lucide-react'
 import { languages } from './LanguageSelectorModal'
 import { useAuth } from '../../context/AuthContext'
+import { getDefaultAvatar } from '../../lib/utils'
 import logoImg from '../../assets/logo.jpeg'
 
 interface HeaderProps {
@@ -87,8 +88,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center space-x-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100 py-1.5 px-3 transition-colors text-left"
               >
-                <div className="w-8 h-8 rounded-full bg-crimson-700 text-white font-bold flex items-center justify-center text-sm shadow-xs">
-                  {user?.first_name ? user.first_name.charAt(0).toUpperCase() : <UserIcon className="w-4 h-4" />}
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shadow-xs flex-shrink-0">
+                  <img
+                    src={user?.photo_url || getDefaultAvatar(user?.gender)}
+                    alt={user?.first_name || 'Member'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      const fallback = getDefaultAvatar(user?.gender)
+                      if (target.src !== fallback) target.src = fallback
+                    }}
+                  />
                 </div>
                 <div className="max-w-[120px] truncate">
                   <div className="text-xs font-bold text-navy-900 truncate">
@@ -199,11 +209,25 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
           <div className="pt-3 border-t border-slate-100 flex flex-col space-y-2">
             {isAuthenticated ? (
               <>
-                <div className="px-3 py-2 bg-slate-50 rounded-lg">
-                  <p className="text-sm font-bold text-navy-900">
-                    {user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Member'}
-                  </p>
-                  <p className="text-xs text-slate-500">{user?.phone_number || user?.email}</p>
+                <div className="px-3 py-2 bg-slate-50 rounded-lg flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+                    <img
+                      src={user?.photo_url || getDefaultAvatar(user?.gender)}
+                      alt={user?.first_name || 'Member'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.currentTarget
+                        const fallback = getDefaultAvatar(user?.gender)
+                        if (target.src !== fallback) target.src = fallback
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-navy-900 truncate">
+                      {user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Member'}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">{user?.phone_number || user?.email}</p>
+                  </div>
                 </div>
                 <Link
                   to="/dashboard"

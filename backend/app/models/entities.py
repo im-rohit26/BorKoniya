@@ -210,8 +210,14 @@ class Message(Base):
     read_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    reply_to_message_id = Column(String(36), ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
+    is_forwarded = Column(Boolean, default=False)
+    message_type = Column(String(20), default="text")
+    media_url = Column(String(500), nullable=True)
+
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("Profile")
+    reply_to = relationship("Message", remote_side=[id], foreign_keys=[reply_to_message_id])
 
     __table_args__ = (Index('ix_messages_conversation_id', 'conversation_id'),)
 

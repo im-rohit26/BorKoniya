@@ -43,6 +43,7 @@ class ConversationMemberInfo(BaseModel):
     profile_id: str
     first_name: str
     last_name: str
+    gender: Optional[str] = None
     photo_url: Optional[str] = None
     community: Optional[str] = None
     current_city: Optional[str] = None
@@ -63,6 +64,17 @@ class ConversationSummaryResponse(BaseModel):
 
 class MessageSendRequest(BaseModel):
     content: str
+    reply_to_message_id: Optional[str] = None
+    media_url: Optional[str] = None
+    message_type: Optional[str] = "text"
+
+
+class ReplySnippetResponse(BaseModel):
+    id: str
+    sender_name: str
+    content: str
+    message_type: Optional[str] = "text"
+    media_url: Optional[str] = None
 
 
 class MessageItemResponse(BaseModel):
@@ -70,10 +82,26 @@ class MessageItemResponse(BaseModel):
     conversation_id: str
     sender_profile_id: str
     sender_name: str
+    sender_gender: Optional[str] = None
     content: str
     is_mine: bool
     is_read: bool
     created_at: datetime
+    reply_to_message_id: Optional[str] = None
+    reply_to: Optional[ReplySnippetResponse] = None
+    is_forwarded: bool = False
+    message_type: Optional[str] = "text"
+    media_url: Optional[str] = None
+
+
+class ForwardMessagesRequest(BaseModel):
+    target_conversation_ids: Optional[List[str]] = None
+    target_profile_ids: Optional[List[str]] = None
+    message_ids: List[str]
+
+
+class BatchDeleteMessagesRequest(BaseModel):
+    message_ids: List[str]
 
 
 class StartConversationRequest(BaseModel):

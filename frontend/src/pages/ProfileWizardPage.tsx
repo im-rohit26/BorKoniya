@@ -28,9 +28,11 @@ import {
   setPrimaryPhoto,
 } from '../lib/profileApi'
 import { masterDataApi, type Community, type SubCommunity, type SelectOption } from '../lib/masterDataApi'
+import { useAuth } from '../context/AuthContext'
 
 export const ProfileWizardPage: React.FC = () => {
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [isSaving, setIsSaving] = useState(false)
@@ -185,6 +187,7 @@ export const ProfileWizardPage: React.FC = () => {
           isPrimary: uploaded.is_primary,
         },
       ])
+      await refreshUser()
     } catch (err: any) {
       console.warn('Backend photo upload error, reading as local preview:', err)
       const reader = new FileReader()
@@ -213,6 +216,7 @@ export const ProfileWizardPage: React.FC = () => {
     if (target?.id) {
       try {
         await setPrimaryPhoto(target.id)
+        await refreshUser()
       } catch (e) {
         console.error('Failed to set primary photo on backend:', e)
       }
@@ -230,6 +234,7 @@ export const ProfileWizardPage: React.FC = () => {
     if (target?.id) {
       try {
         await deleteProfilePhoto(target.id)
+        await refreshUser()
       } catch (e) {
         console.error('Failed to delete photo on backend:', e)
       }

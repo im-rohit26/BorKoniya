@@ -1,11 +1,13 @@
 import React from 'react'
-import { Shield, Lock, User } from 'lucide-react'
+import { Shield, Lock } from 'lucide-react'
+import { getDefaultAvatar } from '../../lib/utils'
 
 interface ProtectedPhotoProps {
   src?: string
   photoUrl?: string
   alt?: string
   altText?: string
+  gender?: string | null
   profileId?: string
   isProtected?: boolean
   className?: string
@@ -17,12 +19,13 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
   photoUrl,
   alt,
   altText,
+  gender,
   profileId = 'BK-MEMBER',
   isProtected = false,
   className = '',
   watermarkText,
 }) => {
-  const imageSource = src || photoUrl
+  const imageSource = src || photoUrl || getDefaultAvatar(gender)
   const imageAlt = alt || altText || 'Member Photo'
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -52,22 +55,23 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
       }}
     >
       {/* Underlying Image with pointer-events-none to prevent drag & context menu */}
-      {imageSource ? (
-        <img
-          src={imageSource}
-          alt={imageAlt}
-          loading="lazy"
-          draggable={false}
-          className={`h-full w-full object-cover transition-transform duration-500 pointer-events-none select-none ${
-            isProtected ? 'blur-md scale-105' : ''
-          }`}
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center text-slate-300 w-full h-full bg-gradient-to-b from-slate-100 to-slate-200">
-          <User className="w-12 h-12 stroke-[1.5]" />
-          <span className="text-[10px] text-slate-400 mt-1 font-medium">{profileId}</span>
-        </div>
-      )}
+      <img
+        src={imageSource}
+        alt={imageAlt}
+        loading="lazy"
+        draggable={false}
+        onError={(e) => {
+          // If custom photo fails to load, fallback safely to default gender avatar
+          const target = e.currentTarget
+          const fallback = getDefaultAvatar(gender)
+          if (target.src !== fallback) {
+            target.src = fallback
+          }
+        }}
+        className={`h-full w-full object-cover transition-transform duration-500 pointer-events-none select-none ${
+          isProtected ? 'blur-md scale-105' : ''
+        }`}
+      />
 
       {/* Transparent Protective Shield (catches all clicks/taps so raw image cannot be touched) */}
       <div

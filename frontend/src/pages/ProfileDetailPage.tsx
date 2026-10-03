@@ -211,6 +211,7 @@ export const ProfileDetailPage: React.FC = () => {
                     src={profile.photo_url}
                     alt={displayName}
                     profileId={profile.id}
+                    gender={profile.gender}
                     className="h-full w-full"
                   />
                   <div className="absolute top-2.5 left-2.5 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 border border-slate-700 flex items-center space-x-1">

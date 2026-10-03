@@ -97,5 +97,6 @@ class AuthMeResponse(BaseModel):
     last_name: Optional[str] = None
     gender: Optional[str] = None
     community: Optional[str] = None
+    photo_url: Optional[str] = None
     profile_status: str = "ACTIVE"
     is_premium: bool = False

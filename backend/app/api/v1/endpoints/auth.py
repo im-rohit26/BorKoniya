@@ -251,6 +251,15 @@ def get_current_user_info(
         .first()
     )
 
+    photo_url = None
+    if profile:
+        from app.models.entities import ProfilePhoto
+        primary_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id, ProfilePhoto.is_primary == True).first()
+        if not primary_photo:
+            primary_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).first()
+        if primary_photo:
+            photo_url = primary_photo.storage_path
+
     return AuthMeResponse(
         user_id=current_user.id,
         email=current_user.email,
@@ -261,6 +270,7 @@ def get_current_user_info(
         last_name=profile.last_name if profile else None,
         gender=profile.gender if profile else None,
         community=profile.community if profile else None,
+        photo_url=photo_url,
         profile_status=profile.status if profile else "INCOMPLETE",
         is_premium=bool(sub),
     )

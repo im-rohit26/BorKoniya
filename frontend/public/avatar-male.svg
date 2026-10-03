@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="maleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="maleSkin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fcd34d" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="64" cy="64" r="64" fill="url(#maleGrad)" />
+  <!-- Shoulders / Clothes -->
+  <path d="M20 120 C24 92, 40 84, 64 84 C88 84, 104 92, 108 120 Z" fill="#0f172a" />
+  <path d="M52 86 L64 102 L76 86 Z" fill="#e2e8f0" />
+  <path d="M60 92 L64 116 L68 92 Z" fill="#b91c1c" />
+  <!-- Neck -->
+  <rect x="56" y="68" width="16" height="20" rx="4" fill="url(#maleSkin)" />
+  <!-- Head / Face -->
+  <circle cx="64" cy="52" r="24" fill="url(#maleSkin)" />
+  <!-- Hair -->
+  <path d="M40 50 C40 32, 52 24, 64 24 C76 24, 88 32, 88 50 C84 42, 78 40, 64 40 C50 40, 44 42, 40 50 Z" fill="#1e293b" />
+  <!-- Smile -->
+  <path d="M56 62 Q64 68 72 62" stroke="#78350f" stroke-width="2.5" stroke-linecap="round" fill="none" />
+</svg>

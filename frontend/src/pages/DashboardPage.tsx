@@ -23,6 +23,7 @@ import {
   getSentInterestIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
+import { getDefaultAvatar } from '../lib/utils'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import { getRecommendedMatches, mapProfileResponseToCard } from '../lib/profileApi'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
@@ -169,14 +170,28 @@ export const DashboardPage: React.FC = () => {
         {/* Welcome Banner & Profile Completion Meter */}
         <div className="rounded-3xl bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 p-6 sm:p-8 text-white shadow-md mb-8 border border-navy-800">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="space-y-1 text-center md:text-left">
-              <span className="text-xs font-semibold text-crimson-400">Welcome Back 👋</span>
-              <h1 className="text-2xl sm:text-3xl font-bold font-serif">
-                {displayName}
-              </h1>
-              <p className="text-xs text-slate-300">
-                {communityDisplay} • Profile ID: {profileIdDisplay}
-              </p>
+            <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-crimson-400 bg-white/10 shadow-md flex-shrink-0">
+                <img
+                  src={user?.photo_url || getDefaultAvatar(user?.gender)}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget
+                    const fallback = getDefaultAvatar(user?.gender)
+                    if (target.src !== fallback) target.src = fallback
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-crimson-400">Welcome Back 👋</span>
+                <h1 className="text-2xl sm:text-3xl font-bold font-serif">
+                  {displayName}
+                </h1>
+                <p className="text-xs text-slate-300">
+                  {communityDisplay} • Profile ID: {profileIdDisplay}
+                </p>
+              </div>
             </div>
 
             {/* Completion Meter */}
