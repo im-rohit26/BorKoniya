@@ -38,6 +38,7 @@ import {
   Eraser,
   MessageCircleOff,
   ChevronDown,
+  Unlock,
 } from 'lucide-react';
 import {
   getConversations,
@@ -49,6 +50,7 @@ import {
   deleteConversationForMe,
   clearConversation,
   blockProfile,
+  unblockProfile,
   markConversationRead,
   getBlockedProfiles,
 } from '../lib/interactionApi';
@@ -142,6 +144,8 @@ export const ChatPage: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const quickRef = useRef<HTMLDivElement>(null);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -163,6 +167,24 @@ export const ChatPage: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [actionMenuMsg]);
+
+  // Close 3-dot menus when clicking outside
+  useEffect(() => {
+    const handleMenuClickOutside = (e: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(e.target as Node)) {
+        setChatMenuOpen(false);
+      }
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    if (chatMenuOpen || headerMenuOpen) {
+      document.addEventListener('mousedown', handleMenuClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleMenuClickOutside);
+    };
+  }, [chatMenuOpen, headerMenuOpen]);
 
   const toggleFavourite = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -322,10 +344,21 @@ export const ChatPage: React.FC = () => {
       await blockProfile(profileId);
       setBlockedProfileIds((prev) => [...prev, profileId]);
       alert(`${name} has been blocked.`);
-      setActiveConvId(null);
       await fetchConversations();
     } catch (err: any) {
       alert(err.message || 'Failed to block user');
+    }
+  };
+
+  const handleUnblockMember = async (profileId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to unblock ${name}?`)) return;
+    try {
+      await unblockProfile(profileId);
+      setBlockedProfileIds((prev) => prev.filter((id) => id !== profileId));
+      alert(`${name} has been unblocked.`);
+      await fetchConversations();
+    } catch (err: any) {
+      alert(err.message || 'Failed to unblock user');
     }
   };
 
@@ -892,7 +925,7 @@ export const ChatPage: React.FC = () => {
               </div>
 
               {headerMenuOpen && (
-                <div className="absolute right-3 top-full mt-1 w-52 max-w-[80vw] bg-white rounded-2xl shadow-xl border border-[#e3e9f5] py-1.5 z-50 text-sm">
+                <div ref={headerMenuRef} className="absolute right-3 top-full mt-1 w-52 max-w-[80vw] bg-white rounded-2xl shadow-xl border border-[#e3e9f5] py-1.5 z-50 text-sm">
                   <button
                     onClick={() => {
                       setHeaderMenuOpen(false);
@@ -1077,24 +1110,20 @@ export const ChatPage: React.FC = () => {
           {/* ================= RIGHT: CHAT WINDOW ================= */}
           {activeConv ? (
             <section className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-gradient-to-br from-[#f3f6fd] via-[#fbf1f6] to-[#fde4ec]">
+              {/* Theme romantic wallpaper background (2nd image) */}
+              <div
+                className="absolute inset-0 bg-cover bg-bottom bg-no-repeat pointer-events-none select-none opacity-45"
+                style={{ backgroundImage: `url('/chat-couple-bg.png')` }}
+              />
+
               {/* Decorative hearts */}
               <Heart
-                className="absolute top-28 right-6 w-40 h-40 text-[#f8c9d6]/60 pointer-events-none"
+                className="absolute top-28 right-6 w-40 h-40 text-[#f8c9d6]/40 pointer-events-none"
                 strokeWidth={1}
               />
-              <Heart className="absolute top-44 right-56 w-6 h-6 text-[#f6a6bb] fill-[#f6a6bb]/70 pointer-events-none" />
-              <Heart className="absolute top-80 left-1/3 w-4 h-4 text-[#e0102f] fill-[#e0102f]/70 pointer-events-none" />
-              <Heart className="absolute top-60 right-24 w-5 h-5 text-[#f6a6bb] fill-[#f6a6bb]/60 pointer-events-none" />
-              {/* Couple illustration — put your image at public/chat-couple.png */}
-              <img
-                src="/chat-couple.png"
-                alt=""
-                aria-hidden
-                className="absolute bottom-28 left-0 w-56 lg:w-72 pointer-events-none select-none opacity-95 hidden sm:block"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <Heart className="absolute top-44 right-56 w-6 h-6 text-[#f6a6bb] fill-[#f6a6bb]/60 pointer-events-none" />
+              <Heart className="absolute top-80 left-1/3 w-4 h-4 text-[#e0102f] fill-[#e0102f]/50 pointer-events-none" />
+              <Heart className="absolute top-60 right-24 w-5 h-5 text-[#f6a6bb] fill-[#f6a6bb]/50 pointer-events-none" />
 
               {/* Chat header or Multi-select Action Bar */}
               {isSelectMode ? (
@@ -1215,7 +1244,7 @@ export const ChatPage: React.FC = () => {
                       <Video className="w-5 h-5" />
                     </button>
 
-                    <div className="relative">
+                    <div className="relative" ref={chatMenuRef}>
                       <button onClick={() => setChatMenuOpen(!chatMenuOpen)} className={ROUND_BTN} title="More options">
                         <MoreVertical className="w-5 h-5" />
                       </button>
@@ -1274,19 +1303,35 @@ export const ChatPage: React.FC = () => {
                             <MessageCircleOff className="w-4 h-4" />
                             Delete Chat for Me
                           </button>
-                          <button
-                            onClick={() => {
-                              setChatMenuOpen(false);
-                              handleBlockMember(
-                                activeConv.other_profile.profile_id,
-                                `${activeConv.other_profile.first_name} ${activeConv.other_profile.last_name}`
-                              );
-                            }}
-                            className="w-full text-left px-4 py-2.5 hover:bg-[#f6f9ff] text-[#0b2a5b] flex items-center gap-2 border-t border-[#eef2fa]"
-                          >
-                            <Ban className="w-4 h-4" />
-                            Block User
-                          </button>
+                          {isBlocked ? (
+                            <button
+                              onClick={() => {
+                                setChatMenuOpen(false);
+                                handleUnblockMember(
+                                  activeConv.other_profile.profile_id,
+                                  `${activeConv.other_profile.first_name} ${activeConv.other_profile.last_name}`
+                                );
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-[#ecfdf5] text-[#16a34a] flex items-center gap-2 border-t border-[#eef2fa] font-medium"
+                            >
+                              <Unlock className="w-4 h-4 text-[#16a34a]" />
+                              Unblock User
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setChatMenuOpen(false);
+                                handleBlockMember(
+                                  activeConv.other_profile.profile_id,
+                                  `${activeConv.other_profile.first_name} ${activeConv.other_profile.last_name}`
+                                );
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-[#f6f9ff] text-[#0b2a5b] flex items-center gap-2 border-t border-[#eef2fa]"
+                            >
+                              <Ban className="w-4 h-4" />
+                              Block User
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1595,9 +1640,13 @@ export const ChatPage: React.FC = () => {
                               {m.is_mine &&
                                 !m.deleted_for_everyone &&
                                 (m.is_read ? (
-                                  <CheckCheck className={`w-3.5 h-3.5 ${isFwdMine ? 'text-[#0b4fd8]' : 'text-white'}`} />
+                                  <span title="Seen" className="inline-flex">
+                                    <CheckCheck className="w-3.5 h-3.5 text-[#22c55e] stroke-[2.5]" />
+                                  </span>
                                 ) : (
-                                  <Check className={`w-3.5 h-3.5 ${isFwdMine ? 'text-[#0b4fd8]/70' : 'text-white/70'}`} />
+                                  <span title="Delivered" className="inline-flex">
+                                    <Check className={`w-3.5 h-3.5 ${isFwdMine ? 'text-[#0b4fd8]/70' : 'text-white/70'}`} />
+                                  </span>
                                 ))}
                             </div>
 
@@ -1680,9 +1729,24 @@ export const ChatPage: React.FC = () => {
               )}
 
               {isBlocked && (
-                <div className="bg-[#fff0f1] border-t border-[#f3c4ca] px-4 py-3 text-center text-xs text-[#9b0016] flex items-center justify-center gap-2 z-10 flex-shrink-0">
-                  <Ban className="w-4 h-4 text-[#e0102f] flex-shrink-0" />
-                  <span>Communication is disabled because this member has been blocked.</span>
+                <div className="bg-[#fff0f1] border-t border-[#f3c4ca] px-4 py-2.5 text-center text-xs text-[#9b0016] flex flex-wrap items-center justify-center gap-2.5 z-10 flex-shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <Ban className="w-4 h-4 text-[#e0102f] flex-shrink-0" />
+                    <span>Communication is disabled because this member has been blocked.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleUnblockMember(
+                        activeConv.other_profile.profile_id,
+                        `${activeConv.other_profile.first_name} ${activeConv.other_profile.last_name}`
+                      )
+                    }
+                    className="px-3 py-1 bg-white hover:bg-[#ecfdf5] text-[#16a34a] border border-[#16a34a]/30 font-semibold rounded-full text-xs transition-colors shadow-sm inline-flex items-center gap-1"
+                  >
+                    <Unlock className="w-3.5 h-3.5" />
+                    Unblock Now
+                  </button>
                 </div>
               )}
               {!canChat && !isBlocked && (
