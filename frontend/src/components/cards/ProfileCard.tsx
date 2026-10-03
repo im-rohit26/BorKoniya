@@ -88,13 +88,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     return (
       <div className="group relative flex flex-col h-full overflow-hidden rounded-3xl bg-white border border-slate-200/80 shadow-xs hover:shadow-xl transition-all duration-300">
         {/* Full-width Top Photo Container */}
-        <div className="relative h-64 sm:h-72 w-full flex-shrink-0 bg-slate-100 overflow-hidden">
+        <div className="relative aspect-[3/4] sm:aspect-[4/5] w-full max-h-[380px] flex-shrink-0 bg-slate-100 overflow-hidden">
           <ProtectedPhoto
             src={profile.photoUrl}
             alt={profile.name}
             profileId={profile.id}
             gender={profile.gender}
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="h-full w-full group-hover:scale-102 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
@@ -282,13 +282,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     <div className="group relative overflow-hidden rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300">
       <div className="flex flex-col sm:flex-row">
         {/* Protected Photo Container */}
-        <div className="relative h-64 sm:h-auto sm:w-56 flex-shrink-0 bg-slate-100 overflow-hidden">
+        <div className="relative aspect-[3/4] sm:aspect-[3/4] sm:w-60 flex-shrink-0 bg-slate-100 overflow-hidden">
           <ProtectedPhoto
             src={profile.photoUrl}
             alt={profile.name}
             profileId={profile.id}
             gender={profile.gender}
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="h-full w-full group-hover:scale-102 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent sm:hidden pointer-events-none" />
 

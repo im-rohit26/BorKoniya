@@ -94,10 +94,10 @@ html, body {
 .photo-watermark-overlay {
   position: absolute;
   inset: 0;
-  pointer-events: auto;
+  pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
-  background: radial-gradient(circle, transparent 60%, rgba(0, 53, 114, 0.2) 100%);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,12 +105,12 @@ html, body {
 }
 
 .photo-watermark-text {
-  transform: rotate(-30deg);
-  color: rgba(255, 255, 255, 0.45);
-  font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  transform: rotate(-25deg);
+  color: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   white-space: nowrap;
   pointer-events: none;
 }

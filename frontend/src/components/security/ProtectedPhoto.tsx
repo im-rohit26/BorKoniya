@@ -11,6 +11,8 @@ interface ProtectedPhotoProps {
   profileId?: string
   isProtected?: boolean
   className?: string
+  imgClassName?: string
+  objectFit?: 'cover' | 'contain'
   watermarkText?: string
 }
 
@@ -23,6 +25,8 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
   profileId = 'BK-MEMBER',
   isProtected = false,
   className = '',
+  imgClassName = '',
+  objectFit = 'cover',
   watermarkText,
 }) => {
   const imageSource = src || photoUrl || getDefaultAvatar(gender)
@@ -68,9 +72,11 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
             target.src = fallback
           }
         }}
-        className={`h-full w-full object-cover transition-transform duration-500 pointer-events-none select-none ${
+        className={`h-full w-full ${
+          objectFit === 'contain' ? 'object-contain' : 'object-cover object-top'
+        } transition-transform duration-500 pointer-events-none select-none ${
           isProtected ? 'blur-md scale-105' : ''
-        }`}
+        } ${imgClassName}`}
       />
 
       {/* Transparent Protective Shield (catches all clicks/taps so raw image cannot be touched) */}
@@ -103,9 +109,9 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
       )}
 
       {/* Privacy Badge */}
-      <div className="absolute bottom-2 right-2 z-20 flex items-center space-x-1 rounded-full bg-navy-950/85 backdrop-blur-xs px-2 py-0.5 text-[9px] font-bold text-crimson-200 pointer-events-none border border-crimson-500/20">
-        <Shield className="h-2.5 w-2.5 text-crimson-300" />
-        <span>Anti-Save Protected</span>
+      <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center space-x-1 rounded-full bg-slate-900/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-medium text-white/90 pointer-events-none border border-white/20 shadow-xs">
+        <Shield className="h-3 w-3 text-emerald-300" />
+        <span className="tracking-wide">Protected</span>
       </div>
     </div>
   )
