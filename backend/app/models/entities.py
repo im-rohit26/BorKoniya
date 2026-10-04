@@ -344,3 +344,7 @@ class MatchScore(Base):
     )
 
 
+from app.models.call import Call  # noqa: E402, F401
+
+
+

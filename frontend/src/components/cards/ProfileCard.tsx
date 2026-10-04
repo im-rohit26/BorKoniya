@@ -13,6 +13,7 @@ import {
   Slash,
   Flag,
   Check,
+  CheckCircle,
 } from 'lucide-react'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { ProtectedPhoto } from '../security/ProtectedPhoto'
@@ -37,6 +38,7 @@ export interface ProfileCardData {
   shortBio: string
   isShortlisted?: boolean
   isInterestSent?: boolean
+  isConnected?: boolean
   gender?: string
 }
 
@@ -73,15 +75,32 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     setIsShortlisted(profile.isShortlisted || false)
   }, [profile.isShortlisted])
 
-  const handleInterest = () => {
+  const handleInterest = async () => {
     if (interestSent) return
-    setInterestSent(true)
-    if (onExpressInterest) onExpressInterest(profile.id)
+    if (onExpressInterest) {
+      try {
+        await onExpressInterest(profile.id)
+        setInterestSent(true)
+      } catch {
+        // Do not update state if handler rejected/unauthenticated
+      }
+    } else {
+      setInterestSent(true)
+    }
   }
 
-  const handleShortlist = () => {
-    setIsShortlisted(!isShortlisted)
-    if (onToggleShortlist) onToggleShortlist(profile.id)
+  const handleShortlist = async () => {
+    const nextVal = !isShortlisted
+    if (onToggleShortlist) {
+      try {
+        await onToggleShortlist(profile.id)
+        setIsShortlisted(nextVal)
+      } catch {
+        // Do not toggle if handler rejected
+      }
+    } else {
+      setIsShortlisted(nextVal)
+    }
   }
 
   if (layout === 'vertical') {
@@ -216,28 +235,38 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           {/* Action Row */}
           <div className="mt-5 pt-3.5 border-t border-slate-100 flex flex-col gap-2.5">
             <div className="flex items-center gap-2">
-              {/* Express Interest */}
-              <button
-                onClick={handleInterest}
-                disabled={interestSent}
-                className={`flex-1 flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
-                  interestSent
-                    ? 'bg-crimson-50 text-crimson-800 border border-crimson-200 cursor-default'
-                    : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
-                }`}
-              >
-                {interestSent ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-crimson-700" />
-                    <span>Interested</span>
-                  </>
-                ) : (
-                  <>
-                    <Heart className="h-3.5 w-3.5" />
-                    <span>Express Interest</span>
-                  </>
-                )}
-              </button>
+              {/* Express Interest / Connected Status */}
+              {profile.isConnected ? (
+                <button
+                  disabled
+                  className="flex-1 flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Connected</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleInterest}
+                  disabled={interestSent}
+                  className={`flex-1 flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
+                    interestSent
+                      ? 'bg-crimson-50 text-crimson-800 border border-crimson-200 cursor-default'
+                      : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
+                  }`}
+                >
+                  {interestSent ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-crimson-700" />
+                      <span>Interested</span>
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="h-3.5 w-3.5" />
+                      <span>Express Interest</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* Shortlist */}
               <button
@@ -416,28 +445,38 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           {/* Action Row */}
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Express Interest */}
-              <button
-                onClick={handleInterest}
-                disabled={interestSent}
-                className={`flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
-                  interestSent
-                    ? 'bg-crimson-50 text-crimson-800 border border-crimson-200 cursor-default'
-                    : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
-                }`}
-              >
-                {interestSent ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-crimson-700" />
-                    <span>Interested</span>
-                  </>
-                ) : (
-                  <>
-                    <Heart className="h-3.5 w-3.5" />
-                    <span>Express Interest</span>
-                  </>
-                )}
-              </button>
+              {/* Express Interest / Connected Status */}
+              {profile.isConnected ? (
+                <button
+                  disabled
+                  className="flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Connected</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleInterest}
+                  disabled={interestSent}
+                  className={`flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
+                    interestSent
+                      ? 'bg-crimson-50 text-crimson-800 border border-crimson-200 cursor-default'
+                      : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
+                  }`}
+                >
+                  {interestSent ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-crimson-700" />
+                      <span>Interested</span>
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="h-3.5 w-3.5" />
+                      <span>Express Interest</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* Shortlist */}
               <button

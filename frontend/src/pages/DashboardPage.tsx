@@ -14,18 +14,21 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  getInterestsSummary,
-  getShortlist,
   sendInterest,
   addToShortlist,
   removeFromShortlist,
   getShortlistedIds,
   getSentInterestIds,
+  getConnectedProfileIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
 import { getDefaultAvatar } from '../lib/utils'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
-import { getRecommendedMatches, mapProfileResponseToCard } from '../lib/profileApi'
+import {
+  getDashboardStats,
+  mapProfileResponseToCard,
+  type DashboardStatsResponse,
+} from '../lib/profileApi'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
 
@@ -38,12 +41,7 @@ export const DashboardPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [matches, setMatches] = useState<ProfileCardData[]>([])
   const [loadingMatches, setLoadingMatches] = useState(true)
-  const [interestsSummary, setInterestsSummary] = useState({
-    received_pending: 0,
-    sent_pending: 0,
-    total_active_connections: 0,
-  })
-  const [shortlistCount, setShortlistCount] = useState(0)
+  const [dashboardData, setDashboardData] = useState<DashboardStatsResponse | null>(null)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -51,50 +49,36 @@ export const DashboardPage: React.FC = () => {
   }
 
   useEffect(() => {
-    getSubscriptionStatus()
-      .then((status) => {
-        if (status.is_active) setIsPremiumUser(true)
-      })
-      .catch(() => {})
+    let isCancelled = false
+    setLoadingMatches(true)
 
-    getInterestsSummary()
-      .then((s) => setInterestsSummary(s))
-      .catch((err) => console.log('Summary error:', err))
-
-    getShortlist()
-      .then((list) => setShortlistCount(list.length))
-      .catch((err) => console.log('Shortlist error:', err))
-
-    let isCancelled = false;
-
-    // Fetch real top 3 matches from Supabase
-    const fetchMatches = async () => {
-      setLoadingMatches(true)
+    const fetchDashboard = async () => {
       try {
-        const raw = await getRecommendedMatches(3)
-        let sIds: string[] = []
-        let sentIds: string[] = []
-        try {
-          [sIds, sentIds] = await Promise.all([
-            getShortlistedIds().catch(() => []),
-            getSentInterestIds().catch(() => []),
-          ])
-        } catch {
-          sIds = []
-          sentIds = []
-        }
-        if (!isCancelled) {
+        const [dash, sub, sIds, sentIds, connIds] = await Promise.all([
+          getDashboardStats().catch(() => null),
+          getSubscriptionStatus().catch(() => null),
+          getShortlistedIds().catch(() => []),
+          getSentInterestIds().catch(() => []),
+          getConnectedProfileIds().catch(() => []),
+        ])
+
+        if (isCancelled) return
+
+        if (sub?.is_active) setIsPremiumUser(true)
+
+        if (dash) {
+          setDashboardData(dash)
           const sSet = new Set(sIds)
           const sentSet = new Set(sentIds)
-          const mapped = raw.slice(0, 3).map((p) =>
-            mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id))
+          const connSet = new Set(connIds)
+          const recProfiles = dash.recommended_profiles || (dash as any).top_matches || []
+          const mapped = recProfiles.map((p) =>
+            mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id), connSet.has(p.id))
           )
           setMatches(mapped)
         }
       } catch (err) {
-        if (!isCancelled) {
-          console.error('Failed to load dashboard matches:', err)
-        }
+        console.error('Failed to load dashboard:', err)
       } finally {
         if (!isCancelled) {
           setLoadingMatches(false)
@@ -102,9 +86,11 @@ export const DashboardPage: React.FC = () => {
       }
     }
 
-    fetchMatches()
-    return () => { isCancelled = true; }
-  }, [])
+    fetchDashboard()
+    return () => {
+      isCancelled = true
+    }
+  }, [user?.user_id])
 
   const handleInterest = async (id: string, name: string) => {
     try {
@@ -125,14 +111,34 @@ export const DashboardPage: React.FC = () => {
         setMatches((prev) =>
           prev.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
         )
-        setShortlistCount((prev) => Math.max(0, prev - 1))
+        setDashboardData((prev) =>
+          prev
+            ? {
+                ...prev,
+                metrics: {
+                  ...prev.metrics,
+                  shortlist_count: Math.max(0, prev.metrics.shortlist_count - 1),
+                },
+              }
+            : null
+        )
         showToast(`${name} removed from shortlist.`)
       } else {
         await addToShortlist(id)
         setMatches((prev) =>
           prev.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
         )
-        setShortlistCount((prev) => prev + 1)
+        setDashboardData((prev) =>
+          prev
+            ? {
+                ...prev,
+                metrics: {
+                  ...prev.metrics,
+                  shortlist_count: prev.metrics.shortlist_count + 1,
+                },
+              }
+            : null
+        )
         showToast(`${name} added to shortlist!`)
       }
     } catch (err: any) {
@@ -157,10 +163,31 @@ export const DashboardPage: React.FC = () => {
     }
   }
 
-  const completionPct = (user as any)?.profile_completion_pct || 0
-  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Valued Member'
-  const communityDisplay = user?.community ? `${user.community} Community` : 'Sadgope / Gowala Community'
+  const completionPct =
+    dashboardData?.metrics?.profile_completion_pct ??
+    (user as any)?.profile_completion_pct ??
+    0
+  const displayName = dashboardData?.user?.first_name
+    ? `${dashboardData.user.first_name} ${dashboardData.user.last_name || ''}`.trim()
+    : user?.first_name
+    ? `${user.first_name} ${user.last_name || ''}`.trim()
+    : 'Valued Member'
+  const communityDisplay = dashboardData?.user?.community
+    ? `${dashboardData.user.community} Community`
+    : user?.community
+    ? `${user.community} Community`
+    : 'Sadgope / Gowala Community'
   const profileIdDisplay = `BK-${(user?.profile_id || '0000').slice(-4).toUpperCase()}`
+
+  const recommendedCount = dashboardData?.metrics?.recommended_count ?? matches.length
+  const interestsCount =
+    (dashboardData?.metrics?.received_interests_count ?? 0) +
+    (dashboardData?.metrics?.sent_interests_count ?? 0)
+  const shortlistedCount = dashboardData?.metrics?.shortlist_count ?? 0
+  const messagesCount =
+    dashboardData?.metrics?.active_conversations_count ??
+    dashboardData?.metrics?.total_active_connections ??
+    0
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfbf9]">
@@ -173,12 +200,12 @@ export const DashboardPage: React.FC = () => {
             <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
               <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-crimson-400 bg-white/10 shadow-md flex-shrink-0">
                 <img
-                  src={user?.photo_url || getDefaultAvatar(user?.gender)}
+                  src={dashboardData?.user?.photo_url || user?.photo_url || getDefaultAvatar(dashboardData?.user?.gender || user?.gender)}
                   alt={displayName}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.currentTarget
-                    const fallback = getDefaultAvatar(user?.gender)
+                    const fallback = getDefaultAvatar(dashboardData?.user?.gender || user?.gender)
                     if (target.src !== fallback) target.src = fallback
                   }}
                 />
@@ -226,7 +253,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs font-semibold">Recommended</span>
               <Sparkles className="h-4 w-4 text-crimson-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-navy-950">{matches.length}</div>
+            <div className="text-2xl font-black text-navy-950">{recommendedCount}</div>
             <p className="text-[11px] text-crimson-700 font-medium mt-1">Explore Matches &rarr;</p>
           </div>
 
@@ -239,7 +266,7 @@ export const DashboardPage: React.FC = () => {
               <Heart className="h-4 w-4 text-crimson-700 group-hover:scale-110 transition-transform" />
             </div>
             <div className="text-2xl font-black text-navy-950">
-              {interestsSummary.received_pending + interestsSummary.sent_pending}
+              {interestsCount}
             </div>
             <p className="text-[11px] text-crimson-700 font-medium mt-1">Manage Requests &rarr;</p>
           </div>
@@ -252,7 +279,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs font-semibold">Shortlisted</span>
               <Star className="h-4 w-4 text-navy-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-navy-950">{shortlistCount}</div>
+            <div className="text-2xl font-black text-navy-950">{shortlistedCount}</div>
             <p className="text-[11px] text-navy-800 font-medium mt-1">View Saved Profiles &rarr;</p>
           </div>
 
@@ -264,7 +291,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs font-semibold">Messages</span>
               <MessageSquare className="h-4 w-4 text-navy-700 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-black text-navy-950">{interestsSummary.total_active_connections}</div>
+            <div className="text-2xl font-black text-navy-950">{messagesCount}</div>
             <p className="text-[11px] text-navy-800 font-medium mt-1">Open Chat &rarr;</p>
           </div>
         </div>
@@ -289,9 +316,24 @@ export const DashboardPage: React.FC = () => {
               <Loader2 className="w-8 h-8 animate-spin text-crimson-700 mb-3" />
               <p className="text-sm font-medium">Loading recommendations from Supabase...</p>
             </div>
+          ) : matches.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center bg-white">
+              <Sparkles className="mx-auto h-8 w-8 text-crimson-600 mb-2 opacity-80" />
+              <h3 className="text-sm font-semibold text-navy-950">No Recommended Matches Right Now</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                All eligible matches might be connected or pending. Explore all community members in Match Discovery.
+              </p>
+              <Link
+                to="/matches"
+                className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-crimson-700 hover:text-crimson-800"
+              >
+                <span>Browse All Matches</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {matches.slice(0, 3).map((profile) => (
+              {matches.slice(0, 6).map((profile) => (
                 <ProfileCard
                   key={profile.id}
                   profile={profile}

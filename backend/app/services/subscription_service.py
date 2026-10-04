@@ -78,7 +78,14 @@ class SubscriptionService:
         coupon = db.query(Coupon).filter(Coupon.code == code_clean, Coupon.is_active == True).first()
 
         if not coupon:
-            raise HTTPException(status_code=400, detail="Invalid or expired coupon code.")
+            return CouponApplyResponse(
+                is_valid=False,
+                coupon_code=code_clean,
+                original_price_inr=original_price,
+                discount_amount_inr=0.00,
+                net_payable_inr=original_price,
+                message="Invalid or expired coupon code.",
+            )
 
         if coupon.discount_type == "PERCENTAGE":
             calc_discount = original_price * (float(coupon.discount_value) / 100.0)

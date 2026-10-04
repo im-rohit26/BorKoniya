@@ -138,6 +138,34 @@ export async function getSentInterestIds(): Promise<string[]> {
   }
 }
 
+export async function getConnectedProfileIds(): Promise<string[]> {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/interests/connected/ids`, {
+      headers: { ...headers },
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // Fall back to querying received & sent accepted
+  }
+
+  try {
+    const [received, sent] = await Promise.all([
+      getReceivedInterests('ACCEPTED').catch(() => []),
+      getSentInterests('ACCEPTED').catch(() => []),
+    ]);
+    const ids = new Set<string>();
+    received.forEach((i) => ids.add(i.sender_profile_id));
+    sent.forEach((i) => ids.add(i.receiver_profile_id));
+    return Array.from(ids);
+  } catch {
+    return [];
+  }
+}
+
 export async function acceptInterest(interestId: string) {
   const res = await fetch(`${API_BASE_URL}/interests/${interestId}/accept`, {
     method: 'POST',
@@ -446,3 +474,38 @@ export async function reportProfile(reportedProfileId: string, reason: string, d
   }
   return res.json();
 }
+
+// 5. Chat Media & Attachment APIs
+export async function uploadChatAttachment(
+  conversationId: string,
+  file: File,
+  attachmentType: 'image' | 'document'
+): Promise<{
+  media_url: string;
+  message_type: 'image' | 'document';
+  original_filename: string;
+  size_bytes: number;
+  mime_type: string;
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('attachment_type', attachmentType);
+
+  const authHeaders = getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/attachment`, {
+    method: 'POST',
+    headers: {
+      ...(authHeaders.Authorization ? { Authorization: authHeaders.Authorization } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to upload attachment' }));
+    let msg = err.detail;
+    if (Array.isArray(msg)) msg = msg.map((e: any) => e.msg || e.message).join(', ');
+    throw new Error(msg || 'Failed to upload attachment');
+  }
+  return res.json();
+}
+

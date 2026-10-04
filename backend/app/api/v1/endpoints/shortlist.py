@@ -7,6 +7,7 @@ from app.api.deps import get_current_profile
 from app.models.entities import Profile, Shortlist, User
 from app.schemas.interaction import ShortlistItemResponse
 from app.api.v1.endpoints.profiles import format_profile_response
+from app.services.matching_service import matching_service, get_match_score
 
 router = APIRouter(prefix="/shortlist", tags=["Shortlist & Bookmarks"])
 
@@ -129,6 +130,15 @@ def get_shortlist(
             continue
         target, user = pu_map[item.target_profile_id]
         formatted = format_profile_response(target, user=user)
+        if current_profile and target.id != current_profile.id:
+            db_score = get_match_score(db, current_profile.id, target.id)
+            if db_score is not None:
+                formatted.match_score = db_score
+                _, formatted.match_breakdown = matching_service.evaluate_match(current_profile, target)
+            else:
+                score, breakdown = matching_service.evaluate_match(current_profile, target)
+                formatted.match_score = score
+                formatted.match_breakdown = breakdown
 
         results.append(
             ShortlistItemResponse(

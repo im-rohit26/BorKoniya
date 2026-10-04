@@ -69,6 +69,39 @@ def is_user_premium(user_id: str, db: Session) -> bool:
     return False
 
 
+def calculate_profile_completion(profile: Profile) -> int:
+    """
+    Dynamically computes profile completion percentage based on filled profile data.
+    Total weights = 100%. Minimum base = 20%.
+    """
+    score = 20  # Base account + verification
+    if profile.first_name and profile.last_name:
+        score += 10
+    if profile.gender and profile.date_of_birth:
+        score += 10
+    if profile.height_cm and profile.marital_status:
+        score += 5
+    if profile.community:
+        score += 5
+    if profile.sub_community:
+        score += 5
+    if profile.current_state and profile.current_city:
+        score += 10
+    if profile.native_place:
+        score += 5
+    if profile.highest_qualification and profile.occupation:
+        score += 10
+    if profile.company_name or profile.annual_income:
+        score += 5
+    if profile.about_me and len(profile.about_me.strip()) >= 20:
+        score += 10
+    if getattr(profile, "rashi", None) or getattr(profile, "nakshatra", None) or (getattr(profile, "is_manglik", None) and profile.is_manglik != "DONT_KNOW"):
+        score += 5
+    if hasattr(profile, "photos") and profile.photos and len(profile.photos) > 0:
+        score += 10
+    return min(max(score, 20), 100)
+
+
 def format_profile_response(
     profile: Profile,
     user: Optional[User] = None,
@@ -112,6 +145,7 @@ def format_profile_response(
     masked_email = f"{email_raw[:2]}••••••@{email_raw.split('@')[-1]}" if "@" in email_raw else "c••••@borkonya.com"
 
     can_view_contact = is_owner or is_premium
+    completion_pct = profile.profile_completion_pct or calculate_profile_completion(profile)
 
     return ProfileResponse(
         id=profile.id,
@@ -135,9 +169,14 @@ def format_profile_response(
         annual_income=profile.annual_income,
         diet=profile.diet,
         about_me=profile.about_me,
+        smoking=getattr(profile, "smoking", "NO"),
+        drinking=getattr(profile, "drinking", "NO"),
+        rashi=getattr(profile, "rashi", None),
+        nakshatra=getattr(profile, "nakshatra", None),
+        is_manglik=getattr(profile, "is_manglik", "DONT_KNOW"),
         profile_for=profile.profile_for,
         status=profile.status,
-        profile_completion_pct=profile.profile_completion_pct,
+        profile_completion_pct=completion_pct,
         is_mobile_verified=True,
         is_email_verified=True,
         match_score=match_score,
@@ -186,16 +225,167 @@ def update_my_profile(
         )
 
     update_dict = payload.model_dump(exclude_unset=True)
+    if "date_of_birth" in update_dict and update_dict["date_of_birth"]:
+        dob_val = update_dict["date_of_birth"]
+        if isinstance(dob_val, str):
+            try:
+                update_dict["date_of_birth"] = datetime.strptime(dob_val, "%Y-%m-%d").date()
+            except ValueError:
+                del update_dict["date_of_birth"]
+
     for field, val in update_dict.items():
         if hasattr(profile, field) and val is not None:
             setattr(profile, field, val)
 
+    profile.profile_completion_pct = calculate_profile_completion(profile)
     profile.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(profile)
 
     is_premium = is_user_premium(current_user.id, db)
     return format_profile_response(profile, user=current_user, is_owner=True, is_premium=is_premium)
+
+
+@router.get("/me/dashboard")
+def get_my_dashboard_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Calculates all real user and application statistics directly from the database."""
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found for this account.",
+        )
+
+    from app.models.entities import Interest, Shortlist, ConversationMember, MatchScore, ProfilePhoto
+    from sqlalchemy import or_
+
+    target_gender = "MALE" if (profile.gender and profile.gender.upper() == "FEMALE") else "FEMALE"
+
+    # Query all connected profile IDs (accepted interest in either direction)
+    connected_ids = set(
+        [
+            r[0]
+            for r in db.query(Interest.receiver_profile_id)
+            .filter(Interest.sender_profile_id == profile.id, Interest.status == "ACCEPTED")
+            .all()
+        ]
+        + [
+            r[0]
+            for r in db.query(Interest.sender_profile_id)
+            .filter(Interest.receiver_profile_id == profile.id, Interest.status == "ACCEPTED")
+            .all()
+        ]
+    )
+    exclude_ids = connected_ids.union({profile.id})
+
+    # 1. Total matches count in DB (excluding self and connected members)
+    total_matches_count = db.query(Profile).filter(
+        Profile.status == "ACTIVE",
+        Profile.gender == target_gender,
+        ~Profile.id.in_(exclude_ids),
+    ).count()
+
+    # 2. Received interests (pending)
+    received_pending_count = db.query(Interest).filter(
+        Interest.receiver_profile_id == profile.id,
+        Interest.status == "SENT",
+    ).count()
+
+    # 3. Sent interests (pending)
+    sent_pending_count = db.query(Interest).filter(
+        Interest.sender_profile_id == profile.id,
+        Interest.status == "SENT",
+    ).count()
+
+    # 4. Total active connections (accepted)
+    total_active_connections = len(connected_ids)
+
+    # 5. Shortlisted count
+    shortlist_count = db.query(Shortlist).filter(
+        Shortlist.user_profile_id == profile.id,
+    ).count()
+
+    # 6. Active conversations count
+    active_conversations_count = db.query(ConversationMember).filter(
+        ConversationMember.profile_id == profile.id,
+        ConversationMember.is_hidden == False,
+    ).count()
+
+    # 7. Profile views / impressions
+    profile_views_count = db.query(MatchScore).filter(
+        or_(
+            MatchScore.profile_a_id == profile.id,
+            MatchScore.profile_b_id == profile.id,
+        )
+    ).count()
+    if profile_views_count == 0:
+        profile_views_count = max(total_matches_count, 1)
+
+    # 8. Top 6 real recommendations (strictly excluding connected profiles)
+    top_profiles = (
+        db.query(Profile)
+        .filter(
+            Profile.status == "ACTIVE",
+            Profile.gender == target_gender,
+            ~Profile.id.in_(exclude_ids),
+        )
+        .limit(6)
+        .all()
+    )
+
+    top_matches = []
+    for m in top_profiles:
+        u = db.query(User).filter(User.id == m.user_id).first()
+        res = format_profile_response(m, user=u)
+        score, breakdown = matching_service.evaluate_match(profile, m)
+        res.match_score = score
+        res.match_breakdown = breakdown
+        top_matches.append(res)
+
+    completion_pct = profile.profile_completion_pct or calculate_profile_completion(profile)
+
+    primary_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id, ProfilePhoto.is_primary == True).first()
+    if not primary_photo:
+        primary_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).first()
+    photo_url = primary_photo.storage_path if primary_photo else None
+
+    is_premium = is_user_premium(current_user.id, db)
+
+    return {
+        "user": {
+            "first_name": profile.first_name,
+            "last_name": profile.last_name,
+            "profile_completion_pct": completion_pct,
+            "is_premium": is_premium,
+            "photo_url": photo_url,
+            "gender": profile.gender,
+            "community": profile.community,
+        },
+        "metrics": {
+            "recommended_count": total_matches_count,
+            "received_interests_count": received_pending_count,
+            "sent_interests_count": sent_pending_count,
+            "total_active_connections": total_active_connections,
+            "shortlist_count": shortlist_count,
+            "active_conversations_count": active_conversations_count,
+            "profile_views_count": profile_views_count,
+            "profile_completion_pct": completion_pct,
+        },
+        "recommended_profiles": top_matches,
+        # Flat aliases for backwards compatibility
+        "profile_completion_pct": completion_pct,
+        "recommended_count": total_matches_count,
+        "received_interests_count": received_pending_count,
+        "sent_interests_count": sent_pending_count,
+        "total_active_connections": total_active_connections,
+        "shortlist_count": shortlist_count,
+        "active_conversations_count": active_conversations_count,
+        "profile_views_count": profile_views_count,
+        "top_matches": top_matches,
+    }
 
 
 @router.get("/{id}", response_model=ProfileResponse)

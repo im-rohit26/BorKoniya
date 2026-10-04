@@ -92,6 +92,20 @@ app.add_middleware(
 # Include API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+# Dedicated root WebSocket endpoint for 1-to-1 Voice & Video Call Signaling (/ws/calls)
+from fastapi import WebSocket, Query
+from typing import Optional
+from app.api.v1.endpoints.calls import handle_calls_websocket
+
+
+@app.websocket("/ws/calls")
+async def root_ws_calls(
+    websocket: WebSocket,
+    token: Optional[str] = Query(default=None),
+):
+    await handle_calls_websocket(websocket, token)
+
+
 # Static Files for Uploads fallback
 import os
 from fastapi.staticfiles import StaticFiles

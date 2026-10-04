@@ -21,8 +21,10 @@ import {
   addToShortlist,
   removeFromShortlist,
   blockProfile,
+  getShortlist,
   getShortlistedIds,
   getSentInterestIds,
+  getConnectedProfileIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
@@ -30,23 +32,63 @@ import {
   getRecommendedMatches,
   getNewMatches,
   getNearYouMatches,
+  getProfileVisitors,
   mapProfileResponseToCard,
 } from '../lib/profileApi'
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
+import { useAuth } from '../context/AuthContext'
+import { masterDataApi, type Community, type SelectOption } from '../lib/masterDataApi'
+import { RotateCcw } from 'lucide-react'
+
+type MatchTabId = 'recommended' | 'new' | 'near_you' | 'visitors' | 'shortlist'
 
 export const MatchesPage: React.FC = () => {
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'recommended' | 'new' | 'near_you' | 'visitors' | 'shortlist'>('recommended')
+  const [activeTab, setActiveTab] = useState<MatchTabId>('recommended')
   const [sortBy, setSortBy] = useState<'score' | 'age_asc' | 'age_desc'>('score')
-  const [profiles, setProfiles] = useState<ProfileCardData[]>([])
+  
+  // Filter States
+  const [filterCommunity, setFilterCommunity] = useState('ALL')
+  const [filterState, setFilterState] = useState('ALL')
+  const [filterMaritalStatus, setFilterMaritalStatus] = useState('ALL')
+  const [filterDiet, setFilterDiet] = useState('ALL')
+
+  const [communities, setCommunities] = useState<Community[]>([])
+  const [states, setStates] = useState<SelectOption[]>([])
+  const [maritalStatuses, setMaritalStatuses] = useState<SelectOption[]>([])
+  const [dietOptions, setDietOptions] = useState<SelectOption[]>([])
+
+  const [tabProfiles, setTabProfiles] = useState<Record<MatchTabId, ProfileCardData[]>>({
+    recommended: [],
+    new: [],
+    near_you: [],
+    visitors: [],
+    shortlist: [],
+  })
   const [loading, setLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [reportModalData, setReportModalData] = useState<{ id: string; name: string } | null>(null)
   const [isPremiumUser, setIsPremiumUser] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState('Direct Family Messaging')
+
+  // Load master data on mount
+  useEffect(() => {
+    Promise.all([
+      masterDataApi.getCommunities().catch(() => []),
+      masterDataApi.getStates().catch(() => []),
+      masterDataApi.getMaritalStatuses().catch(() => []),
+      masterDataApi.getDietOptions().catch(() => []),
+    ]).then(([comm, st, mar, diet]) => {
+      setCommunities(comm)
+      setStates(st)
+      setMaritalStatuses(mar)
+      setDietOptions(diet)
+    }).catch(console.error)
+  }, [])
 
   // Load subscription status on mount
   useEffect(() => {
@@ -57,47 +99,70 @@ export const MatchesPage: React.FC = () => {
       .catch(() => {})
   }, [])
 
-  // Fetch real matches whenever activeTab changes
+  // Fetch real matches across all categories with filters applied
   useEffect(() => {
     let isCancelled = false
     setLoading(true)
 
-    const fetchProfiles = async () => {
+    const fetchAllCategories = async () => {
       try {
-        let rawProfiles = []
-        if (activeTab === 'new') {
-          rawProfiles = await getNewMatches(3)
-        } else if (activeTab === 'near_you') {
-          rawProfiles = await getNearYouMatches(3)
-        } else {
-          rawProfiles = await getRecommendedMatches(3)
-        }
+        const filters: Record<string, any> = {}
+        if (filterCommunity && filterCommunity !== 'ALL') filters.community = filterCommunity
+        if (filterState && filterState !== 'ALL') filters.state = filterState
+        if (filterMaritalStatus && filterMaritalStatus !== 'ALL') filters.marital_status = filterMaritalStatus
+        if (filterDiet && filterDiet !== 'ALL') filters.diet = filterDiet
 
-        let shortlistedIds: string[] = []
-        let sentInterestIds: string[] = []
-        try {
-          [shortlistedIds, sentInterestIds] = await Promise.all([
-            getShortlistedIds().catch(() => []),
-            getSentInterestIds().catch(() => []),
-          ])
-        } catch {
-          shortlistedIds = []
-          sentInterestIds = []
-        }
+        const [
+          rawRecommended,
+          rawNew,
+          rawNearYou,
+          rawVisitors,
+          shortlistItems,
+          shortlistedIds,
+          sentInterestIds,
+          connectedIds,
+        ] = await Promise.all([
+          getRecommendedMatches(20, filters, 1).catch(() => []),
+          getNewMatches(20, filters, 1).catch(() => []),
+          getNearYouMatches(20, filters, 1).catch(() => []),
+          getProfileVisitors(20, filters, 1).catch(() => []),
+          getShortlist().catch(() => []),
+          getShortlistedIds().catch(() => []),
+          getSentInterestIds().catch(() => []),
+          getConnectedProfileIds().catch(() => []),
+        ])
+
+        if (isCancelled) return
+
         const shortlistedSet = new Set(shortlistedIds)
         const sentInterestSet = new Set(sentInterestIds)
+        const connectedSet = new Set(connectedIds)
 
-        if (!isCancelled) {
-          const mapped = rawProfiles.slice(0, 3).map((p) =>
-            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id))
+        const mapList = (list: any[]) =>
+          list.map((p) =>
+            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id), connectedSet.has(p.id))
           )
-          setProfiles(mapped)
-        }
+
+        const mappedShortlist = shortlistItems
+          .filter((item) => item?.profile)
+          .map((item) =>
+            mapProfileResponseToCard(
+              item.profile,
+              true,
+              sentInterestSet.has(item.profile.id),
+              connectedSet.has(item.profile.id)
+            )
+          )
+
+        setTabProfiles({
+          recommended: mapList(rawRecommended),
+          new: mapList(rawNew),
+          near_you: mapList(rawNearYou),
+          visitors: mapList(rawVisitors),
+          shortlist: mappedShortlist,
+        })
       } catch (err) {
-        console.error('Failed to fetch matches from Supabase:', err)
-        if (!isCancelled) {
-          setProfiles([])
-        }
+        console.error('Failed to fetch matches:', err)
       } finally {
         if (!isCancelled) {
           setLoading(false)
@@ -105,11 +170,11 @@ export const MatchesPage: React.FC = () => {
       }
     }
 
-    fetchProfiles()
+    fetchAllCategories()
     return () => {
       isCancelled = true
     }
-  }, [activeTab])
+  }, [filterCommunity, filterState, filterMaritalStatus, filterDiet, isAuthenticated])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -117,34 +182,80 @@ export const MatchesPage: React.FC = () => {
   }
 
   const handleInterest = async (id: string, name: string) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      throw new Error('Please login to express interest')
+    }
     try {
       await sendInterest(id)
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
-      )
+      setTabProfiles((prev) => {
+        const updateList = (list: ProfileCardData[]) =>
+          list.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
+        return {
+          recommended: updateList(prev.recommended),
+          new: updateList(prev.new),
+          near_you: updateList(prev.near_you),
+          visitors: updateList(prev.visitors),
+          shortlist: updateList(prev.shortlist),
+        }
+      })
       showToast(`Express Interest sent to ${name}!`)
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
+      throw err
     }
   }
 
   const handleToggleShortlist = async (id: string, name: string, isCurrentlyShortlisted?: boolean) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      throw new Error('Please login to shortlist profiles')
+    }
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
-        setProfiles((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
-        )
+        setTabProfiles((prev) => {
+          const updateList = (list: ProfileCardData[]) =>
+            list.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
+          return {
+            recommended: updateList(prev.recommended),
+            new: updateList(prev.new),
+            near_you: updateList(prev.near_you),
+            visitors: updateList(prev.visitors),
+            shortlist: prev.shortlist.filter((p) => p.id !== id),
+          }
+        })
         showToast(`${name} removed from shortlist.`)
       } else {
         await addToShortlist(id)
-        setProfiles((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
-        )
+        setTabProfiles((prev) => {
+          const allCards = [
+            ...prev.recommended,
+            ...prev.new,
+            ...prev.near_you,
+            ...prev.visitors,
+          ]
+          const targetCard = allCards.find((p) => p.id === id)
+          const updateList = (list: ProfileCardData[]) =>
+            list.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
+          const nextShortlist =
+            targetCard && !prev.shortlist.some((p) => p.id === id)
+              ? [{ ...targetCard, isShortlisted: true }, ...prev.shortlist]
+              : updateList(prev.shortlist)
+
+          return {
+            recommended: updateList(prev.recommended),
+            new: updateList(prev.new),
+            near_you: updateList(prev.near_you),
+            visitors: updateList(prev.visitors),
+            shortlist: nextShortlist,
+          }
+        })
         showToast(`${name} added to shortlist!`)
       }
     } catch (err: any) {
       console.error(err)
+      throw err
     }
   }
 
@@ -152,7 +263,16 @@ export const MatchesPage: React.FC = () => {
     if (!window.confirm(`Block ${name}? They will be removed from your matches.`)) return
     try {
       await blockProfile(id)
-      setProfiles((prev) => prev.filter((p) => p.id !== id))
+      setTabProfiles((prev) => {
+        const filterList = (list: ProfileCardData[]) => list.filter((p) => p.id !== id)
+        return {
+          recommended: filterList(prev.recommended),
+          new: filterList(prev.new),
+          near_you: filterList(prev.near_you),
+          visitors: filterList(prev.visitors),
+          shortlist: filterList(prev.shortlist),
+        }
+      })
       showToast(`${name} has been blocked.`)
     } catch (err: any) {
       alert(err.message || 'Failed to block member')
@@ -177,16 +297,15 @@ export const MatchesPage: React.FC = () => {
     }
   }
 
-  // Filter profiles according to active tab
-  let displayProfiles = [...profiles]
-
-  if (activeTab === 'near_you') {
-    displayProfiles = displayProfiles.filter(
-      (p) => p.location.includes('Kolkata') || p.location.includes('Bhubaneswar')
-    )
-  } else if (activeTab === 'shortlist') {
-    displayProfiles = displayProfiles.filter((p) => p.isShortlisted)
+  const handleResetFilters = () => {
+    setFilterCommunity('ALL')
+    setFilterState('ALL')
+    setFilterMaritalStatus('ALL')
+    setFilterDiet('ALL')
   }
+
+  // Select profiles for active tab
+  let displayProfiles = [...(tabProfiles[activeTab] || [])]
 
   // Sort profiles
   if (sortBy === 'age_asc') {
@@ -196,9 +315,6 @@ export const MatchesPage: React.FC = () => {
   } else {
     displayProfiles.sort((a, b) => b.matchScore - a.matchScore)
   }
-
-  // Strict 3 profile limit per Requirement 6
-  displayProfiles = displayProfiles.slice(0, 3)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfbf9]">
@@ -253,21 +369,87 @@ export const MatchesPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Real Backend Match Filter Bar */}
+        <div className="mb-6 rounded-2xl bg-white p-3.5 sm:p-4 border border-slate-200 shadow-xs flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center space-x-1.5 text-xs font-bold text-navy-950 mr-1">
+            <Filter className="h-4 w-4 text-crimson-700" />
+            <span>Filters:</span>
+          </div>
+
+          {/* Community Filter */}
+          <select
+            value={filterCommunity}
+            onChange={(e) => setFilterCommunity(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+          >
+            <option value="ALL">All Communities</option>
+            {communities.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+
+          {/* State Filter */}
+          <select
+            value={filterState}
+            onChange={(e) => setFilterState(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+          >
+            <option value="ALL">All Locations</option>
+            {states.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+
+          {/* Marital Status Filter */}
+          <select
+            value={filterMaritalStatus}
+            onChange={(e) => setFilterMaritalStatus(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+          >
+            <option value="ALL">All Marital Statuses</option>
+            {maritalStatuses.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+
+          {/* Diet Filter */}
+          <select
+            value={filterDiet}
+            onChange={(e) => setFilterDiet(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+          >
+            <option value="ALL">All Diets</option>
+            {dietOptions.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+
+          {(filterCommunity !== 'ALL' || filterState !== 'ALL' || filterMaritalStatus !== 'ALL' || filterDiet !== 'ALL') && (
+            <button
+              onClick={handleResetFilters}
+              className="inline-flex items-center space-x-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
+
         {/* Category Navigation Tabs */}
         <div className="flex items-center space-x-2 overflow-x-auto pb-3 mb-8 no-scrollbar">
           {[
-            { id: 'recommended', label: 'Recommended for You', icon: Sparkles, count: profiles.length },
-            { id: 'new', label: 'New Matches', icon: Users, count: 4 },
-            { id: 'near_you', label: 'Near You (WB & Odisha)', icon: MapPin, count: 2 },
-            { id: 'visitors', label: 'Who Viewed Me', icon: Eye, count: 8 },
-            { id: 'shortlist', label: 'Shortlisted', icon: Star, count: profiles.filter(p => p.isShortlisted).length },
+            { id: 'recommended', label: 'Recommended for You', icon: Sparkles, count: tabProfiles.recommended.length },
+            { id: 'new', label: 'New Matches', icon: Users, count: tabProfiles.new.length },
+            { id: 'near_you', label: 'Near You (WB & Odisha)', icon: MapPin, count: tabProfiles.near_you.length },
+            { id: 'visitors', label: 'Who Viewed Me', icon: Eye, count: tabProfiles.visitors.length },
+            { id: 'shortlist', label: 'Shortlisted', icon: Star, count: tabProfiles.shortlist.length },
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as MatchTabId)}
                 className={`flex items-center space-x-2 rounded-2xl px-4 py-2.5 text-xs font-bold whitespace-nowrap transition-all ${
                   isActive
                     ? 'bg-navy-900 text-white shadow-md'
@@ -296,7 +478,9 @@ export const MatchesPage: React.FC = () => {
                 <Lock className="h-6 w-6 text-crimson-300" />
               </div>
               <div>
-                <h3 className="text-base font-bold">8 Members Viewed Your Profile This Week</h3>
+                <h3 className="text-base font-bold">
+                  {tabProfiles.visitors.length} {tabProfiles.visitors.length === 1 ? 'Member' : 'Members'} Viewed Your Profile This Week
+                </h3>
                 <p className="text-xs text-slate-200 mt-0.5">
                   Upgrade to BorKonya Premium to unlock who visited you and connect with them instantly.
                 </p>

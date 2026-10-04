@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom'
 import type { ProfileResponse } from '../../lib/profileApi'
 import type { UserMe } from '../../lib/authApi'
+import { getDefaultAvatar } from '../../lib/utils'
 
 interface HeroProps {
   onStartRegistration: () => void
@@ -150,21 +151,16 @@ export const Hero: React.FC<HeroProps> = ({
                 /* Authenticated Member's Own Profile Card */
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-crimson-50/60 via-white to-navy-50/50 p-6 text-center border border-slate-100">
                   <div className="mx-auto mb-4 h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-crimson-700 p-1 shadow-xs overflow-hidden">
-                    {myProfile?.photo_url ? (
-                      <img
-                        src={myProfile.photo_url}
-                        alt={myProfile.first_name}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-full w-full rounded-full bg-white flex items-center justify-center text-navy-950 font-serif text-2xl sm:text-3xl font-bold">
-                        {myProfile?.first_name
-                          ? `${myProfile.first_name[0]}${myProfile.last_name ? myProfile.last_name[0] : ''}`
-                          : user?.first_name
-                          ? `${user.first_name[0]}${user.last_name ? user.last_name[0] : ''}`
-                          : 'BK'}
-                      </div>
-                    )}
+                    <img
+                      src={myProfile?.photo_url || user?.photo_url || getDefaultAvatar(myProfile?.gender || user?.gender)}
+                      alt={myProfile?.first_name || user?.first_name || 'Member'}
+                      className="h-full w-full rounded-full object-cover"
+                      onError={(e) => {
+                        const target = e.currentTarget
+                        const fallback = getDefaultAvatar(myProfile?.gender || user?.gender)
+                        if (target.src !== fallback) target.src = fallback
+                      }}
+                    />
                   </div>
 
                   <div className="inline-flex items-center space-x-1.5 rounded-full bg-crimson-50 px-3 py-1 text-xs font-semibold text-crimson-800 border border-crimson-200 mb-2">
@@ -228,10 +224,12 @@ export const Hero: React.FC<HeroProps> = ({
               ) : (
                 /* Profile Card Mockup matching reference image for visitors */
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-crimson-50/60 via-white to-navy-50/50 p-6 text-center border border-slate-100">
-                  <div className="mx-auto mb-4 h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-crimson-700 p-1 shadow-xs">
-                    <div className="h-full w-full rounded-full bg-white flex items-center justify-center text-navy-950 font-serif text-2xl sm:text-3xl font-bold">
-                      BK
-                    </div>
+                  <div className="mx-auto mb-4 h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-crimson-700 p-1 shadow-xs overflow-hidden">
+                    <img
+                      src={getDefaultAvatar('FEMALE')}
+                      alt="Verified Member"
+                      className="h-full w-full rounded-full object-cover"
+                    />
                   </div>
 
                   <div className="inline-flex items-center space-x-1.5 rounded-full bg-crimson-50 px-3 py-1 text-xs font-semibold text-crimson-800 border border-crimson-200 mb-2">

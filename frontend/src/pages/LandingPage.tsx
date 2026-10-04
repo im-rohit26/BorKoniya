@@ -15,6 +15,7 @@ import {
   removeFromShortlist,
   getShortlistedIds,
   getSentInterestIds,
+  getConnectedProfileIds,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import {
@@ -63,22 +64,26 @@ export const LandingPage: React.FC = () => {
     const fetchProfiles = async () => {
       setLoading(true)
       try {
-        const raw = await getRecommendedMatches(3)
+        const raw = await getRecommendedMatches(6)
         let sIds: string[] = []
         let sentIds: string[] = []
+        let connIds: string[] = []
         try {
-          [sIds, sentIds] = await Promise.all([
+          [sIds, sentIds, connIds] = await Promise.all([
             getShortlistedIds().catch(() => []),
             getSentInterestIds().catch(() => []),
+            getConnectedProfileIds().catch(() => []),
           ])
         } catch {
           sIds = []
           sentIds = []
+          connIds = []
         }
         const sSet = new Set(sIds)
         const sentSet = new Set(sentIds)
-        const mapped = raw.slice(0, 3).map((p) =>
-          mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id))
+        const connSet = new Set(connIds)
+        const mapped = raw.slice(0, 6).map((p) =>
+          mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id), connSet.has(p.id))
         )
         setProfiles(mapped)
       } catch (err) {
@@ -92,6 +97,10 @@ export const LandingPage: React.FC = () => {
   }, [isAuthenticated, user?.user_id])
 
   const handleInterest = async (id: string, name: string) => {
+    if (!isAuthenticated) {
+      setRegisterModalOpen(true)
+      throw new Error('Please login or register to express interest')
+    }
     try {
       await sendInterest(id)
       setProfiles((prev) =>
@@ -100,10 +109,15 @@ export const LandingPage: React.FC = () => {
       showToast(`Express Interest sent to ${name}!`)
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
+      throw err
     }
   }
 
   const handleToggleShortlist = async (id: string, name: string, isCurrentlyShortlisted?: boolean) => {
+    if (!isAuthenticated) {
+      setRegisterModalOpen(true)
+      throw new Error('Please login or register to shortlist profiles')
+    }
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
@@ -120,6 +134,7 @@ export const LandingPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err)
+      throw err
     }
   }
 

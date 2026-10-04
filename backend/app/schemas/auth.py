@@ -15,27 +15,34 @@ def validate_digits_only_phone(v: str) -> str:
 
 
 class SendOtpRequest(BaseModel):
-    phone_number: str = Field(..., min_length=10, max_length=15)
+    phone_number: Optional[str] = None
     phone_country_code: str = "+91"
     email: Optional[EmailStr] = None
 
     @field_validator("phone_number")
-    def check_phone_digits(cls, v: str) -> str:
-        return validate_digits_only_phone(v)
+    def check_phone_digits(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return validate_digits_only_phone(v)
+        return v
 
 
 class SendOtpResponse(BaseModel):
     message: str
-    phone_number: str
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
+    demo_otp: Optional[str] = None
 
 
 class VerifyOtpRequest(BaseModel):
-    phone_number: str
+    phone_number: Optional[str] = None
+    email: Optional[EmailStr] = None
     otp_code: str = Field(..., min_length=4, max_length=6)
 
     @field_validator("phone_number")
-    def check_phone_digits(cls, v: str) -> str:
-        return validate_digits_only_phone(v)
+    def check_phone_digits(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return validate_digits_only_phone(v)
+        return v
 
 
 class RegisterRequest(BaseModel):
@@ -51,7 +58,7 @@ class RegisterRequest(BaseModel):
     native_place: Optional[str] = None
     current_state: str = "West Bengal"
     current_city: str = "Kolkata"
-    email: Optional[EmailStr] = None
+    email: EmailStr  # Mandatory email per Requirement 10
 
     @field_validator("phone_number")
     def check_phone_digits(cls, v: str) -> str:
@@ -99,4 +106,5 @@ class AuthMeResponse(BaseModel):
     community: Optional[str] = None
     photo_url: Optional[str] = None
     profile_status: str = "ACTIVE"
+    profile_completion_pct: Optional[int] = 0
     is_premium: bool = False

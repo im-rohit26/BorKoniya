@@ -272,15 +272,41 @@ def get_sent_interest_ids(
     current_profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
+    """Returns profile IDs where the current user sent an interest that is pending."""
     rows = (
         db.query(Interest.receiver_profile_id)
         .filter(
             Interest.sender_profile_id == current_profile.id,
-            Interest.status.in_(["SENT", "ACCEPTED"]),
+            Interest.status == "SENT",
         )
         .all()
     )
     return [r[0] for r in rows]
+
+
+@router.get("/connected/ids", response_model=List[str])
+def get_connected_interest_ids(
+    current_profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """Returns all profile IDs where mutual connection is established (status == ACCEPTED)."""
+    rows1 = (
+        db.query(Interest.receiver_profile_id)
+        .filter(
+            Interest.sender_profile_id == current_profile.id,
+            Interest.status == "ACCEPTED",
+        )
+        .all()
+    )
+    rows2 = (
+        db.query(Interest.sender_profile_id)
+        .filter(
+            Interest.receiver_profile_id == current_profile.id,
+            Interest.status == "ACCEPTED",
+        )
+        .all()
+    )
+    return list({r[0] for r in rows1}.union({r[0] for r in rows2}))
 
 
 @router.post("/{interest_id}/accept", response_model=InterestActionResponse)

@@ -25,9 +25,10 @@ import {
   blockProfile,
   getShortlistedIds,
   getSentInterestIds,
+  getConnectedProfileIds,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
-import { getSearchProfiles, mapProfileResponseToCard } from '../lib/profileApi'
+import { getSearchProfilesWithTotal, mapProfileResponseToCard } from '../lib/profileApi'
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
@@ -45,8 +46,11 @@ export const SearchPage: React.FC = () => {
   const [upgradeFeature, setUpgradeFeature] = useState('Instant Family Messaging')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 12
+  const [totalCount, setTotalCount] = useState(0)
 
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
 
   // Opposite-gender determination:
   // Females search for males (Groom), males search for females (Bride)
@@ -109,7 +113,7 @@ export const SearchPage: React.FC = () => {
       .catch(() => {})
   }, [])
 
-  // Fetch profiles from Supabase API based on filters
+  // Fetch profiles from API based on filters & page
   useEffect(() => {
     let isCancelled = false
     setLoading(true)
@@ -123,33 +127,45 @@ export const SearchPage: React.FC = () => {
         if (maritalStatus && maritalStatus !== 'ALL') filters.marital_status = maritalStatus
         if (education && education !== 'ALL') filters.highest_qualification = education
         if (profession && profession !== 'ALL') filters.occupation = profession
+        if (diet && diet !== 'ALL') filters.diet = diet
 
-        const raw = await getSearchProfiles(filters, 3)
+        const result = await getSearchProfilesWithTotal(filters, pageSize, currentPage)
 
         let shortlistedIds: string[] = []
         let sentInterestIds: string[] = []
+        let connectedIds: string[] = []
         try {
-          [shortlistedIds, sentInterestIds] = await Promise.all([
+          [shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
             getShortlistedIds().catch(() => []),
             getSentInterestIds().catch(() => []),
+            getConnectedProfileIds().catch(() => []),
           ])
         } catch {
           shortlistedIds = []
           sentInterestIds = []
+          connectedIds = []
         }
         const shortlistedSet = new Set(shortlistedIds)
         const sentInterestSet = new Set(sentInterestIds)
+        const connectedSet = new Set(connectedIds)
 
         if (!isCancelled) {
-          const mapped = raw.slice(0, 3).map((p) =>
-            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id))
+          const mapped = result.profiles.map((p) =>
+            mapProfileResponseToCard(
+              p,
+              shortlistedSet.has(p.id),
+              sentInterestSet.has(p.id),
+              connectedSet.has(p.id)
+            )
           )
           setProfiles(mapped)
+          setTotalCount(result.total)
         }
       } catch (err) {
-        console.error('Failed to load search results from Supabase:', err)
+        console.error('Failed to load search results:', err)
         if (!isCancelled) {
           setProfiles([])
+          setTotalCount(0)
         }
       } finally {
         if (!isCancelled) {
@@ -162,9 +178,18 @@ export const SearchPage: React.FC = () => {
     return () => {
       isCancelled = true
     }
-  }, [lookingFor, community, state, maritalStatus, education, profession])
+  }, [lookingFor, community, state, maritalStatus, education, profession, diet, currentPage])
+
+  // Reset page to 1 when criteria change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [lookingFor, community, state, maritalStatus, education, profession, diet])
 
   const handleInterest = async (id: string, name: string) => {
+    if (!isAuthenticated) {
+      setRegisterModalOpen(true)
+      throw new Error('Please login or register to express interest')
+    }
     try {
       await sendInterest(id)
       setProfiles((prev) =>
@@ -173,10 +198,15 @@ export const SearchPage: React.FC = () => {
       showToast(`Express Interest sent to ${name}!`)
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
+      throw err
     }
   }
 
   const handleToggleShortlist = async (id: string, name: string, isCurrentlyShortlisted?: boolean) => {
+    if (!isAuthenticated) {
+      setRegisterModalOpen(true)
+      throw new Error('Please login or register to shortlist profiles')
+    }
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
@@ -193,6 +223,7 @@ export const SearchPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err)
+      throw err
     }
   }
 
@@ -293,8 +324,6 @@ export const SearchPage: React.FC = () => {
   } else {
     filteredProfiles.sort((a, b) => b.matchScore - a.matchScore)
   }
-  // Enforce 3 profile limit per Requirement 6
-  filteredProfiles = filteredProfiles.slice(0, 3)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfbf9]">
@@ -311,7 +340,7 @@ export const SearchPage: React.FC = () => {
               Matrimonial Search Console
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Showing {filteredProfiles.length} verified matrimonial profiles for the Sadgope & Gowala community
+              Showing {totalCount > 0 ? `${totalCount} verified matrimonial profiles` : `${filteredProfiles.length} verified matrimonial profiles`} for the Sadgope & Gowala community
             </p>
           </div>
 
@@ -514,18 +543,49 @@ export const SearchPage: React.FC = () => {
                 <p className="text-sm font-medium">Searching verified profiles in Supabase...</p>
               </div>
             ) : filteredProfiles.length > 0 ? (
-              filteredProfiles.map((profile) => (
-                <ProfileCard
-                  key={profile.id}
-                  profile={profile}
-                  layout="horizontal"
-                  onExpressInterest={() => handleInterest(profile.id, profile.name)}
-                  onToggleShortlist={() => handleToggleShortlist(profile.id, profile.name, profile.isShortlisted)}
-                  onMessage={() => handleStartMessage(profile.id)}
-                  onBlock={() => handleBlock(profile.id, profile.name)}
-                  onReport={() => setReportModalData({ id: profile.id, name: profile.name })}
-                />
-              ))
+              <>
+                <div className="space-y-4">
+                  {filteredProfiles.map((profile) => (
+                    <ProfileCard
+                      key={profile.id}
+                      profile={profile}
+                      layout="horizontal"
+                      onExpressInterest={() => handleInterest(profile.id, profile.name)}
+                      onToggleShortlist={() => handleToggleShortlist(profile.id, profile.name, profile.isShortlisted)}
+                      onMessage={() => handleStartMessage(profile.id)}
+                      onBlock={() => handleBlock(profile.id, profile.name)}
+                      onReport={() => setReportModalData({ id: profile.id, name: profile.name })}
+                    />
+                  ))}
+                </div>
+
+                {totalCount > pageSize && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-slate-200 mt-6 bg-white p-4 rounded-2xl shadow-xs">
+                    <span className="text-xs text-slate-500 font-medium">
+                      Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} profiles
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-3 py-1.5 text-xs font-bold text-navy-950 bg-slate-100 rounded-xl">
+                        Page {currentPage} of {Math.max(1, Math.ceil(totalCount / pageSize))}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
+                        disabled={currentPage >= Math.ceil(totalCount / pageSize)}
+                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="rounded-2xl bg-white p-12 text-center border border-slate-200">
                 <Search className="mx-auto h-12 w-12 text-slate-300 mb-3" />

@@ -29,17 +29,33 @@ router = APIRouter(prefix="/auth", tags=["Authentication & OTP"])
 
 @router.post("/send-otp", response_model=SendOtpResponse)
 def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
+    if not payload.phone_number and not payload.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please provide a mobile number or email address.",
+        )
+
+    # If email provided for registration verification, check if already in use
+    if payload.email:
+        existing_user = db.query(User).filter(User.email == payload.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email address already exists. Please log in.",
+            )
+
     otp = f"{random.randint(100000, 999999)}"
-    
+
+    # Send email OTP if email is present
     if payload.email and settings.SMTP_USER and settings.SMTP_PASSWORD:
         try:
             msg = MIMEMultipart()
             msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_USER}>"
             msg['To'] = payload.email
-            msg['Subject'] = "Your BorKonya OTP Code"
+            msg['Subject'] = "Your BorKonya Verification OTP Code"
             body = (
                 f"Dear User,\n\n"
-                f"Your one-time password (OTP) for BorKonya is:\n\n"
+                f"Your one-time verification code (OTP) for BorKonya is:\n\n"
                 f"  {otp}\n\n"
                 f"This code is valid for {settings.OTP_EXPIRY_MINUTES} minutes.\n"
                 f"Do not share this code with anyone.\n\n"
@@ -55,47 +71,84 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
         except Exception as e:
             logging.warning(f"Failed to send OTP email to {payload.email}: {e}")
     elif payload.email:
-        logging.warning("SMTP not configured. OTP stored in DB but not emailed.")
-    else:
-        logging.warning("No email provided. OTP stored in DB but not sent.")
+        logging.warning("SMTP not configured or credentials missing. OTP stored in DB.")
 
-    new_otp = OTPStore(
-        identifier=payload.phone_number,
-        otp_code=otp,
-        purpose="VERIFY",
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
-    )
-    db.add(new_otp)
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+
+    # Invalidate existing unused verification OTPs for these identifiers
+    identifiers = [x for x in [payload.email, payload.phone_number] if x]
+    db.query(OTPStore).filter(
+        OTPStore.identifier.in_(identifiers),
+        OTPStore.purpose == "VERIFY",
+        OTPStore.is_used == False,
+    ).update({"is_used": True}, synchronize_session=False)
+
+    # Store new OTP for each identifier provided
+    for ident in identifiers:
+        new_otp = OTPStore(
+            identifier=ident,
+            otp_code=otp,
+            purpose="VERIFY",
+            expires_at=expiry,
+        )
+        db.add(new_otp)
     db.commit()
 
+    is_dev = settings.DEBUG or settings.ENVIRONMENT == "development"
     return SendOtpResponse(
-        message="OTP sent successfully.",
+        message="OTP sent successfully." + (" Check your email." if payload.email else ""),
         phone_number=payload.phone_number,
+        email=payload.email,
+        demo_otp=otp if is_dev else None,
     )
 
 
 @router.post("/verify-otp")
 def verify_otp(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
-    otp_entry = db.query(OTPStore).filter(
-        OTPStore.identifier == payload.phone_number,
-        OTPStore.purpose == "VERIFY",
-        OTPStore.is_used == False,
-        OTPStore.expires_at > datetime.now(timezone.utc)
-    ).order_by(OTPStore.created_at.desc()).first()
-
-    if not otp_entry or otp_entry.otp_code != payload.otp_code:
+    identifiers = [x for x in [payload.email, payload.phone_number] if x]
+    if not identifiers:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired OTP. Please try again.",
+            detail="Please provide a mobile number or email address.",
         )
-    
+
+    now = datetime.now(timezone.utc)
+    otp_entry = db.query(OTPStore).filter(
+        OTPStore.identifier.in_(identifiers),
+        OTPStore.purpose == "VERIFY",
+        OTPStore.is_used == False,
+    ).order_by(OTPStore.created_at.desc()).first()
+
+    if not otp_entry:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP. Please request a new code.",
+        )
+
+    exp = otp_entry.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired. Please request a new code.",
+        )
+
+    if otp_entry.otp_code != payload.otp_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP code. Please check and try again.",
+        )
+
     otp_entry.is_used = True
     db.commit()
-    
+
     return {
         "status": "VERIFIED",
         "phone_number": payload.phone_number,
-        "message": "Mobile number verified successfully.",
+        "email": payload.email,
+        "message": "Verification completed successfully.",
     }
 
 
@@ -272,6 +325,7 @@ def get_current_user_info(
         community=profile.community if profile else None,
         photo_url=photo_url,
         profile_status=profile.status if profile else "INCOMPLETE",
+        profile_completion_pct=profile.profile_completion_pct if profile else 0,
         is_premium=bool(sub),
     )
 
@@ -327,19 +381,33 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     elif user and user.email:
         logging.warning("SMTP not configured. Password reset OTP stored in DB but not emailed.")
             
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+
+    # Invalidate previous unused reset OTPs for this identifier
+    db.query(OTPStore).filter(
+        OTPStore.identifier == payload.phone_or_email,
+        OTPStore.purpose == "RESET_PASSWORD",
+        OTPStore.is_used == False,
+    ).update({"is_used": True}, synchronize_session=False)
+
     new_otp = OTPStore(
         identifier=payload.phone_or_email,
         otp_code=otp,
         purpose="RESET_PASSWORD",
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
+        expires_at=expiry,
     )
     db.add(new_otp)
     db.commit()
     
-    return {
+    is_dev = settings.DEBUG or settings.ENVIRONMENT == "development"
+    res = {
         "status": "OTP_SENT",
         "message": "If an account exists with this mobile number or email, a verification code has been sent.",
     }
+    if is_dev:
+        res["demo_otp"] = otp
+    return res
 
 
 @router.post("/reset-password")
@@ -350,14 +418,29 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
             detail="Password must contain at least 8 characters.",
         )
 
+    now = datetime.now(timezone.utc)
     otp_entry = db.query(OTPStore).filter(
         OTPStore.identifier == payload.phone_or_email,
         OTPStore.purpose == "RESET_PASSWORD",
         OTPStore.is_used == False,
-        OTPStore.expires_at > datetime.now(timezone.utc)
     ).order_by(OTPStore.created_at.desc()).first()
 
-    if not otp_entry or otp_entry.otp_code != payload.otp_code:
+    if not otp_entry:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code.",
+        )
+
+    exp = otp_entry.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code.",
+        )
+
+    if otp_entry.otp_code != payload.otp_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OTP code.",

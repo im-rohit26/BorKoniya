@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import date
 
 
@@ -22,6 +22,11 @@ class ProfileBase(BaseModel):
     annual_income: Optional[str] = None
     diet: str = "NON_VEGETARIAN"
     about_me: Optional[str] = None
+    smoking: Optional[str] = "NO"
+    drinking: Optional[str] = "NO"
+    rashi: Optional[str] = None
+    nakshatra: Optional[str] = None
+    is_manglik: Optional[str] = "DONT_KNOW"
 
 
 class PhotoItemResponse(BaseModel):
@@ -68,7 +73,7 @@ class ProfileUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     gender: Optional[str] = None
-    date_of_birth: Optional[date] = None
+    date_of_birth: Optional[Union[date, str]] = None
     height_cm: Optional[int] = None
     marital_status: Optional[str] = None
     mother_tongue: Optional[str] = None
@@ -82,6 +87,11 @@ class ProfileUpdate(BaseModel):
     company_name: Optional[str] = None
     annual_income: Optional[str] = None
     diet: Optional[str] = None
+    smoking: Optional[str] = None
+    drinking: Optional[str] = None
+    rashi: Optional[str] = None
+    nakshatra: Optional[str] = None
+    is_manglik: Optional[str] = None
     about_me: Optional[str] = None
     profile_for: Optional[str] = None
     photo_url: Optional[str] = None

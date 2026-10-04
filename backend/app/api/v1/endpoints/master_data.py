@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.entities import Community, SubCommunity
 
-router = APIRouter(prefix="/master-data", tags=["Master Data"])
+router = APIRouter(tags=["Master Data"])
 
 @router.get("/communities")
 def get_communities(db: Session = Depends(get_db)):

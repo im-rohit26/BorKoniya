@@ -38,6 +38,10 @@ import {
   MessageCircleOff,
   ChevronDown,
   Unlock,
+  Image as ImageIcon,
+  FileText,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import {
   getConversations,
@@ -52,6 +56,7 @@ import {
   unblockProfile,
   markConversationRead,
   getBlockedProfiles,
+  uploadChatAttachment,
 } from '../lib/interactionApi';
 import type { ConversationSummary, MessageItem } from '../lib/interactionApi';
 import { supabase } from '../lib/supabase';
@@ -62,6 +67,8 @@ import { Header } from '../components/common/Header';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 import { masterDataApi } from '../lib/masterDataApi';
 import { useAuth } from '../context/AuthContext';
+import { useCall } from '../hooks/useCall';
+import { PhoneMissed, PhoneCall } from 'lucide-react';
 
 /*
   THEME (BorKonya reference design)
@@ -87,6 +94,7 @@ export const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  const { startVoiceCall: initiateVoiceCall, startVideoCall: initiateVideoCall, callState } = useCall();
   const [langModalOpen, setLangModalOpen] = useState(false);
   const wsConnectedRef = useRef(false);
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
@@ -141,6 +149,13 @@ export const ChatPage: React.FC = () => {
   const [forwardSearch, setForwardSearch] = useState('');
   const [isForwarding, setIsForwarding] = useState(false);
 
+  // Attachment State
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,22 +168,57 @@ export const ChatPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    const file = e.target.files?.[0];
+    if (!file || !activeConvId) return;
+
+    if (type === 'image') {
+      if (file.size > 15 * 1024 * 1024) {
+        alert('Image must be less than 15 MB before compression.');
+        return;
+      }
+    } else {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Document must be less than 10 MB.');
+        return;
+      }
+    }
+
+    setIsUploadingAttachment(true);
+    setShowAttachmentMenu(false);
+    try {
+      const uploadRes = await uploadChatAttachment(activeConvId, file, type);
+      const sentMsg = await sendMessage(activeConvId, uploadRes.original_filename || file.name, {
+        mediaUrl: uploadRes.media_url,
+        messageType: uploadRes.message_type,
+      });
+      setMessages((prev) => [...prev, sentMsg]);
+      setTimeout(scrollToBottom, 100);
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload attachment.');
+    } finally {
+      setIsUploadingAttachment(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
   const [blockedProfileIds, setBlockedProfileIds] = useState<string[]>([]);
 
-  // Close message action popup when clicking outside
+  // Close message action popup and attachment menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
         setActionMenuMsg(null);
       }
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(e.target as Node)) {
+        setShowAttachmentMenu(false);
+      }
     };
-    if (actionMenuMsg) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [actionMenuMsg]);
+  }, []);
 
   // Close 3-dot menus when clicking outside
   useEffect(() => {
@@ -341,9 +391,16 @@ export const ChatPage: React.FC = () => {
       if (!wsConnectedRef.current) fetchChatMessages(true);
     }, 4000);
 
+    const handleCallEnded = () => {
+      fetchChatMessages(true);
+      fetchConversations();
+    };
+    window.addEventListener('borkonya:call-ended', handleCallEnded);
+
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
+      window.removeEventListener('borkonya:call-ended', handleCallEnded);
       if (channel) supabase.removeChannel(channel);
     };
   }, [activeConvId]);
@@ -351,6 +408,56 @@ export const ChatPage: React.FC = () => {
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const isBlocked = activeConv ? blockedProfileIds.includes(activeConv.other_profile.profile_id) : false;
   const canChat = activeConv ? activeConv.can_chat !== false : true;
+
+  const startVoiceCall = () => {
+    if (!activeConv) return;
+    if (isBlocked) {
+      setErrorBanner('Calling is disabled because this member is blocked.');
+      return;
+    }
+    if (!canChat) {
+      setErrorBanner('Voice & Video calls unlock on accepted interest or BorKonya Premium membership.');
+      return;
+    }
+    const p = activeConv.other_profile;
+    initiateVoiceCall(
+      {
+        profile_id: p.profile_id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        full_name: `${p.first_name} ${p.last_name || ''}`.trim(),
+        photo_url: p.photo_url,
+        gender: p.gender,
+        conversation_id: activeConv.id,
+      },
+      activeConv.id
+    );
+  };
+
+  const startVideoCall = () => {
+    if (!activeConv) return;
+    if (isBlocked) {
+      setErrorBanner('Calling is disabled because this member is blocked.');
+      return;
+    }
+    if (!canChat) {
+      setErrorBanner('Voice & Video calls unlock on accepted interest or BorKonya Premium membership.');
+      return;
+    }
+    const p = activeConv.other_profile;
+    initiateVideoCall(
+      {
+        profile_id: p.profile_id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        full_name: `${p.first_name} ${p.last_name || ''}`.trim(),
+        photo_url: p.photo_url,
+        gender: p.gender,
+        conversation_id: activeConv.id,
+      },
+      activeConv.id
+    );
+  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
@@ -1089,7 +1196,7 @@ export const ChatPage: React.FC = () => {
                 filteredConversations.map((c) => {
                   const isActive = c.id === activeConvId;
                   const name = `${c.other_profile.first_name} ${c.other_profile.last_name || ''}`.trim();
-                  const isOtherOnline = onlineUserIds.has(c.other_profile.profile_id);
+                  const isOtherOnline = onlineUserIds.has(c.other_profile.profile_id) || !!c.other_profile.is_online;
                   const isFav = favouriteConvIds.includes(c.id);
 
                   return (
@@ -1258,7 +1365,7 @@ export const ChatPage: React.FC = () => {
                         <h2 className="font-bold text-[#0b2a5b] text-base leading-tight truncate">
                           {activeConv.other_profile.first_name} {activeConv.other_profile.last_name}
                         </h2>
-                        {onlineUserIds.has(activeConv.other_profile.profile_id) ? (
+                        {onlineUserIds.has(activeConv.other_profile.profile_id) || activeConv.other_profile.is_online ? (
                           <span className="flex items-center gap-1 text-xs text-[#16a34a] font-medium flex-shrink-0">
                             <span className="w-2 h-2 rounded-full bg-[#16a34a]" />
                             Online
@@ -1293,17 +1400,21 @@ export const ChatPage: React.FC = () => {
                     </button>
 
                     <button
-                      className={`${ROUND_BTN} !text-[#0b4fd8] hidden sm:flex`}
+                      className={`${ROUND_BTN} !text-[#0b4fd8] ${
+                        callState !== 'IDLE' ? 'opacity-50 pointer-events-none' : ''
+                      }`}
                       title="Voice call"
-                      onClick={() => alert('Voice call coming soon.')}
+                      onClick={startVoiceCall}
                     >
                       <Phone className="w-5 h-5" />
                     </button>
 
                     <button
-                      className={`${ROUND_BTN} !text-[#0b4fd8] hidden sm:flex`}
+                      className={`${ROUND_BTN} !text-[#0b4fd8] ${
+                        callState !== 'IDLE' ? 'opacity-50 pointer-events-none' : ''
+                      }`}
                       title="Video call"
-                      onClick={() => alert('Video call coming soon.')}
+                      onClick={startVideoCall}
                     >
                       <Video className="w-5 h-5" />
                     </button>
@@ -1680,10 +1791,114 @@ export const ChatPage: React.FC = () => {
                                 <Ban className="w-3.5 h-3.5 text-[#a4b1c7]" />
                                 <span>This message was deleted</span>
                               </div>
+                            ) : m.message_type === 'call_voice' || m.message_type === 'call_video' ? (
+                              (() => {
+                                const isVideoCall = m.message_type === 'call_video';
+                                const isMissed = m.content.toLowerCase().includes('missed');
+                                const parts = m.content.split('•').map((s) => s.trim());
+                                const titleLabel = parts[0] || (isVideoCall ? 'Video call' : 'Voice call');
+                                const durationLabel = parts[1] || '';
+
+                                return (
+                                  <div className="flex items-center gap-3 py-1 min-w-[180px]">
+                                    <div
+                                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                        isMissed
+                                          ? 'bg-[#fde8ee] text-[#e0102f]'
+                                          : onBlue
+                                          ? 'bg-white/20 text-white'
+                                          : 'bg-[#eef3fb] text-[#0a56e0]'
+                                      }`}
+                                    >
+                                      {isMissed ? (
+                                        <PhoneMissed className="w-5 h-5" />
+                                      ) : isVideoCall ? (
+                                        <Video className="w-5 h-5" />
+                                      ) : (
+                                        <PhoneCall className="w-5 h-5" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p
+                                        className={`text-sm font-bold leading-snug ${
+                                          isMissed && !onBlue ? 'text-[#e0102f]' : ''
+                                        }`}
+                                      >
+                                        {isMissed
+                                          ? isVideoCall
+                                            ? '🔴 Missed video call'
+                                            : '📞 Missed voice call'
+                                          : isVideoCall
+                                          ? '🎥 Video call'
+                                          : `📞 ${titleLabel}`}
+                                      </p>
+                                      <p
+                                        className={`text-xs mt-0.5 ${
+                                          onBlue ? 'text-white/80' : 'text-[#6b7a99]'
+                                        }`}
+                                      >
+                                        {isMissed
+                                          ? `${formatDateChip(m.created_at)}, ${timeString}`
+                                          : durationLabel || 'Completed'}
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (isVideoCall) startVideoCall();
+                                        else startVoiceCall();
+                                      }}
+                                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 ${
+                                        onBlue
+                                          ? 'bg-white text-[#0a56e0] hover:bg-white/90'
+                                          : 'bg-[#fde8ee] text-[#e0102f] hover:bg-[#fbd5df]'
+                                      }`}
+                                      title={isVideoCall ? 'Video call again' : 'Voice call again'}
+                                    >
+                                      Call
+                                    </button>
+                                  </div>
+                                );
+                              })()
                             ) : (
-                              <p className="whitespace-pre-wrap leading-relaxed text-[14px] [overflow-wrap:anywhere]">
-                                {m.content}
-                              </p>
+                              <>
+                                {m.media_url && (m.message_type === 'image' || /\.(jpe?g|png|webp|gif)$/i.test(m.media_url)) ? (
+                                  <div className="mb-2 rounded-2xl overflow-hidden max-w-xs sm:max-w-sm border border-black/10 bg-black/5 shadow-xs">
+                                    <img
+                                      src={m.media_url.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`}
+                                      alt="Attachment"
+                                      className="max-h-72 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                      onClick={() => window.open(m.media_url?.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`, '_blank')}
+                                    />
+                                  </div>
+                                ) : m.media_url ? (
+                                  <div className="mb-2">
+                                    <a
+                                      href={m.media_url.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${
+                                        onBlue
+                                          ? 'bg-white/15 border-white/30 text-white hover:bg-white/25'
+                                          : 'bg-slate-50 border-slate-200 text-[#0b2a5b] hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      <FileText className="w-6 h-6 flex-shrink-0 text-crimson-600" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-bold truncate">{m.content || 'Document'}</p>
+                                        <span className="text-[10px] opacity-80">Click to view/download</span>
+                                      </div>
+                                      <Download className="w-4 h-4 flex-shrink-0 opacity-80" />
+                                    </a>
+                                  </div>
+                                ) : null}
+                                {(!m.media_url || (m.content && !m.content.includes('/') && m.content !== m.media_url.split('/').pop())) && (
+                                  <p className="whitespace-pre-wrap leading-relaxed text-[14px] [overflow-wrap:anywhere]">
+                                    {m.content}
+                                  </p>
+                                )}
+                              </>
                             )}
 
                             {/* Time & Read Receipts */}
@@ -1877,15 +2092,82 @@ export const ChatPage: React.FC = () => {
                 }}
                 className="px-3 pt-3 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/90 backdrop-blur border-t border-[#e3e9f5] flex items-center gap-2.5 z-10 flex-shrink-0"
               >
-                <div className="flex items-center gap-0.5 bg-[#f1f4fb] rounded-full p-1 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => alert('Attachments coming soon.')}
-                    className="p-2 rounded-full text-[#0b4fd8] hover:bg-white transition-colors"
-                    title="More"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                <div className="flex items-center gap-0.5 bg-[#f1f4fb] rounded-full p-1 flex-shrink-0 relative">
+                  {/* Hidden inputs for Image and Document */}
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, 'image')}
+                  />
+                  <input
+                    type="file"
+                    ref={docInputRef}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, 'document')}
+                  />
+
+                  {/* Attachment Popover Button */}
+                  <div className="relative" ref={attachmentMenuRef}>
+                    <button
+                      type="button"
+                      disabled={isBlocked || !canChat || isUploadingAttachment}
+                      onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                      className={`p-2 rounded-full transition-colors ${
+                        showAttachmentMenu
+                          ? 'bg-white text-[#e0102f] shadow-xs'
+                          : 'text-[#0b4fd8] hover:bg-white'
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                      title="Attach Photo or Document"
+                    >
+                      {isUploadingAttachment ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-[#e0102f]" />
+                      ) : (
+                        <Paperclip className="w-5 h-5" />
+                      )}
+                    </button>
+
+                    {showAttachmentMenu && (
+                      <div className="absolute bottom-full mb-3 left-0 w-64 bg-white rounded-2xl shadow-xl border border-[#e3e9f5] p-2 z-50 animate-in fade-in zoom-in-95">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAttachmentMenu(false);
+                            imageInputRef.current?.click();
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors group"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-crimson-50 text-crimson-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-navy-950">Photos & Images</p>
+                            <p className="text-[10px] text-slate-500">Auto-compressed to ≤ 1 MB</p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAttachmentMenu(false);
+                            docInputRef.current?.click();
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors group mt-1"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-navy-950">Documents</p>
+                            <p className="text-[10px] text-slate-500">PDF, DOC, XLS up to 10 MB</p>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -1895,14 +2177,6 @@ export const ChatPage: React.FC = () => {
                     title="Insert emoji"
                   >
                     <Smile className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alert('Photo & document sharing is secured under BorKonya family privacy settings.')}
-                    className="hidden sm:flex p-2 rounded-full text-[#0b4fd8] hover:bg-white transition-colors"
-                    title="Attach file"
-                  >
-                    <Paperclip className="w-5 h-5" />
                   </button>
                 </div>
 

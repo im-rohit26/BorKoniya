@@ -35,6 +35,7 @@ import {
   blockProfile,
   getShortlistedIds,
   getSentInterestIds,
+  getConnectedProfileIds,
 } from '../lib/interactionApi'
 import { getProfileById, formatHeight, type ProfileResponse } from '../lib/profileApi'
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
@@ -56,6 +57,7 @@ export const ProfileDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [interestSent, setInterestSent] = useState(false)
   const [isShortlisted, setIsShortlisted] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
     getSubscriptionStatus()
@@ -69,14 +71,16 @@ export const ProfileDetailPage: React.FC = () => {
       setLoading(true)
       setError(null)
       try {
-        const [data, shortlistedIds, sentInterestIds] = await Promise.all([
+        const [data, shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
           getProfileById(id),
           getShortlistedIds().catch((): string[] => []),
           getSentInterestIds().catch((): string[] => []),
+          getConnectedProfileIds().catch((): string[] => []),
         ])
         setProfile(data)
         setIsShortlisted((shortlistedIds as string[]).includes(data.id))
         setInterestSent((sentInterestIds as string[]).includes(data.id))
+        setIsConnected((connectedIds as string[]).includes(data.id))
       } catch (err: any) {
         console.error('Failed to load profile:', err)
         setError(err.message || 'Profile could not be loaded.')
@@ -254,18 +258,28 @@ export const ProfileDetailPage: React.FC = () => {
 
                   {/* Action Buttons */}
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3 border-t border-slate-100">
-                    <button
-                      onClick={handleInterest}
-                      disabled={interestSent}
-                      className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-                        interestSent
-                          ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
-                          : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
-                      }`}
-                    >
-                      {interestSent ? <Check className="h-4 w-4 text-crimson-700" /> : <Heart className="h-4 w-4" />}
-                      <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
-                    </button>
+                    {isConnected ? (
+                      <button
+                        disabled
+                        className="flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default"
+                      >
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        <span>Connected</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleInterest}
+                        disabled={interestSent}
+                        className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                          interestSent
+                            ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
+                            : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
+                        }`}
+                      >
+                        {interestSent ? <Check className="h-4 w-4 text-crimson-700" /> : <Heart className="h-4 w-4" />}
+                        <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={handleShortlist}

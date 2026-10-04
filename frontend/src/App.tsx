@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { CallProvider } from './context/CallContext'
+import { CallNotification } from './components/calling/CallNotification'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
@@ -35,6 +37,10 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
       <AuthProvider>
+        <CallProvider>
+        {/* Global 1-to-1 Voice & Video Call UI */}
+        <CallNotification />
+
         {/* Global Anti-Screenshot & Download Shield */}
         <ScreenCaptureProtection />
 
@@ -145,6 +151,7 @@ export default function App() {
 
         {/* Persistent App-Like Mobile Bottom Navigation Bar */}
         <MobileBottomNav />
+        </CallProvider>
       </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

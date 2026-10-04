@@ -19,6 +19,7 @@ import {
   Upload,
   Plus,
   Loader2,
+  CheckCircle,
 } from 'lucide-react'
 import { getMyProfile, updateMyProfile } from '../lib/authApi'
 import {
@@ -138,16 +139,22 @@ export const ProfileWizardPage: React.FC = () => {
     masterDataApi.getSubCommunities(commId).then(setSubCommunities).catch(() => {})
   }, [formData.community, communities])
 
-  // Calculate dynamic completion percentage
+  // Calculate dynamic completion percentage matching backend algorithm
   const calculateCompletion = () => {
     let score = 20
-    if (formData.firstName && formData.lastName) score += 15
-    if (formData.community && formData.subCommunity) score += 15
-    if (formData.highestQualification && formData.occupation) score += 15
-    if (formData.fatherOccupation) score += 10
-    if (formData.aboutMe && formData.aboutMe.length > 50) score += 15
+    if (formData.firstName && formData.lastName) score += 10
+    if (formData.gender && formData.dob) score += 10
+    if (formData.heightCm && formData.maritalStatus) score += 5
+    if (formData.community) score += 5
+    if (formData.subCommunity) score += 5
+    if (formData.currentState && formData.currentCity) score += 10
+    if (formData.nativePlace) score += 5
+    if (formData.highestQualification && formData.occupation) score += 10
+    if (formData.company || formData.annualIncome) score += 5
+    if (formData.aboutMe && formData.aboutMe.trim().length >= 20) score += 10
+    if (formData.rashi || formData.nakshatra || (formData.isManglik && formData.isManglik !== 'DONT_KNOW')) score += 5
     if (photos.length > 0) score += 10
-    return Math.min(score, 100)
+    return Math.min(Math.max(score, 20), 100)
   }
 
   const completionPct = calculateCompletion()
@@ -315,6 +322,11 @@ export const ProfileWizardPage: React.FC = () => {
             company: p.company_name || prev.company,
             annualIncome: p.annual_income || prev.annualIncome,
             diet: p.diet || prev.diet,
+            smoking: p.smoking || prev.smoking,
+            drinking: p.drinking || prev.drinking,
+            rashi: p.rashi || prev.rashi,
+            nakshatra: p.nakshatra || prev.nakshatra,
+            isManglik: p.is_manglik || prev.isManglik,
             aboutMe: p.about_me || prev.aboutMe,
           }))
         }
@@ -322,41 +334,64 @@ export const ProfileWizardPage: React.FC = () => {
       .catch(() => {})
   }, [])
 
+  const [saveToast, setSaveToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setSaveToast({ type, message })
+    setTimeout(() => setSaveToast(null), 3500)
+  }
+
+  const saveProfileData = async (shouldNavigate = false): Promise<boolean> => {
+    setIsSaving(true)
+    const primaryPhoto = photos.find((p) => p.isPrimary) || photos[0]
+    try {
+      await updateMyProfile({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        gender: formData.gender,
+        date_of_birth: formData.dob,
+        height_cm: parseInt(formData.heightCm, 10) || 165,
+        marital_status: formData.maritalStatus,
+        mother_tongue: formData.motherTongue,
+        community: formData.community,
+        sub_community: formData.subCommunity,
+        native_place: formData.nativePlace,
+        current_state: formData.currentState,
+        current_city: formData.currentCity,
+        highest_qualification: formData.highestQualification,
+        occupation: formData.occupation,
+        company_name: formData.company,
+        annual_income: formData.annualIncome,
+        diet: formData.diet,
+        smoking: formData.smoking,
+        drinking: formData.drinking,
+        rashi: formData.rashi,
+        nakshatra: formData.nakshatra,
+        is_manglik: formData.isManglik,
+        about_me: formData.aboutMe,
+        photo_url: primaryPhoto?.url,
+      })
+      await refreshUser()
+      showToast('success', 'Profile saved successfully!')
+      if (shouldNavigate) {
+        setTimeout(() => navigate('/dashboard'), 800)
+      }
+      return true
+    } catch (e: any) {
+      console.error('Failed to save profile updates:', e)
+      showToast('error', e.message || 'Failed to save changes. Please try again.')
+      return false
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleNext = async () => {
-    if (currentStep < totalSteps) {
+    const isLastStep = currentStep === totalSteps
+    const success = await saveProfileData(isLastStep)
+    if (success && !isLastStep) {
       setCurrentStep(currentStep + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
-    } else {
-      setIsSaving(true)
-      const primaryPhoto = photos.find((p) => p.isPrimary) || photos[0]
-      try {
-        await updateMyProfile({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          gender: formData.gender,
-          date_of_birth: formData.dob,
-          height_cm: parseInt(formData.heightCm) || 165,
-          marital_status: formData.maritalStatus,
-          mother_tongue: formData.motherTongue,
-          community: formData.community,
-          sub_community: formData.subCommunity,
-          native_place: formData.nativePlace,
-          current_state: formData.currentState,
-          current_city: formData.currentCity,
-          highest_qualification: formData.highestQualification,
-          occupation: formData.occupation,
-          company_name: formData.company,
-          annual_income: formData.annualIncome,
-          diet: formData.diet,
-          about_me: formData.aboutMe,
-          photo_url: primaryPhoto?.url,
-        })
-      } catch (e) {
-        console.error('Failed to save profile updates:', e)
-      } finally {
-        setIsSaving(false)
-        navigate('/dashboard')
-      }
     }
   }
 
@@ -424,7 +459,10 @@ export const ProfileWizardPage: React.FC = () => {
               return (
                 <div
                   key={idx}
-                  onClick={() => setCurrentStep(idx + 1)}
+                  onClick={async () => {
+                    await saveProfileData(false)
+                    setCurrentStep(idx + 1)
+                  }}
                   className={`cursor-pointer py-1.5 px-1 rounded-lg transition-all truncate ${
                     isCurrent
                       ? 'bg-crimson-700 text-white shadow-xs'
@@ -1310,7 +1348,7 @@ export const ProfileWizardPage: React.FC = () => {
           )}
 
           {/* Navigation Controls */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between gap-3">
             {currentStep > 1 ? (
               <button
                 type="button"
@@ -1324,18 +1362,41 @@ export const ProfileWizardPage: React.FC = () => {
               <div />
             )}
 
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={isSaving}
-              className="inline-flex items-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-98 disabled:opacity-50"
-            >
-              <span>{isSaving ? 'Saving Profile...' : currentStep === totalSteps ? 'Finish & Save Profile' : 'Save & Continue'}</span>
-              <ArrowRight className="h-4 w-4 text-white" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => saveProfileData(false)}
+                disabled={isSaving}
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition-all disabled:opacity-50"
+              >
+                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                <span>{isSaving ? 'Saving...' : 'Save Progress'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={isSaving}
+                className="inline-flex items-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-98 disabled:opacity-50"
+              >
+                <span>{isSaving ? 'Saving Profile...' : currentStep === totalSteps ? 'Finish & Save Profile' : 'Save & Continue'}</span>
+                <ArrowRight className="h-4 w-4 text-white" />
+              </button>
+            </div>
           </div>
         </div>
       </main>
+
+      {saveToast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300 text-white ${
+            saveToast.type === 'success' ? 'bg-emerald-700' : 'bg-red-700'
+          }`}
+        >
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">{saveToast.message}</span>
+        </div>
+      )}
 
       <Footer />
       <LanguageSelectorModal isOpen={langModalOpen} onClose={() => setLangModalOpen(false)} />

@@ -53,6 +53,17 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER_KEY: str = "mock_payment_key"
     PAYMENT_PROVIDER_SECRET: str = "mock_payment_secret"
 
+    # WebRTC (STUN / TURN) & Calling Signaling
+    STUN_URLS: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+    TURN_URLS: str = ""
+    TURN_SHARED_SECRET: str = ""
+    TURN_STATIC_USERNAME: str = ""
+    TURN_STATIC_CREDENTIAL: str = ""
+    TURN_CREDENTIAL_TTL_SECONDS: int = 3600
+    CALL_RING_TIMEOUT_SECONDS: int = 45
+    CALL_RATE_LIMIT_PER_MINUTE: int = 10
+    REDIS_URL: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

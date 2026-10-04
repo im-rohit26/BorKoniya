@@ -45,7 +45,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
 
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [generatedMockOtp, setGeneratedMockOtp] = useState('749201')
+  const [demoOtp, setDemoOtp] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
 
   if (!isOpen) return null
@@ -74,8 +74,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.phone || formData.phone.length < 10) {
+    const cleanPhone = formData.phone.trim()
+    const cleanEmail = formData.email.trim()
+    if (!cleanPhone || cleanPhone.length < 10) {
       setErrorMessage('Please enter a valid 10-digit mobile number')
+      return
+    }
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setErrorMessage('A valid email address is required for account verification')
       return
     }
     if (formData.password.length < 8) {
@@ -86,13 +92,15 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     setIsSubmitting(true)
 
     try {
-      const res = await sendOtp(formData.phone.trim())
+      const res = await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail })
       if (res.demo_otp) {
-        setGeneratedMockOtp(res.demo_otp)
+        setDemoOtp(res.demo_otp)
+      } else {
+        setDemoOtp(null)
       }
       setStep('otp_verification')
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send OTP')
+      setErrorMessage(err.message || 'Failed to send verification OTP')
     } finally {
       setIsSubmitting(false)
     }
@@ -121,7 +129,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     setIsSubmitting(true)
     setErrorMessage('')
     try {
-      await verifyOtp(formData.phone.trim(), entered)
+      await verifyOtp({ phoneNumber: formData.phone.trim(), email: formData.email.trim() }, entered)
       await register({
         profile_for: profileFor,
         first_name: formData.firstName.trim(),
@@ -135,7 +143,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
         native_place: formData.nativePlace,
         current_state: formData.state,
         current_city: formData.city,
-        email: formData.email.trim() || undefined,
+        email: formData.email.trim(),
       })
 
       setStep('success')
@@ -363,11 +371,27 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Create Password *</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Email Address (For Verification) *
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="your.email@example.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Create Password (min 8 chars) *</label>
                 <input
                   type="password"
                   required
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
@@ -388,7 +412,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                 disabled={isSubmitting}
                 className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 py-3 text-xs font-bold text-white shadow-md transition-all"
               >
-                <span>{isSubmitting ? 'Sending OTP...' : 'Send Verification OTP'}</span>
+                <span>{isSubmitting ? 'Sending Verification Code...' : 'Send Verification OTP'}</span>
                 <ArrowRight className="h-4 w-4 text-white" />
               </button>
             </div>
@@ -402,16 +426,19 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                 <Smartphone className="h-6 w-6" />
               </div>
               <h2 className="text-xl font-bold text-navy-950 font-serif">
-                Verify Mobile Number
+                Account Verification
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-600 mt-1">
                 Enter the 6-digit OTP sent to{' '}
-                <span className="font-semibold text-slate-800">+91 {formData.phone}</span>
+                <span className="font-semibold text-navy-900">{formData.email}</span>
+                {formData.phone ? ` and +91 ${formData.phone}` : ''}
               </p>
 
-              <div className="mt-3 inline-block rounded-lg bg-crimson-50 px-3 py-1.5 text-xs text-crimson-900 border border-crimson-200">
-                Demo Verification Code: <span className="font-mono font-bold text-crimson-700">{generatedMockOtp}</span>
-              </div>
+              {demoOtp && (
+                <div className="mt-3 inline-block rounded-lg bg-crimson-50 px-3 py-1.5 text-xs text-crimson-900 border border-crimson-200">
+                  Demo Verification Code: <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
+                </div>
+              )}
             </div>
 
             {errorMessage && (

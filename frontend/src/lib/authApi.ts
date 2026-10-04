@@ -13,6 +13,7 @@ export interface UserMe {
   photo_url?: string | null;
   profile_status: string;
   is_premium: boolean;
+  profile_completion_pct?: number;
 }
 
 export interface TokenResponse {
@@ -38,7 +39,7 @@ export interface RegisterPayload {
   native_place?: string;
   current_state?: string;
   current_city?: string;
-  email?: string;
+  email: string;
 }
 
 export function getAuthToken(): string | null {
@@ -92,12 +93,19 @@ export function getAuthHeaders(): Record<string, string> {
   return {};
 }
 
-// 1. Send OTP
-export async function sendOtp(phoneNumber: string): Promise<{ message: string; demo_otp?: string }> {
+// 1. Send OTP (Supports Phone and/or Email)
+export async function sendOtp(
+  target: { phoneNumber?: string; email?: string } | string
+): Promise<{ message: string; demo_otp?: string }> {
+  const body =
+    typeof target === 'string'
+      ? { phone_number: target }
+      : { phone_number: target.phoneNumber, email: target.email };
+
   const res = await fetch(`${API_BASE_URL}/auth/send-otp`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone_number: phoneNumber }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to send OTP' }));
@@ -106,12 +114,20 @@ export async function sendOtp(phoneNumber: string): Promise<{ message: string; d
   return res.json();
 }
 
-// 2. Verify OTP
-export async function verifyOtp(phoneNumber: string, otpCode: string): Promise<{ status: string; message: string }> {
+// 2. Verify OTP (Supports Phone and/or Email)
+export async function verifyOtp(
+  target: { phoneNumber?: string; email?: string } | string,
+  otpCode: string
+): Promise<{ status: string; message: string }> {
+  const body =
+    typeof target === 'string'
+      ? { phone_number: target, otp_code: otpCode }
+      : { phone_number: target.phoneNumber, email: target.email, otp_code: otpCode };
+
   const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone_number: phoneNumber, otp_code: otpCode }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Invalid OTP' }));

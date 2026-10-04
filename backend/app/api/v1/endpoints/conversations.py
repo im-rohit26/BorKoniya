@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import io
+import uuid
+import shutil
+from PIL import Image
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
@@ -213,6 +218,8 @@ def get_conversations(
         for inc in accepted_interests
     }
 
+    from app.websocket.call_manager import call_manager
+
     results = []
     for conv, other_profile, last_msg_content, last_msg_time, unread in rows:
         can_chat = is_premium or (other_profile.id in mutual_ids)
@@ -237,7 +244,7 @@ def get_conversations(
                     current_city=other_profile.current_city,
                     current_state=other_profile.current_state,
                     occupation=other_profile.occupation,
-                    is_online=False,
+                    is_online=bool(call_manager.active_connections.get(other_profile.id)),
                 ),
                 last_message=last_msg_content,
                 last_message_time=last_msg_time if last_msg_time else conv.updated_at,
@@ -895,5 +902,157 @@ def clear_conversation(
     member.cleared_at = datetime.now(timezone.utc)
     db.commit()
     return {"status": "SUCCESS", "message": "Chat cleared successfully."}
+
+
+@router.post("/{conversation_id}/attachment")
+async def upload_chat_attachment(
+    conversation_id: str,
+    file: UploadFile = File(...),
+    attachment_type: str = Form("image"),  # "image" or "document"
+    current_profile: Profile = Depends(get_current_profile),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload and process chat attachment.
+    - Images: JPG, PNG, WebP compressed & resized via Pillow to <= 1 MB.
+    - Documents: PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX verified <= 10 MB.
+    """
+    # 1. Verify user is member of conversation
+    member = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.profile_id == current_profile.id,
+        )
+        .first()
+    )
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a participant in this conversation.",
+        )
+
+    # 2. Check other member and entitlement
+    other_member = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.profile_id != current_profile.id,
+        )
+        .first()
+    )
+    if other_member:
+        can_chat = check_chat_entitlement(
+            current_user.id, current_profile.id, other_member.profile_id, db
+        )
+        if not can_chat:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chat unlocks on mutual accepted interest or Premium subscription.",
+            )
+
+    # 3. Read file content
+    contents = await file.read()
+    raw_size = len(contents)
+
+    upload_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
+        "uploads",
+        "attachments",
+    )
+    os.makedirs(upload_dir, exist_ok=True)
+
+    clean_filename = file.filename or "attachment"
+    ext = os.path.splitext(clean_filename)[1].lower()
+
+    if attachment_type == "image":
+        # Image requirements: JPG/JPEG, PNG, WebP
+        allowed_img_exts = {".jpg", ".jpeg", ".png", ".webp"}
+        if ext not in allowed_img_exts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported image format '{ext}'. Allowed: JPG, PNG, WebP.",
+            )
+        if file.content_type and not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid image MIME type.",
+            )
+
+        # Process and compress with Pillow
+        try:
+            img = Image.open(io.BytesIO(contents))
+            # Convert RGBA to RGB for JPEG
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
+            # Resize if dimensions exceed 1920x1920 preserving aspect ratio
+            max_dim = 1920
+            if img.width > max_dim or img.height > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+            out_filename = f"{uuid.uuid4().hex}.jpg"
+            out_path = os.path.join(upload_dir, out_filename)
+
+            # Compress to ensure <= 1 MB (1048576 bytes)
+            quality = 85
+            out_bytes = io.BytesIO()
+            img.save(out_bytes, format="JPEG", quality=quality, optimize=True)
+            while out_bytes.tell() > 1_048_576 and quality > 30:
+                quality -= 10
+                out_bytes = io.BytesIO()
+                img.save(out_bytes, format="JPEG", quality=quality, optimize=True)
+
+            with open(out_path, "wb") as f_out:
+                f_out.write(out_bytes.getvalue())
+
+            final_size = os.path.getsize(out_path)
+            media_url = f"http://localhost:8000/uploads/attachments/{out_filename}"
+            msg_type = "image"
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to process image: {str(e)}",
+            )
+    else:
+        # Document requirements: Max 10 MB, Safe formats
+        max_doc_size = 10 * 1024 * 1024
+        if raw_size > max_doc_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Document exceeds 10 MB limit ({raw_size / (1024 * 1024):.1f} MB).",
+            )
+        allowed_doc_exts = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"}
+        if ext not in allowed_doc_exts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported document format '{ext}'. Allowed: PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX.",
+            )
+
+        # Check for executable signatures (MZ header for EXE, ELF header for Linux)
+        if contents.startswith(b"MZ") or contents.startswith(b"\x7fELF"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Executable files are strictly prohibited.",
+            )
+
+        safe_name = "".join(c for c in clean_filename if c.isalnum() or c in "._- ")
+        out_filename = f"{uuid.uuid4().hex[:8]}_{safe_name}"
+        out_path = os.path.join(upload_dir, out_filename)
+        with open(out_path, "wb") as f_out:
+            f_out.write(contents)
+
+        final_size = raw_size
+        media_url = f"http://localhost:8000/uploads/attachments/{out_filename}"
+        msg_type = "document"
+
+    return {
+        "status": "SUCCESS",
+        "media_url": media_url,
+        "message_type": msg_type,
+        "file_name": clean_filename,
+        "file_size": final_size,
+    }
 
 

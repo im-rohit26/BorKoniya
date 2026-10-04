@@ -24,6 +24,11 @@ export interface ProfileResponse {
   annual_income?: string;
   diet: string;
   about_me?: string;
+  smoking?: string;
+  drinking?: string;
+  rashi?: string;
+  nakshatra?: string;
+  is_manglik?: string;
   age: number;
   profile_for: string;
   status: string;
@@ -59,7 +64,8 @@ export function formatHeight(heightCm?: number): string {
 export function mapProfileResponseToCard(
   p: ProfileResponse,
   isShortlisted = false,
-  isInterestSent = false
+  isInterestSent = false,
+  isConnected = false
 ): ProfileCardData {
   return {
     id: p.id,
@@ -81,12 +87,30 @@ export function mapProfileResponseToCard(
     shortBio: p.about_me || 'Verified community profile on BorKonya.',
     isShortlisted: isShortlisted,
     isInterestSent: isInterestSent,
+    isConnected: isConnected,
     gender: p.gender,
   };
 }
 
-export async function getRecommendedMatches(limit = 3): Promise<ProfileResponse[]> {
-  const res = await fetch(`${API_BASE_URL}/matches/recommended?limit=${limit}`, {
+function buildMatchQueryParams(filters: Record<string, any> = {}, limit = 20, page = 1): string {
+  const queryParams = new URLSearchParams();
+  queryParams.set('limit', String(limit));
+  queryParams.set('page', String(page));
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== null && value !== 'ALL' && value !== 'ANY' && value !== '') {
+      queryParams.set(key, String(value));
+    }
+  }
+  return queryParams.toString();
+}
+
+export async function getRecommendedMatches(
+  limit = 20,
+  filters: Record<string, any> = {},
+  page = 1
+): Promise<ProfileResponse[]> {
+  const qs = buildMatchQueryParams(filters, limit, page);
+  const res = await fetch(`${API_BASE_URL}/matches/recommended?${qs}`, {
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) {
@@ -95,8 +119,13 @@ export async function getRecommendedMatches(limit = 3): Promise<ProfileResponse[
   return res.json();
 }
 
-export async function getNewMatches(limit = 3): Promise<ProfileResponse[]> {
-  const res = await fetch(`${API_BASE_URL}/matches/new?limit=${limit}`, {
+export async function getNewMatches(
+  limit = 20,
+  filters: Record<string, any> = {},
+  page = 1
+): Promise<ProfileResponse[]> {
+  const qs = buildMatchQueryParams(filters, limit, page);
+  const res = await fetch(`${API_BASE_URL}/matches/new?${qs}`, {
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) {
@@ -105,8 +134,13 @@ export async function getNewMatches(limit = 3): Promise<ProfileResponse[]> {
   return res.json();
 }
 
-export async function getNearYouMatches(limit = 3): Promise<ProfileResponse[]> {
-  const res = await fetch(`${API_BASE_URL}/matches/near-you?limit=${limit}`, {
+export async function getNearYouMatches(
+  limit = 20,
+  filters: Record<string, any> = {},
+  page = 1
+): Promise<ProfileResponse[]> {
+  const qs = buildMatchQueryParams(filters, limit, page);
+  const res = await fetch(`${API_BASE_URL}/matches/near-you?${qs}`, {
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) {
@@ -115,26 +149,108 @@ export async function getNearYouMatches(limit = 3): Promise<ProfileResponse[]> {
   return res.json();
 }
 
-export async function getSearchProfiles(
-  filters: Record<string, any>,
-  limit = 3
+export async function getProfileVisitors(
+  limit = 20,
+  filters: Record<string, any> = {},
+  page = 1
 ): Promise<ProfileResponse[]> {
-  const queryParams = new URLSearchParams();
-  queryParams.set('limit', String(limit));
-
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== undefined && value !== null && value !== 'ALL' && value !== 'ANY' && value !== '') {
-      queryParams.set(key, String(value));
-    }
+  const qs = buildMatchQueryParams(filters, limit, page);
+  const res = await fetch(`${API_BASE_URL}/matches/visitors?${qs}`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    throw new Error('Failed to fetch profile visitors');
   }
+  return res.json();
+}
 
-  const res = await fetch(`${API_BASE_URL}/search?${queryParams.toString()}`, {
+export async function getSearchProfiles(
+  filters: Record<string, any> = {},
+  limit = 20,
+  page = 1
+): Promise<ProfileResponse[]> {
+  const qs = buildMatchQueryParams(filters, limit, page);
+  const res = await fetch(`${API_BASE_URL}/search?${qs}`, {
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) {
     throw new Error('Failed to search profiles');
   }
   return res.json();
+}
+
+export async function getSearchProfilesWithTotal(
+  filters: Record<string, any> = {},
+  limit = 20,
+  page = 1
+): Promise<{ profiles: ProfileResponse[]; total: number }> {
+  const qs = buildMatchQueryParams(filters, limit, page);
+  const res = await fetch(`${API_BASE_URL}/search?${qs}`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    throw new Error('Failed to search profiles');
+  }
+  const totalHeader = res.headers.get('X-Total-Count');
+  const profiles: ProfileResponse[] = await res.json();
+  const total = totalHeader ? parseInt(totalHeader, 10) : profiles.length;
+  return { profiles, total };
+}
+
+export interface DashboardStatsResponse {
+  user: {
+    first_name: string;
+    last_name: string;
+    profile_completion_pct: number;
+    is_premium: boolean;
+    photo_url: string | null;
+    gender: string;
+    community: string;
+  };
+  metrics: {
+    recommended_count: number;
+    received_interests_count: number;
+    sent_interests_count: number;
+    total_active_connections: number;
+    shortlist_count: number;
+    active_conversations_count: number;
+    profile_views_count: number;
+    profile_completion_pct: number;
+  };
+  recommended_profiles: ProfileResponse[];
+}
+
+export async function getDashboardStats(): Promise<DashboardStatsResponse> {
+  const res = await fetch(`${API_BASE_URL}/profile/me/dashboard`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    throw new Error('Failed to load dashboard metrics');
+  }
+  const raw = await res.json();
+  const completionPct = raw.metrics?.profile_completion_pct ?? raw.profile_completion_pct ?? 80;
+  return {
+    user: raw.user || {
+      first_name: '',
+      last_name: '',
+      profile_completion_pct: completionPct,
+      is_premium: false,
+      photo_url: null,
+      gender: '',
+      community: '',
+    },
+    metrics: {
+      recommended_count: raw.metrics?.recommended_count ?? raw.recommended_count ?? 0,
+      received_interests_count: raw.metrics?.received_interests_count ?? raw.received_interests_count ?? 0,
+      sent_interests_count: raw.metrics?.sent_interests_count ?? raw.sent_interests_count ?? 0,
+      total_active_connections: raw.metrics?.total_active_connections ?? raw.total_active_connections ?? 0,
+      shortlist_count: raw.metrics?.shortlist_count ?? raw.shortlist_count ?? 0,
+      active_conversations_count: raw.metrics?.active_conversations_count ?? raw.active_conversations_count ?? 0,
+      profile_views_count: raw.metrics?.profile_views_count ?? raw.profile_views_count ?? 0,
+      profile_completion_pct: completionPct,
+    },
+    recommended_profiles: raw.recommended_profiles || raw.top_matches || [],
+  };
 }
 
 export async function getProfileById(id: string): Promise<ProfileResponse> {
