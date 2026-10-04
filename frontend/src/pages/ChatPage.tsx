@@ -92,6 +92,7 @@ export const ChatPage: React.FC = () => {
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [activeConvId, setActiveConvId] = useState<string | null>(conversationId || null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
@@ -243,6 +244,41 @@ export const ChatPage: React.FC = () => {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Presence channel to broadcast and track real active online users
+  useEffect(() => {
+    const presenceChannel = supabase.channel('online_users', {
+      config: { presence: { key: currentUser?.profile_id || currentUser?.user_id || 'anonymous' } },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const activeIds = new Set<string>();
+        Object.keys(state).forEach((key) => {
+          activeIds.add(key);
+          const presences = state[key] as any[];
+          presences?.forEach((p) => {
+            if (p.profile_id) activeIds.add(p.profile_id);
+            if (p.user_id) activeIds.add(p.user_id);
+          });
+        });
+        setOnlineUserIds(activeIds);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            profile_id: currentUser?.profile_id,
+            user_id: currentUser?.user_id,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [currentUser?.profile_id, currentUser?.user_id]);
 
   // Load messages + realtime
   useEffect(() => {
@@ -617,10 +653,32 @@ export const ChatPage: React.FC = () => {
 
   const totalUnreadCount = conversations.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
 
-  const formatTimeSnippet = (dateStr?: string) => {
-    if (!dateStr) return '';
+  // Robust date parser ensuring UTC dates without 'Z' are parsed correctly in local timezone
+  const parseDateTime = (dateStr?: string | Date | null): Date | null => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+    const s = String(dateStr).trim();
+    if (!s) return null;
+    // If string has 'T' or space separator and no timezone offset or Z, treat as UTC
+    if (!s.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(s)) {
+      const utcIso = s.includes(' ') ? s.replace(' ', 'T') + 'Z' : s + 'Z';
+      const d = new Date(utcIso);
+      if (!isNaN(d.getTime())) return d;
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const formatMessageTime = (dateStr?: string | Date | null) => {
+    const date = parseDateTime(dateStr);
+    if (!date) return '';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const formatTimeSnippet = (dateStr?: string | Date | null) => {
+    const date = parseDateTime(dateStr);
+    if (!date) return '';
     try {
-      const date = new Date(dateStr);
       const now = new Date();
       if (date.toDateString() === now.toDateString()) {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -635,8 +693,9 @@ export const ChatPage: React.FC = () => {
   };
 
   // Date chip label shown between messages of different days
-  const formatDateChip = (dateStr: string) => {
-    const date = new Date(dateStr);
+  const formatDateChip = (dateStr?: string | Date | null) => {
+    const date = parseDateTime(dateStr);
+    if (!date) return 'Today';
     const now = new Date();
     if (date.toDateString() === now.toDateString()) return 'Today';
     const yesterday = new Date();
@@ -1030,6 +1089,7 @@ export const ChatPage: React.FC = () => {
                 filteredConversations.map((c) => {
                   const isActive = c.id === activeConvId;
                   const name = `${c.other_profile.first_name} ${c.other_profile.last_name || ''}`.trim();
+                  const isOtherOnline = onlineUserIds.has(c.other_profile.profile_id);
                   const isFav = favouriteConvIds.includes(c.id);
 
                   return (
@@ -1050,7 +1110,7 @@ export const ChatPage: React.FC = () => {
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        {c.other_profile.is_online && (
+                        {isOtherOnline && (
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#16a34a] border-2 border-white rounded-full" />
                         )}
                       </div>
@@ -1064,13 +1124,13 @@ export const ChatPage: React.FC = () => {
                         </div>
 
                         <p className="text-xs mt-0.5 flex items-center gap-1">
-                          {c.other_profile.is_online ? (
+                          {isOtherOnline ? (
                             <>
                               <span className="w-2 h-2 rounded-full bg-[#16a34a]" />
                               <span className="text-[#16a34a] font-medium">Online</span>
                             </>
                           ) : (
-                            <span className="text-[#8a96b0]">Last seen recently</span>
+                            <span className="text-[#8a96b0]">Offline</span>
                           )}
                         </p>
 
@@ -1198,10 +1258,14 @@ export const ChatPage: React.FC = () => {
                         <h2 className="font-bold text-[#0b2a5b] text-base leading-tight truncate">
                           {activeConv.other_profile.first_name} {activeConv.other_profile.last_name}
                         </h2>
-                        {activeConv.other_profile.is_online && (
+                        {onlineUserIds.has(activeConv.other_profile.profile_id) ? (
                           <span className="flex items-center gap-1 text-xs text-[#16a34a] font-medium flex-shrink-0">
                             <span className="w-2 h-2 rounded-full bg-[#16a34a]" />
                             Online
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[#8a96b0] font-medium flex-shrink-0">
+                            Offline
                           </span>
                         )}
                       </div>
@@ -1496,16 +1560,14 @@ export const ChatPage: React.FC = () => {
                   </div>
                 ) : (
                   messages.map((m, idx) => {
-                    const timeString = new Date(m.created_at).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false,
-                    });
+                    const timeString = formatMessageTime(m.created_at);
                     const isSelected = selectedMessageIds.includes(m.id);
                     const userReaction = reactions[m.id];
                     const prev = idx > 0 ? messages[idx - 1] : null;
+                    const curDate = parseDateTime(m.created_at);
+                    const prevDate = prev ? parseDateTime(prev.created_at) : null;
                     const showDateChip =
-                      !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+                      !prevDate || !curDate || prevDate.toDateString() !== curDate.toDateString();
                     const isFwdMine = !!m.is_forwarded && m.is_mine;
                     const onBlue = m.is_mine && !isFwdMine;
 

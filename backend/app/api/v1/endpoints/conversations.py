@@ -237,7 +237,7 @@ def get_conversations(
                     current_city=other_profile.current_city,
                     current_state=other_profile.current_state,
                     occupation=other_profile.occupation,
-                    is_online=True,
+                    is_online=False,
                 ),
                 last_message=last_msg_content,
                 last_message_time=last_msg_time if last_msg_time else conv.updated_at,

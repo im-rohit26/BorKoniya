@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Globe, Menu, X, Sparkles, LogOut, ChevronDown } from 'lucide-react'
+import { Globe, Menu, X, Sparkles, LogOut, ChevronDown, Trash2, LayoutDashboard, User } from 'lucide-react'
 import { languages } from './LanguageSelectorModal'
 import { useAuth } from '../../context/AuthContext'
 import { getDefaultAvatar } from '../../lib/utils'
@@ -16,15 +16,34 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
   const { t, i18n } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, isAuthenticated, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
+  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const { user, isAuthenticated, logout, deleteMyAccount } = useAuth()
 
   const handleLogout = () => {
     logout()
     setUserDropdownOpen(false)
     setMobileMenuOpen(false)
     navigate('/login')
+  }
+
+  const handleConfirmDeleteAccount = async () => {
+    setIsDeletingAccount(true)
+    setDeleteError(null)
+    try {
+      await deleteMyAccount()
+      setDeleteAccountModalOpen(false)
+      setUserDropdownOpen(false)
+      setMobileMenuOpen(false)
+      navigate('/login')
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete account. Please try again.')
+    } finally {
+      setIsDeletingAccount(false)
+    }
   }
 
   const currentLang = languages.find((l) => i18n.language.startsWith(l.code)) || languages[0]
@@ -113,36 +132,56 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
 
               {userDropdownOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-48 rounded-xl bg-white p-1.5 shadow-lg border border-slate-100 text-sm z-50"
+                  className="absolute right-0 mt-2 w-60 rounded-2xl bg-white p-2 shadow-xl border border-slate-100 text-sm z-50 transition-all duration-150 animate-in fade-in zoom-in-95"
                   onMouseLeave={() => setUserDropdownOpen(false)}
                 >
                   <Link
                     to="/dashboard"
                     onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center space-x-2 px-3 py-2 rounded-lg text-slate-700 hover:bg-crimson-50 hover:text-crimson-700 font-medium"
+                    className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
                   >
+                    <LayoutDashboard className="w-4 h-4 text-slate-500" />
                     <span>Dashboard</span>
                   </Link>
+
                   <Link
                     to="/profile/edit"
                     onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center space-x-2 px-3 py-2 rounded-lg text-slate-700 hover:bg-crimson-50 hover:text-crimson-700 font-medium"
+                    className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
                   >
+                    <User className="w-4 h-4 text-slate-500" />
                     <span>My Profile</span>
                   </Link>
+
                   <Link
                     to="/subscription"
                     onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center space-x-2 px-3 py-2 rounded-lg text-slate-700 hover:bg-crimson-50 hover:text-crimson-700 font-medium"
+                    className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
                   >
+                    <Sparkles className="w-4 h-4 text-amber-500" />
                     <span>Upgrade Plan</span>
                   </Link>
-                  <div className="my-1 border-t border-slate-100" />
+
+                  <div className="my-1.5 border-t border-slate-100" />
+
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(false)
+                      setDeleteAccountModalOpen(true)
+                    }}
+                    className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
+                  >
+                    <Trash2 className="w-4 h-4 flex-shrink-0" />
+                    <span className="whitespace-nowrap">Delete Account Permanently</span>
+                  </button>
+
+                  <div className="my-1.5 border-t border-slate-100" />
+
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-crimson-700 hover:bg-crimson-50 font-medium transition-colors"
+                    className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-crimson-700 hover:bg-crimson-50 font-medium transition-colors text-left"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-4 h-4 flex-shrink-0" />
                     <span>Logout</span>
                   </button>
                 </div>
@@ -232,20 +271,48 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
                 <Link
                   to="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-crimson-50 hover:text-crimson-700"
+                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center space-x-2.5"
                 >
-                  Dashboard
+                  <LayoutDashboard className="w-4 h-4 text-slate-500" />
+                  <span>Dashboard</span>
                 </Link>
+
                 <Link
                   to="/profile/edit"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-crimson-50 hover:text-crimson-700"
+                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center space-x-2.5"
                 >
-                  My Profile
+                  <User className="w-4 h-4 text-slate-500" />
+                  <span>My Profile</span>
                 </Link>
+
+                <Link
+                  to="/subscription"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center space-x-2.5"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Upgrade Plan</span>
+                </Link>
+
+                <div className="my-1 border-t border-slate-100" />
+
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    setDeleteAccountModalOpen(true)
+                  }}
+                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 flex items-center space-x-2.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Account Permanently</span>
+                </button>
+
+                <div className="my-1 border-t border-slate-100" />
+
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left rounded-lg px-3 py-2 text-sm font-semibold text-crimson-700 hover:bg-crimson-50 flex items-center space-x-2"
+                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm font-semibold text-crimson-700 hover:bg-crimson-50 flex items-center space-x-2.5"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
@@ -271,6 +338,57 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= DELETE ACCOUNT CONFIRMATION MODAL ================= */}
+      {deleteAccountModalOpen && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#0b2a5b]/45 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-[#e3e9f5] overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#fde8ee] flex items-center justify-center mx-auto mb-4 text-[#e0102f]">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <h3 className="font-bold text-[#0b2a5b] text-lg mb-2">
+              Delete Account Permanently?
+            </h3>
+
+            <p className="text-xs text-[#6b7a99] leading-relaxed mb-4">
+              Are you sure you want to permanently delete your account? This action cannot be undone. All your profile information, matches, chats, and subscriptions will be permanently removed.
+            </p>
+
+            {deleteError && (
+              <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 font-medium">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 justify-center">
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={() => {
+                  setDeleteAccountModalOpen(false)
+                  setDeleteError(null)
+                }}
+                className="flex-1 py-2.5 px-4 text-xs font-semibold text-[#0b2a5b] bg-[#f1f4fb] hover:bg-[#e4ebf8] rounded-full transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={handleConfirmDeleteAccount}
+                className="flex-1 py-2.5 px-4 text-xs font-bold text-white bg-[#e0102f] hover:bg-[#c70a27] rounded-full transition-colors shadow-md shadow-[#e0102f]/25 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isDeletingAccount ? (
+                  <span>Deleting...</span>
+                ) : (
+                  <span>Delete Permanently</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

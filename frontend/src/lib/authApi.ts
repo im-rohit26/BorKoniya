@@ -240,3 +240,15 @@ export async function updateMyProfile(payload: Record<string, any>): Promise<any
   }
   return res.json();
 }
+
+export async function deleteAccount(): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/auth/me`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete account' }));
+    throw new Error(err.detail || 'Failed to delete account');
+  }
+  return res.json();
+}

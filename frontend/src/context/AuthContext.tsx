@@ -12,6 +12,7 @@ import {
   loginUser,
   registerUser,
   getCurrentUser,
+  deleteAccount,
 } from '../lib/authApi';
 
 interface AuthContextType {
@@ -22,6 +23,7 @@ interface AuthContextType {
   login: (phoneOrEmail: string, password: string) => Promise<TokenResponse>;
   register: (payload: RegisterPayload) => Promise<TokenResponse>;
   logout: () => void;
+  deleteMyAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -136,6 +138,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const deleteMyAccount = async () => {
+    await deleteAccount();
+    removeAuthToken();
+    removeRefreshToken();
+    setTokenState(null);
+    setUser(null);
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -144,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     register,
     logout,
+    deleteMyAccount,
     refreshUser,
   };
 

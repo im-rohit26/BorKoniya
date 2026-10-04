@@ -276,6 +276,21 @@ def get_current_user_info(
     )
 
 
+@router.delete("/me")
+def delete_my_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete the authenticated user's account and all associated data.
+    Foreign key cascading will remove the associated profile, photos, messages,
+    conversations memberships, subscriptions, interests, and shortlists.
+    """
+    db.delete(current_user)
+    db.commit()
+    return {"status": "SUCCESS", "message": "Account deleted permanently."}
+
+
 @router.post("/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     otp = f"{random.randint(100000, 999999)}"
