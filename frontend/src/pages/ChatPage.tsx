@@ -59,6 +59,7 @@ import {
   uploadChatAttachment,
 } from '../lib/interactionApi';
 import type { ConversationSummary, MessageItem } from '../lib/interactionApi';
+import { BACKEND_ROOT_URL } from '../lib/config';
 import { supabase } from '../lib/supabase';
 import { ProtectedPhoto } from '../components/security/ProtectedPhoto';
 import { ScreenCaptureProtection } from '../components/security/ScreenCaptureProtection';
@@ -1866,16 +1867,16 @@ export const ChatPage: React.FC = () => {
                                 {m.media_url && (m.message_type === 'image' || /\.(jpe?g|png|webp|gif)$/i.test(m.media_url)) ? (
                                   <div className="mb-2 rounded-2xl overflow-hidden max-w-xs sm:max-w-sm border border-black/10 bg-black/5 shadow-xs">
                                     <img
-                                      src={m.media_url.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`}
+                                      src={m.media_url.startsWith('http') ? m.media_url : `${BACKEND_ROOT_URL}${m.media_url}`}
                                       alt="Attachment"
                                       className="max-h-72 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                                      onClick={() => window.open(m.media_url?.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`, '_blank')}
+                                      onClick={() => window.open(m.media_url?.startsWith('http') ? m.media_url : `${BACKEND_ROOT_URL}${m.media_url}`, '_blank')}
                                     />
                                   </div>
                                 ) : m.media_url ? (
                                   <div className="mb-2">
                                     <a
-                                      href={m.media_url.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`}
+                                      href={m.media_url.startsWith('http') ? m.media_url : `${BACKEND_ROOT_URL}${m.media_url}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${

@@ -52,11 +52,13 @@ const FORBIDDEN_FIELDS = new Set([
   'mobile',
 ]);
 
+import { API_BASE_URL } from '../lib/config';
+
 function resolveWebSocketBaseUrl(): string {
-  const explicitWs = import.meta.env.VITE_WS_URL;
+  const explicitWs = import.meta.env.VITE_WS_URL || import.meta.env.Backend_WS_URL || import.meta.env.BACKEND_WS_URL;
   if (explicitWs) return explicitWs;
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+  const apiUrl = API_BASE_URL;
   try {
     const parsed = new URL(apiUrl);
     const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';

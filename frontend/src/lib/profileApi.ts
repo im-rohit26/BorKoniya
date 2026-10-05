@@ -1,7 +1,6 @@
 import { getAuthHeaders } from './authApi';
 import type { ProfileCardData } from '../components/cards/ProfileCard';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from './config';
 
 export interface ProfileResponse {
   id: string;
