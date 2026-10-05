@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
 
+    @field_validator("DATABASE_URL", mode="before")
+    def fix_database_url(cls, v):
+        if isinstance(v, str) and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
+
     # Supabase (Optional in dev, required in production)
     SUPABASE_URL: str = "https://mock.supabase.co"
     SUPABASE_SERVICE_ROLE_KEY: str = "mock-service-key"
