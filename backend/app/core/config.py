@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     OTP_PROVIDER_KEY: str = "mock_otp_provider_key"
     SMS_SENDER_ID: str = "BORKON"
 
+    @field_validator("SMTP_PASSWORD", mode="before")
+    def clean_smtp_password(cls, v):
+        if isinstance(v, str):
+            return v.strip().replace('"', '').replace("'", '').replace(" ", "")
+        return v
+
     # Payment
     PAYMENT_PROVIDER: str = "MOCK"
     PAYMENT_PROVIDER_KEY: str = "mock_payment_key"

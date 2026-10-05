@@ -49,6 +49,7 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
     # Send email OTP if email is present
     if payload.email and settings.SMTP_USER and settings.SMTP_PASSWORD:
         try:
+            print(f"[SMTP] Sending OTP email to {payload.email} via {settings.SMTP_USER}...")
             msg = MIMEMultipart()
             msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_USER}>"
             msg['To'] = payload.email
@@ -62,15 +63,18 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
                 f"- Team BorKonya"
             )
             msg.attach(MIMEText(body, 'plain'))
-            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
             server.starttls()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
             server.quit()
+            print(f"[SMTP] SUCCESS: OTP sent to {payload.email}")
             logging.info(f"OTP email sent successfully to {payload.email}")
         except Exception as e:
-            logging.warning(f"Failed to send OTP email to {payload.email}: {e}")
+            print(f"[SMTP] ERROR: Failed to send OTP to {payload.email}: {e}")
+            logging.error(f"Failed to send OTP email to {payload.email}: {e}")
     elif payload.email:
+        print("[SMTP] WARNING: SMTP_USER or SMTP_PASSWORD is not configured in environment variables. Email skipped.")
         logging.warning("SMTP not configured or credentials missing. OTP stored in DB.")
 
     now = datetime.now(timezone.utc)
@@ -370,15 +374,18 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
                 f"- Team BorKonya"
             )
             msg.attach(MIMEText(body, 'plain'))
-            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
             server.starttls()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
             server.quit()
+            print(f"[SMTP] SUCCESS: Password reset OTP sent to {user.email}")
             logging.info(f"Password reset OTP email sent to {user.email}")
         except Exception as e:
-            logging.warning(f"Failed to send password reset email to {user.email}: {e}")
+            print(f"[SMTP] ERROR: Failed to send password reset email to {user.email}: {e}")
+            logging.error(f"Failed to send password reset email to {user.email}: {e}")
     elif user and user.email:
+        print("[SMTP] WARNING: SMTP_USER or SMTP_PASSWORD not set. Password reset email skipped.")
         logging.warning("SMTP not configured. Password reset OTP stored in DB but not emailed.")
             
     now = datetime.now(timezone.utc)
@@ -470,3 +477,42 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
         "status": "SUCCESS",
         "message": "Password updated successfully. You may now log in with your new password.",
     }
+
+
+@router.get("/smtp-status")
+def check_smtp_status():
+    """
+    Diagnostic endpoint to test and verify SMTP email delivery status.
+    Never exposes passwords.
+    """
+    configured = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
+    if not configured:
+        return {
+            "status": "NOT_CONFIGURED",
+            "message": "SMTP_USER or SMTP_PASSWORD is not configured in environment variables.",
+            "smtp_user": settings.SMTP_USER or None,
+            "smtp_host": settings.SMTP_HOST,
+            "smtp_port": settings.SMTP_PORT,
+        }
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.quit()
+        return {
+            "status": "CONNECTED",
+            "message": "SMTP is connected and authenticated successfully with Gmail.",
+            "smtp_user": settings.SMTP_USER,
+            "smtp_host": settings.SMTP_HOST,
+            "smtp_port": settings.SMTP_PORT,
+        }
+    except Exception as e:
+        return {
+            "status": "CONNECTION_FAILED",
+            "message": f"SMTP authentication/connection failed: {str(e)}",
+            "smtp_user": settings.SMTP_USER,
+            "smtp_host": settings.SMTP_HOST,
+            "smtp_port": settings.SMTP_PORT,
+        }
+

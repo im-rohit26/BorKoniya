@@ -26,3 +26,8 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+
