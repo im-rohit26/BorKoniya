@@ -1,4 +1,5 @@
-from typing import List, Optional, Dict, Any
+from __future__ import annotations
+from typing import List, Optional, Dict, Any, Tuple
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -16,6 +17,8 @@ from app.schemas.call import (
 )
 from app.services.call_service import CallService
 from app.websocket.call_manager import call_manager
+
+TupleUserAndProfile = Tuple[str, str, str, Optional[str]]
 
 router = APIRouter(tags=["Voice & Video Calling"])
 
@@ -119,7 +122,6 @@ def _authenticate_websocket(websocket: WebSocket, token_param: Optional[str]) ->
         db.close()
 
 
-TupleUserAndProfile = tuple[str, str, str, Optional[str]]
 
 
 async def handle_calls_websocket(websocket: WebSocket, token: Optional[str] = None):
