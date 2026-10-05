@@ -21,7 +21,13 @@ class Settings(BaseSettings):
     @field_validator("ALLOWED_ORIGINS", mode="before")
     def parse_allowed_origins(cls, v):
         if isinstance(v, str):
-            return [i.strip() for i in v.split(",") if i.strip()]
+            origins = set()
+            for i in v.split(","):
+                stripped = i.strip()
+                if stripped:
+                    origins.add(stripped)
+                    origins.add(stripped.rstrip("/"))
+            return list(origins)
         return v
 
     # Database
