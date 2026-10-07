@@ -92,19 +92,23 @@ export const MatchesPage: React.FC = () => {
 
   // Load subscription status on mount
   useEffect(() => {
-    getSubscriptionStatus()
-      .then((status) => {
-        if (status.is_active) setIsPremiumUser(true)
-      })
-      .catch(() => {})
-  }, [])
+    if (isAuthenticated) {
+      getSubscriptionStatus()
+        .then((status) => {
+          if (status.is_active) setIsPremiumUser(true)
+        })
+        .catch(() => {})
+    } else {
+      setIsPremiumUser(false)
+    }
+  }, [isAuthenticated])
 
-  // Fetch real matches across all categories with filters applied
+  // Fetch real matches for active category only with filters applied
   useEffect(() => {
     let isCancelled = false
     setLoading(true)
 
-    const fetchAllCategories = async () => {
+    const fetchActiveCategory = async () => {
       try {
         const filters: Record<string, any> = {}
         if (filterCommunity && filterCommunity !== 'ALL') filters.community = filterCommunity
@@ -112,25 +116,22 @@ export const MatchesPage: React.FC = () => {
         if (filterMaritalStatus && filterMaritalStatus !== 'ALL') filters.marital_status = filterMaritalStatus
         if (filterDiet && filterDiet !== 'ALL') filters.diet = filterDiet
 
-        const [
-          rawRecommended,
-          rawNew,
-          rawNearYou,
-          rawVisitors,
-          shortlistItems,
-          shortlistedIds,
-          sentInterestIds,
-          connectedIds,
-        ] = await Promise.all([
-          getRecommendedMatches(20, filters, 1).catch(() => []),
-          getNewMatches(20, filters, 1).catch(() => []),
-          getNearYouMatches(20, filters, 1).catch(() => []),
-          getProfileVisitors(20, filters, 1).catch(() => []),
-          getShortlist().catch(() => []),
-          getShortlistedIds().catch(() => []),
-          getSentInterestIds().catch(() => []),
-          getConnectedProfileIds().catch(() => []),
-        ])
+        let shortlistedIds: string[] = []
+        let sentInterestIds: string[] = []
+        let connectedIds: string[] = []
+        if (isAuthenticated) {
+          try {
+            [shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
+              getShortlistedIds().catch(() => []),
+              getSentInterestIds().catch(() => []),
+              getConnectedProfileIds().catch(() => []),
+            ])
+          } catch {
+            shortlistedIds = []
+            sentInterestIds = []
+            connectedIds = []
+          }
+        }
 
         if (isCancelled) return
 
@@ -143,24 +144,40 @@ export const MatchesPage: React.FC = () => {
             mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id), connectedSet.has(p.id))
           )
 
-        const mappedShortlist = shortlistItems
-          .filter((item) => item?.profile)
-          .map((item) =>
-            mapProfileResponseToCard(
-              item.profile,
-              true,
-              sentInterestSet.has(item.profile.id),
-              connectedSet.has(item.profile.id)
+        if (activeTab === 'shortlist') {
+          const shortlistItems = isAuthenticated ? await getShortlist().catch(() => []) : []
+          const mappedShortlist = shortlistItems
+            .filter((item) => item?.profile)
+            .map((item) =>
+              mapProfileResponseToCard(
+                item.profile,
+                true,
+                sentInterestSet.has(item.profile.id),
+                connectedSet.has(item.profile.id)
+              )
             )
-          )
+          if (!isCancelled) {
+            setTabProfiles((prev) => ({ ...prev, shortlist: mappedShortlist }))
+          }
+        } else {
+          let rawList: any[] = []
+          if (activeTab === 'recommended') {
+            rawList = await getRecommendedMatches(20, filters, 1).catch(() => [])
+          } else if (activeTab === 'new') {
+            rawList = await getNewMatches(20, filters, 1).catch(() => [])
+          } else if (activeTab === 'near_you') {
+            rawList = await getNearYouMatches(20, filters, 1).catch(() => [])
+          } else if (activeTab === 'visitors') {
+            rawList = await getProfileVisitors(20, filters, 1).catch(() => [])
+          }
 
-        setTabProfiles({
-          recommended: mapList(rawRecommended),
-          new: mapList(rawNew),
-          near_you: mapList(rawNearYou),
-          visitors: mapList(rawVisitors),
-          shortlist: mappedShortlist,
-        })
+          if (!isCancelled) {
+            setTabProfiles((prev) => ({
+              ...prev,
+              [activeTab]: mapList(rawList),
+            }))
+          }
+        }
       } catch (err) {
         console.error('Failed to fetch matches:', err)
       } finally {
@@ -170,11 +187,11 @@ export const MatchesPage: React.FC = () => {
       }
     }
 
-    fetchAllCategories()
+    fetchActiveCategory()
     return () => {
       isCancelled = true
     }
-  }, [filterCommunity, filterState, filterMaritalStatus, filterDiet, isAuthenticated])
+  }, [activeTab, filterCommunity, filterState, filterMaritalStatus, filterDiet, isAuthenticated])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)

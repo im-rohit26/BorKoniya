@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional, Set
 from datetime import date
 from app.core.database import get_db
@@ -11,6 +11,58 @@ from app.api.v1.endpoints.profiles import format_profile_response
 from app.services.matching_service import matching_service, get_match_score
 
 router = APIRouter(prefix="/matches", tags=["Matching Engine"])
+
+
+def batch_format_matches(
+    profiles: List[Profile],
+    ref_profile: Optional[Profile],
+    db: Session,
+    default_score: int = 88,
+    default_breakdown: Optional[List[str]] = None,
+) -> List[ProfileResponse]:
+    if not profiles:
+        return []
+    if default_breakdown is None:
+        default_breakdown = [
+            "Community aligned (Sadgope / Gowala heritage)",
+            "Educational background verified",
+            "Regional lifestyle compatibility",
+        ]
+
+    candidate_ids = [p.id for p in profiles]
+    scores_map = {}
+    if ref_profile and candidate_ids:
+        scores = (
+            db.query(MatchScore)
+            .filter(
+                or_(
+                    and_(MatchScore.profile_a_id == ref_profile.id, MatchScore.profile_b_id.in_(candidate_ids)),
+                    and_(MatchScore.profile_b_id == ref_profile.id, MatchScore.profile_a_id.in_(candidate_ids)),
+                )
+            )
+            .all()
+        )
+        for s in scores:
+            other_id = s.profile_b_id if s.profile_a_id == ref_profile.id else s.profile_a_id
+            scores_map[other_id] = s.score
+
+    results = []
+    for p in profiles:
+        user = p.user
+        res = format_profile_response(p, user=user)
+        if ref_profile and p.id != ref_profile.id:
+            if p.id in scores_map:
+                res.match_score = scores_map[p.id]
+                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
+            else:
+                score, breakdown = matching_service.evaluate_match(ref_profile, p)
+                res.match_score = score
+                res.match_breakdown = breakdown
+        else:
+            res.match_score = default_score
+            res.match_breakdown = default_breakdown
+        results.append(res)
+    return results
 
 
 def get_blocked_ids(profile_id: Optional[str], db: Session) -> Set[str]:
@@ -139,37 +191,13 @@ def get_recommended_matches(
     total_count = query.count()
     response.headers["X-Total-Count"] = str(total_count)
 
-    profiles = query.offset((page - 1) * limit).limit(limit).all()
-    results = []
-
-    ref_profile = my_profile
-
-    for p in profiles:
-        user = db.query(User).filter(User.id == p.user_id).first()
-        res = format_profile_response(p, user=user)
-
-        if ref_profile and p.id != ref_profile.id:
-            db_score = get_match_score(db, ref_profile.id, p.id)
-            if db_score is not None:
-                res.match_score = db_score
-                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
-            else:
-                score, breakdown = matching_service.evaluate_match(ref_profile, p)
-                res.match_score = score
-                res.match_breakdown = breakdown
-        else:
-            # Baseline compatibility for visitors or reference profile
-            score, breakdown = 88, [
-                "Community aligned (Sadgope / Gowala heritage)",
-                "Educational background verified",
-                "Regional lifestyle compatibility",
-            ]
-            res.match_score = score
-            res.match_breakdown = breakdown
-
-        results.append(res)
-
-    return results
+    profiles = (
+        query.options(joinedload(Profile.user), selectinload(Profile.photos))
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return batch_format_matches(profiles, my_profile, db, default_score=88)
 
 
 @router.get("/new", response_model=List[ProfileResponse])
@@ -227,31 +255,19 @@ def get_new_matches(
     response.headers["X-Total-Count"] = str(total_count)
 
     profiles = (
-        query
+        query.options(joinedload(Profile.user), selectinload(Profile.photos))
         .order_by(Profile.created_at.desc())
         .offset((page - 1) * limit)
         .limit(limit)
         .all()
     )
-    results = []
-    ref_profile = my_profile
-    for p in profiles:
-        user = db.query(User).filter(User.id == p.user_id).first()
-        res = format_profile_response(p, user=user)
-        if ref_profile and p.id != ref_profile.id:
-            db_score = get_match_score(db, ref_profile.id, p.id)
-            if db_score is not None:
-                res.match_score = db_score
-                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
-            else:
-                score, breakdown = matching_service.evaluate_match(ref_profile, p)
-                res.match_score = score
-                res.match_breakdown = breakdown
-        else:
-            res.match_score = 85
-            res.match_breakdown = ["Recent member", "Community verified"]
-        results.append(res)
-    return results
+    return batch_format_matches(
+        profiles,
+        my_profile,
+        db,
+        default_score=85,
+        default_breakdown=["Recent member", "Community verified"],
+    )
 
 
 @router.get("/near-you", response_model=List[ProfileResponse])
@@ -311,26 +327,19 @@ def get_near_you_matches(
     total_count = query.count()
     response.headers["X-Total-Count"] = str(total_count)
 
-    profiles = query.offset((page - 1) * limit).limit(limit).all()
-    results = []
-    ref_profile = my_profile
-    for p in profiles:
-        user = db.query(User).filter(User.id == p.user_id).first()
-        res = format_profile_response(p, user=user)
-        if ref_profile and p.id != ref_profile.id:
-            db_score = get_match_score(db, ref_profile.id, p.id)
-            if db_score is not None:
-                res.match_score = db_score
-                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
-            else:
-                score, breakdown = matching_service.evaluate_match(ref_profile, p)
-                res.match_score = score
-                res.match_breakdown = breakdown
-        else:
-            res.match_score = 90
-            res.match_breakdown = ["Native regional match", "Community verified"]
-        results.append(res)
-    return results
+    profiles = (
+        query.options(joinedload(Profile.user), selectinload(Profile.photos))
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return batch_format_matches(
+        profiles,
+        my_profile,
+        db,
+        default_score=90,
+        default_breakdown=["Native regional match", "Community verified"],
+    )
 
 
 @router.get("/visitors", response_model=List[ProfileResponse])
@@ -366,23 +375,16 @@ def get_profile_visitors(
     total_count = query.count()
     response.headers["X-Total-Count"] = str(total_count)
 
-    profiles = query.offset((page - 1) * limit).limit(limit).all()
-    results = []
-    ref_profile = my_profile
-    for p in profiles:
-        user = db.query(User).filter(User.id == p.user_id).first()
-        res = format_profile_response(p, user=user)
-        if ref_profile and p.id != ref_profile.id:
-            db_score = get_match_score(db, ref_profile.id, p.id)
-            if db_score is not None:
-                res.match_score = db_score
-                _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
-            else:
-                score, breakdown = matching_service.evaluate_match(ref_profile, p)
-                res.match_score = score
-                res.match_breakdown = breakdown
-        else:
-            res.match_score = 86
-            res.match_breakdown = ["Recent profile view", "Community member"]
-        results.append(res)
-    return results
+    profiles = (
+        query.options(joinedload(Profile.user), selectinload(Profile.photos))
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return batch_format_matches(
+        profiles,
+        my_profile,
+        db,
+        default_score=86,
+        default_breakdown=["Recent profile view", "Community member"],
+    )

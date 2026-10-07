@@ -24,64 +24,88 @@ from app.schemas.auth import (
     RefreshRequest,
 )
 
+from app.services.email_service import email_service
+
 router = APIRouter(prefix="/auth", tags=["Authentication & OTP"])
 
 
 @router.post("/send-otp", response_model=SendOtpResponse)
 def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
-    if not payload.phone_number and not payload.email:
+    clean_email = payload.email.strip().lower() if payload.email else None
+    clean_phone = payload.phone_number.strip() if payload.phone_number else None
+
+    if not clean_phone and not clean_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please provide a mobile number or email address.",
+            detail="Please provide a valid mobile number or email address.",
         )
 
-    # If email provided for registration verification, check if already in use
-    if payload.email:
-        existing_user = db.query(User).filter(User.email == payload.email).first()
-        if existing_user:
+    # If email provided, check if already in use
+    if clean_email:
+        existing_user_email = db.query(User).filter(User.email == clean_email).first()
+        if existing_user_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="An account with this email address already exists. Please log in.",
             )
 
-    otp = f"{random.randint(100000, 999999)}"
-
-    # Send email OTP if email is present
-    if payload.email and settings.SMTP_USER and settings.SMTP_PASSWORD:
-        try:
-            print(f"[SMTP] Sending OTP email to {payload.email} via {settings.SMTP_USER}...")
-            msg = MIMEMultipart()
-            msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_USER}>"
-            msg['To'] = payload.email
-            msg['Subject'] = "Your BorKonya Verification OTP Code"
-            body = (
-                f"Dear User,\n\n"
-                f"Your one-time verification code (OTP) for BorKonya is:\n\n"
-                f"  {otp}\n\n"
-                f"This code is valid for {settings.OTP_EXPIRY_MINUTES} minutes.\n"
-                f"Do not share this code with anyone.\n\n"
-                f"- Team BorKonya"
+    # If phone provided, check if already in use
+    if clean_phone:
+        existing_user_phone = db.query(User).filter(User.phone_number == clean_phone).first()
+        if existing_user_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this mobile number already exists. Please log in.",
             )
-            msg.attach(MIMEText(body, 'plain'))
-            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-            server.quit()
-            print(f"[SMTP] SUCCESS: OTP sent to {payload.email}")
-            logging.info(f"OTP email sent successfully to {payload.email}")
-        except Exception as e:
-            print(f"[SMTP] ERROR: Failed to send OTP to {payload.email}: {e}")
-            logging.error(f"Failed to send OTP email to {payload.email}: {e}")
-    elif payload.email:
-        print("[SMTP] WARNING: SMTP_USER or SMTP_PASSWORD is not configured in environment variables. Email skipped.")
-        logging.warning("SMTP not configured or credentials missing. OTP stored in DB.")
 
     now = datetime.now(timezone.utc)
+    cooldown_secs = settings.OTP_RESEND_COOLDOWN_SECONDS or 60
+    identifiers = [x for x in [clean_email, clean_phone] if x]
+
+    # Rate limiting & resend cooldown
+    recent_otp = (
+        db.query(OTPStore)
+        .filter(
+            OTPStore.identifier.in_(identifiers),
+            OTPStore.purpose == "VERIFY",
+            OTPStore.is_used == False,
+        )
+        .order_by(OTPStore.created_at.desc())
+        .first()
+    )
+
+    if recent_otp and recent_otp.created_at:
+        created_at = (
+            recent_otp.created_at.replace(tzinfo=timezone.utc)
+            if recent_otp.created_at.tzinfo is None
+            else recent_otp.created_at
+        )
+        elapsed = (now - created_at).total_seconds()
+        if elapsed < cooldown_secs:
+            wait_remaining = max(1, int(cooldown_secs - elapsed))
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {wait_remaining} seconds before requesting a new verification code.",
+            )
+
+    otp = f"{random.randint(100000, 999999)}"
+
+    # Deliver OTP via Email if email is present
+    if clean_email:
+        success, error_msg = email_service.send_otp_email(
+            to_email=clean_email,
+            otp_code=otp,
+            recipient_name="Member",
+        )
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=error_msg or "Unable to send verification email. Please verify your email and try again.",
+            )
+
     expiry = now + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
 
-    # Invalidate existing unused verification OTPs for these identifiers
-    identifiers = [x for x in [payload.email, payload.phone_number] if x]
+    # Invalidate previous unused verification OTPs for these identifiers
     db.query(OTPStore).filter(
         OTPStore.identifier.in_(identifiers),
         OTPStore.purpose == "VERIFY",
@@ -101,16 +125,18 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
 
     is_dev = settings.DEBUG or settings.ENVIRONMENT == "development"
     return SendOtpResponse(
-        message="OTP sent successfully." + (" Check your email." if payload.email else ""),
-        phone_number=payload.phone_number,
-        email=payload.email,
+        message="Verification code sent successfully." + (" Check your email inbox and spam folder." if clean_email else ""),
+        phone_number=clean_phone,
+        email=clean_email,
         demo_otp=otp if is_dev else None,
     )
 
 
 @router.post("/verify-otp")
 def verify_otp(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
-    identifiers = [x for x in [payload.email, payload.phone_number] if x]
+    clean_email = payload.email.strip().lower() if payload.email else None
+    clean_phone = payload.phone_number.strip() if payload.phone_number else None
+    identifiers = [x for x in [clean_email, clean_phone] if x]
     if not identifiers:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -127,7 +153,7 @@ def verify_otp(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
     if not otp_entry:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired OTP. Please request a new code.",
+            detail="Invalid or expired verification code. Please request a new code.",
         )
 
     exp = otp_entry.expires_at
@@ -351,62 +377,75 @@ def delete_my_account(
 
 @router.post("/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    clean_target = payload.phone_or_email.strip()
+    clean_identifier = clean_target.lower() if "@" in clean_target else clean_target
+    now = datetime.now(timezone.utc)
+    cooldown_secs = settings.OTP_RESEND_COOLDOWN_SECONDS or 60
+
+    # Rate limiting & cooldown
+    recent_otp = (
+        db.query(OTPStore)
+        .filter(
+            OTPStore.identifier == clean_identifier,
+            OTPStore.purpose == "RESET_PASSWORD",
+            OTPStore.is_used == False,
+        )
+        .order_by(OTPStore.created_at.desc())
+        .first()
+    )
+
+    if recent_otp and recent_otp.created_at:
+        created_at = (
+            recent_otp.created_at.replace(tzinfo=timezone.utc)
+            if recent_otp.created_at.tzinfo is None
+            else recent_otp.created_at
+        )
+        elapsed = (now - created_at).total_seconds()
+        if elapsed < cooldown_secs:
+            wait_remaining = max(1, int(cooldown_secs - elapsed))
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {wait_remaining} seconds before requesting a new password reset code.",
+            )
+
     otp = f"{random.randint(100000, 999999)}"
-    
+
     # Try to find user to get email for OTP
     user = db.query(User).filter(
-        (User.phone_number == payload.phone_or_email) | (User.email == payload.phone_or_email)
+        (User.phone_number == clean_identifier) | (User.email == clean_identifier)
     ).first()
-    
-    if user and user.email and settings.SMTP_USER and settings.SMTP_PASSWORD:
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_USER}>"
-            msg['To'] = user.email
-            msg['Subject'] = "BorKonya Password Reset OTP"
-            body = (
-                f"Dear {user.profile.first_name if user.profile else 'User'},\n\n"
-                f"We received a request to reset your BorKonya password.\n\n"
-                f"Your OTP is:\n\n"
-                f"  {otp}\n\n"
-                f"This code is valid for {settings.OTP_EXPIRY_MINUTES} minutes.\n"
-                f"If you did not request this, please ignore this email.\n\n"
-                f"- Team BorKonya"
+
+    if user and user.email:
+        recipient_name = user.profile.first_name if user.profile else "Member"
+        success, error_msg = email_service.send_password_reset_email(
+            to_email=user.email,
+            otp_code=otp,
+            recipient_name=recipient_name,
+        )
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=error_msg or "Unable to send password reset email. Please try again shortly.",
             )
-            msg.attach(MIMEText(body, 'plain'))
-            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-            server.quit()
-            print(f"[SMTP] SUCCESS: Password reset OTP sent to {user.email}")
-            logging.info(f"Password reset OTP email sent to {user.email}")
-        except Exception as e:
-            print(f"[SMTP] ERROR: Failed to send password reset email to {user.email}: {e}")
-            logging.error(f"Failed to send password reset email to {user.email}: {e}")
-    elif user and user.email:
-        print("[SMTP] WARNING: SMTP_USER or SMTP_PASSWORD not set. Password reset email skipped.")
-        logging.warning("SMTP not configured. Password reset OTP stored in DB but not emailed.")
-            
-    now = datetime.now(timezone.utc)
+
     expiry = now + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
 
     # Invalidate previous unused reset OTPs for this identifier
     db.query(OTPStore).filter(
-        OTPStore.identifier == payload.phone_or_email,
+        OTPStore.identifier == clean_identifier,
         OTPStore.purpose == "RESET_PASSWORD",
         OTPStore.is_used == False,
     ).update({"is_used": True}, synchronize_session=False)
 
     new_otp = OTPStore(
-        identifier=payload.phone_or_email,
+        identifier=clean_identifier,
         otp_code=otp,
         purpose="RESET_PASSWORD",
         expires_at=expiry,
     )
     db.add(new_otp)
     db.commit()
-    
+
     is_dev = settings.DEBUG or settings.ENVIRONMENT == "development"
     res = {
         "status": "OTP_SENT",
@@ -485,34 +524,5 @@ def check_smtp_status():
     Diagnostic endpoint to test and verify SMTP email delivery status.
     Never exposes passwords.
     """
-    configured = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
-    if not configured:
-        return {
-            "status": "NOT_CONFIGURED",
-            "message": "SMTP_USER or SMTP_PASSWORD is not configured in environment variables.",
-            "smtp_user": settings.SMTP_USER or None,
-            "smtp_host": settings.SMTP_HOST,
-            "smtp_port": settings.SMTP_PORT,
-        }
-
-    try:
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
-        server.starttls()
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.quit()
-        return {
-            "status": "CONNECTED",
-            "message": "SMTP is connected and authenticated successfully with Gmail.",
-            "smtp_user": settings.SMTP_USER,
-            "smtp_host": settings.SMTP_HOST,
-            "smtp_port": settings.SMTP_PORT,
-        }
-    except Exception as e:
-        return {
-            "status": "CONNECTION_FAILED",
-            "message": f"SMTP authentication/connection failed: {str(e)}",
-            "smtp_user": settings.SMTP_USER,
-            "smtp_host": settings.SMTP_HOST,
-            "smtp_port": settings.SMTP_PORT,
-        }
+    return email_service.test_connection()
 

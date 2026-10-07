@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 from datetime import date
 import json
@@ -117,11 +117,32 @@ def search_profiles(
     response.headers["X-Total-Count"] = str(total_count)
 
     offset_val = (page - 1) * limit
-    profiles_users = query.offset(offset_val).limit(limit).all()
+    profiles_users = (
+        query.options(selectinload(Profile.photos))
+        .offset(offset_val)
+        .limit(limit)
+        .all()
+    )
     results = []
 
     today = date.today()
     ref_profile = my_profile
+    candidate_ids = [p.id for p, _ in profiles_users]
+    scores_map = {}
+    if ref_profile and candidate_ids:
+        scores = (
+            db.query(MatchScore)
+            .filter(
+                or_(
+                    and_(MatchScore.profile_a_id == ref_profile.id, MatchScore.profile_b_id.in_(candidate_ids)),
+                    and_(MatchScore.profile_b_id == ref_profile.id, MatchScore.profile_a_id.in_(candidate_ids)),
+                )
+            )
+            .all()
+        )
+        for s in scores:
+            other_id = s.profile_b_id if s.profile_a_id == ref_profile.id else s.profile_a_id
+            scores_map[other_id] = s.score
 
     for p, user in profiles_users:
         res = format_profile_response(p, user=user)
@@ -133,9 +154,8 @@ def search_profiles(
         res.age = calculated_age
 
         if ref_profile and p.id != ref_profile.id:
-            db_score = get_match_score(db, ref_profile.id, p.id)
-            if db_score is not None:
-                res.match_score = db_score
+            if p.id in scores_map:
+                res.match_score = scores_map[p.id]
                 _, res.match_breakdown = matching_service.evaluate_match(ref_profile, p)
             else:
                 score, breakdown = matching_service.evaluate_match(ref_profile, p)

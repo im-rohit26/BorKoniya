@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   X,
@@ -47,6 +47,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [demoOtp, setDemoOtp] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
 
   if (!isOpen) return null
 
@@ -89,6 +99,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
       return
     }
     setErrorMessage('')
+    setResendSuccess(null)
     setIsSubmitting(true)
 
     try {
@@ -98,9 +109,35 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
       } else {
         setDemoOtp(null)
       }
+      setResendCooldown(60)
       setStep('otp_verification')
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to send verification OTP')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isSubmitting) return
+    const cleanPhone = formData.phone.trim()
+    const cleanEmail = formData.email.trim()
+    setErrorMessage('')
+    setResendSuccess(null)
+    setIsSubmitting(true)
+
+    try {
+      const res = await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail })
+      if (res.demo_otp) {
+        setDemoOtp(res.demo_otp)
+      } else {
+        setDemoOtp(null)
+      }
+      setResendCooldown(60)
+      setResendSuccess('New verification code sent successfully to your email.')
+      setOtp(['', '', '', '', '', ''])
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Unable to resend OTP. Please wait a moment and try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -459,6 +496,30 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   className="h-12 w-11 rounded-xl border border-slate-300 text-center text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
                 />
               ))}
+            </div>
+
+            {resendSuccess && (
+              <div className="rounded-lg bg-emerald-50 p-2.5 text-xs font-semibold text-emerald-700 border border-emerald-200 text-center">
+                {resendSuccess}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+              <span>Didn't receive the email OTP?</span>
+              {resendCooldown > 0 ? (
+                <span className="font-semibold text-slate-400">
+                  Resend in <span className="font-mono text-crimson-700">{resendCooldown}s</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isSubmitting}
+                  className="font-bold text-crimson-700 hover:text-crimson-800 hover:underline disabled:opacity-50"
+                >
+                  Resend OTP
+                </button>
+              )}
             </div>
 
             <div className="flex space-x-3 pt-2">

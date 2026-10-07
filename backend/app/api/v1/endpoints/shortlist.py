@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import or_
 from datetime import datetime, timezone
 from typing import List
 from app.core.database import get_db
 from app.api.deps import get_current_profile
-from app.models.entities import Profile, Shortlist, User
+from app.models.entities import Profile, Shortlist, User, MatchScore
 from app.schemas.interaction import ShortlistItemResponse
 from app.api.v1.endpoints.profiles import format_profile_response
 from app.services.matching_service import matching_service, get_match_score
@@ -118,11 +119,25 @@ def get_shortlist(
     profiles_users = (
         db.query(Profile, User)
         .join(User, User.id == Profile.user_id)
+        .options(selectinload(Profile.photos))
         .filter(Profile.id.in_(target_ids))
         .all()
     )
     
     pu_map = {p.id: (p, u) for p, u in profiles_users}
+
+    # Batch fetch match scores to avoid N+1 queries
+    scores_map = {}
+    if target_ids and current_profile:
+        scores = db.query(MatchScore).filter(
+            or_(
+                (MatchScore.profile_a_id == current_profile.id) & (MatchScore.profile_b_id.in_(target_ids)),
+                (MatchScore.profile_b_id == current_profile.id) & (MatchScore.profile_a_id.in_(target_ids)),
+            )
+        ).all()
+        for s in scores:
+            other_id = s.profile_b_id if s.profile_a_id == current_profile.id else s.profile_a_id
+            scores_map[other_id] = s.score
 
     results = []
     for item in items:
@@ -131,7 +146,7 @@ def get_shortlist(
         target, user = pu_map[item.target_profile_id]
         formatted = format_profile_response(target, user=user)
         if current_profile and target.id != current_profile.id:
-            db_score = get_match_score(db, current_profile.id, target.id)
+            db_score = scores_map.get(target.id)
             if db_score is not None:
                 formatted.match_score = db_score
                 _, formatted.match_breakdown = matching_service.evaluate_match(current_profile, target)

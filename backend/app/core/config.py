@@ -57,11 +57,25 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "BorKonya"
     OTP_EXPIRY_MINUTES: int = 10
+    OTP_RESEND_COOLDOWN_SECONDS: int = 60
     OTP_PROVIDER_KEY: str = "mock_otp_provider_key"
     SMS_SENDER_ID: str = "BORKON"
+    BACKEND_PUBLIC_URL: str = ""
+
+    @field_validator("SMTP_USER", mode="before")
+    def clean_smtp_user(cls, v):
+        if isinstance(v, str):
+            return v.strip().replace('"', '').replace("'", '').replace(" ", "")
+        return v
 
     @field_validator("SMTP_PASSWORD", mode="before")
     def clean_smtp_password(cls, v):
+        if isinstance(v, str):
+            return v.strip().replace('"', '').replace("'", '').replace(" ", "")
+        return v
+
+    @field_validator("SMTP_HOST", mode="before")
+    def clean_smtp_host(cls, v):
         if isinstance(v, str):
             return v.strip().replace('"', '').replace("'", '').replace(" ", "")
         return v

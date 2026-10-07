@@ -106,12 +106,16 @@ export const SearchPage: React.FC = () => {
 
   // Check subscription status on mount
   useEffect(() => {
-    getSubscriptionStatus()
-      .then((status) => {
-        if (status.is_active) setIsPremiumUser(true)
-      })
-      .catch(() => {})
-  }, [])
+    if (isAuthenticated) {
+      getSubscriptionStatus()
+        .then((status) => {
+          if (status.is_active) setIsPremiumUser(true)
+        })
+        .catch(() => {})
+    } else {
+      setIsPremiumUser(false)
+    }
+  }, [isAuthenticated])
 
   // Fetch profiles from API based on filters & page
   useEffect(() => {
@@ -134,16 +138,18 @@ export const SearchPage: React.FC = () => {
         let shortlistedIds: string[] = []
         let sentInterestIds: string[] = []
         let connectedIds: string[] = []
-        try {
-          [shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
-            getShortlistedIds().catch(() => []),
-            getSentInterestIds().catch(() => []),
-            getConnectedProfileIds().catch(() => []),
-          ])
-        } catch {
-          shortlistedIds = []
-          sentInterestIds = []
-          connectedIds = []
+        if (isAuthenticated) {
+          try {
+            [shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
+              getShortlistedIds().catch(() => []),
+              getSentInterestIds().catch(() => []),
+              getConnectedProfileIds().catch(() => []),
+            ])
+          } catch {
+            shortlistedIds = []
+            sentInterestIds = []
+            connectedIds = []
+          }
         }
         const shortlistedSet = new Set(shortlistedIds)
         const sentInterestSet = new Set(sentInterestIds)

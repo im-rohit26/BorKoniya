@@ -16,10 +16,25 @@ export interface SubCommunity {
   name: string;
 }
 
+const cache = new Map<string, Promise<any>>();
+
 async function fetchMasterData<T>(endpoint: string): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/master-data${endpoint}`);
-  if (!res.ok) throw new Error(`Failed to load master data: ${endpoint}`);
-  return res.json();
+  if (cache.has(endpoint)) {
+    return cache.get(endpoint) as Promise<T>;
+  }
+
+  const promise = fetch(`${API_BASE_URL}/master-data${endpoint}`)
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`Failed to load master data: ${endpoint}`);
+      return (await res.json()) as T;
+    })
+    .catch((err) => {
+      cache.delete(endpoint);
+      throw err;
+    });
+
+  cache.set(endpoint, promise);
+  return promise;
 }
 
 export const masterDataApi = {

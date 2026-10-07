@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, KeyRound, ShieldCheck, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { forgotPassword, resetPassword } from '../../lib/authApi';
 
@@ -21,6 +21,16 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
   const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   if (!isOpen) return null;
 
@@ -33,15 +43,37 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
     setIsLoading(true);
     setErrorMessage(null);
+    setResendSuccess(null);
 
     try {
       const res = await forgotPassword(phoneOrEmail.trim());
       if (res.demo_otp) {
         setDemoOtp(res.demo_otp);
       }
+      setResendCooldown(60);
       setStep('verify_and_reset');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to send OTP code. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isLoading) return;
+    setIsLoading(true);
+    setErrorMessage(null);
+    setResendSuccess(null);
+    try {
+      const res = await forgotPassword(phoneOrEmail.trim());
+      if (res.demo_otp) {
+        setDemoOtp(res.demo_otp);
+      }
+      setResendCooldown(60);
+      setResendSuccess('New verification code sent successfully.');
+      setOtpCode('');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Unable to resend OTP. Please wait a moment and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -168,6 +200,30 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                 onChange={(e) => setOtpCode(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 font-mono font-bold tracking-widest text-center focus:border-crimson-700 focus:outline-none"
               />
+            </div>
+
+            {resendSuccess && (
+              <div className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700 border border-emerald-200 text-center">
+                {resendSuccess}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+              <span>Didn't receive the email OTP?</span>
+              {resendCooldown > 0 ? (
+                <span className="font-semibold text-slate-400">
+                  Resend in <span className="font-mono text-crimson-700">{resendCooldown}s</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
+                  className="font-bold text-crimson-700 hover:text-crimson-800 hover:underline disabled:opacity-50"
+                >
+                  Resend OTP
+                </button>
+              )}
             </div>
 
             <div>

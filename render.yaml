@@ -26,6 +26,12 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_FROM_NAME
+        value: BorKonya
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASSWORD
