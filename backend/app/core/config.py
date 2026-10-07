@@ -86,11 +86,11 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER_SECRET: str = "mock_payment_secret"
 
     # WebRTC (STUN / TURN) & Calling Signaling
-    STUN_URLS: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
-    TURN_URLS: str = ""
+    STUN_URLS: str = "stun:stun.relay.metered.ca:80,stun:stun.l.google.com:19302"
+    TURN_URLS: str = "turn:global.relay.metered.ca:80,turn:global.relay.metered.ca:80?transport=tcp,turn:global.relay.metered.ca:443,turns:global.relay.metered.ca:443?transport=tcp"
     TURN_SHARED_SECRET: str = ""
-    TURN_STATIC_USERNAME: str = ""
-    TURN_STATIC_CREDENTIAL: str = ""
+    TURN_STATIC_USERNAME: str = "2d6f532140885f340c97d232"
+    TURN_STATIC_CREDENTIAL: str = "lYAb1mssOpEcBNHC"
     TURN_CREDENTIAL_TTL_SECONDS: int = 3600
     CALL_RING_TIMEOUT_SECONDS: int = 45
     CALL_RATE_LIMIT_PER_MINUTE: int = 10

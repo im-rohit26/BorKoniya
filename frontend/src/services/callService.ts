@@ -34,15 +34,17 @@ export async function fetchWebRTCConfiguration(): Promise<RTCConfiguration> {
 
   const fallbackConfig: RTCConfiguration = {
     iceServers: [
+      { urls: 'stun:stun.relay.metered.ca:80' },
       ...defaultStunUrls.map((urls: string) => ({ urls })),
       {
         urls: [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp',
+          'turn:global.relay.metered.ca:80',
+          'turn:global.relay.metered.ca:80?transport=tcp',
+          'turn:global.relay.metered.ca:443',
+          'turns:global.relay.metered.ca:443?transport=tcp',
         ],
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
+        username: '2d6f532140885f340c97d232',
+        credential: 'lYAb1mssOpEcBNHC',
       },
     ],
     iceCandidatePoolSize: 10,
