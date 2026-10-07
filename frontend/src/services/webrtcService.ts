@@ -82,6 +82,10 @@ export class WebRTCService {
     }
   }
 
+  public hasPeerConnection(): boolean {
+    return this.peerConnection !== null && this.peerConnection.connectionState !== 'closed';
+  }
+
   public async createPeerConnection(callbacks: WebRTCCallbacks): Promise<RTCPeerConnection> {
     this.closePeerConnection();
     const rtcConfig = await fetchWebRTCConfiguration();

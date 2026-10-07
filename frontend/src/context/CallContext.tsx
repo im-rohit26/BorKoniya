@@ -354,7 +354,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ['ACCEPTED', 'CONNECTING', 'CONNECTED'].includes(callStateRef.current)
           ) {
             try {
-              await setupPeerConnection(activeId);
+              if (!webrtcService.hasPeerConnection()) {
+                await setupPeerConnection(activeId);
+              }
               const answer = await webrtcService.handleOfferAndCreateAnswer(event.sdp);
               websocketService.send({
                 type: 'call.answer',

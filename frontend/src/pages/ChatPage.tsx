@@ -98,6 +98,7 @@ export const ChatPage: React.FC = () => {
   const { startVoiceCall: initiateVoiceCall, startVideoCall: initiateVideoCall, callState } = useCall();
   const [langModalOpen, setLangModalOpen] = useState(false);
   const wsConnectedRef = useRef(false);
+  const currentChannelRef = useRef<any>(null);
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -195,6 +196,12 @@ export const ChatPage: React.FC = () => {
       });
       setMessages((prev) => [...prev, sentMsg]);
       setTimeout(scrollToBottom, 100);
+      fetchConversations(true);
+      currentChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { conversation_id: activeConvId, message_id: sentMsg.id },
+      });
     } catch (err: any) {
       alert(err.message || 'Failed to upload attachment.');
     } finally {
@@ -266,8 +273,8 @@ export const ChatPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const fetchConversations = async () => {
-    setIsLoadingConvs(true);
+  const fetchConversations = async (silent = false) => {
+    if (!silent) setIsLoadingConvs(true);
     try {
       const convs = await getConversations();
       setConversations(convs);
@@ -277,7 +284,7 @@ export const ChatPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to load conversations:', err);
     } finally {
-      setIsLoadingConvs(false);
+      if (!silent) setIsLoadingConvs(false);
     }
   };
 
@@ -293,6 +300,13 @@ export const ChatPage: React.FC = () => {
           'আশা করি আপনি ভালো আছেন!',
         ]);
       });
+
+    // Background poll for conversations list so unread counts/snippets stay fresh
+    const convPoll = setInterval(() => {
+      fetchConversations(true);
+    }, 8000);
+
+    return () => clearInterval(convPoll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -373,28 +387,37 @@ export const ChatPage: React.FC = () => {
         .on(
           'postgres_changes',
           {
-            event: 'INSERT',
+            event: '*',
             schema: 'public',
             table: 'messages',
             filter: `conversation_id=eq.${activeConvId}`,
           },
-          () => fetchChatMessages(true)
+          () => {
+            fetchChatMessages(true);
+            fetchConversations(true);
+          }
         )
+        .on('broadcast', { event: 'new_message' }, () => {
+          fetchChatMessages(true);
+          fetchConversations(true);
+        })
         .subscribe((status: string) => {
           wsConnectedRef.current = status === 'SUBSCRIBED';
         });
+
+      currentChannelRef.current = channel;
     } catch (e) {
       console.warn('Realtime channel error:', e);
     }
 
-    // Fallback polling only while realtime is not connected
+    // Unconditional silent poll every 2.5 seconds to guarantee zero missed messages
     const pollInterval = setInterval(() => {
-      if (!wsConnectedRef.current) fetchChatMessages(true);
-    }, 4000);
+      fetchChatMessages(true);
+    }, 2500);
 
     const handleCallEnded = () => {
       fetchChatMessages(true);
-      fetchConversations();
+      fetchConversations(true);
     };
     window.addEventListener('borkonya:call-ended', handleCallEnded);
 
@@ -402,7 +425,12 @@ export const ChatPage: React.FC = () => {
       isMounted = false;
       clearInterval(pollInterval);
       window.removeEventListener('borkonya:call-ended', handleCallEnded);
-      if (channel) supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+        if (currentChannelRef.current === channel) {
+          currentChannelRef.current = null;
+        }
+      }
     };
   }, [activeConvId]);
 
@@ -475,7 +503,12 @@ export const ChatPage: React.FC = () => {
       setReplyingTo(null);
       setShowEmojiPicker(false);
       setTimeout(scrollToBottom, 50);
-      fetchConversations();
+      fetchConversations(true);
+      currentChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { conversation_id: activeConvId, message_id: newMsg.id },
+      });
     } catch (err: any) {
       setErrorBanner(err.message || 'Failed to send message.');
     } finally {
