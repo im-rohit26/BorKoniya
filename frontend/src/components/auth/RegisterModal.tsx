@@ -199,93 +199,95 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-200">
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
-        <div className="text-center mb-5 pr-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-2 border-b border-slate-100 flex-shrink-0">
           <img
             src={logoImg}
             alt="BorKoniya"
-            className="h-10 w-auto object-contain mx-auto"
+            className="h-8 sm:h-9 w-auto object-contain"
           />
+          <button
+            onClick={onClose}
+            className="min-h-[44px] min-w-[44px] -mr-2 rounded-full p-2 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="mb-6">
-          <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-            <span>
-              {step === 'who_for' && 'Step 1 of 3: Profile For'}
-              {step === 'basic_details' && 'Step 2 of 3: Basic & Contact Details'}
-              {step === 'otp_verification' && 'Step 3 of 3: Mobile OTP Verification'}
-              {step === 'success' && 'Account Created!'}
-            </span>
-            <span className="text-crimson-700 font-semibold">
-              {step === 'who_for' && '33%'}
-              {step === 'basic_details' && '66%'}
-              {step === 'otp_verification' && '90%'}
-              {step === 'success' && '100%'}
-            </span>
+        {/* Scrollable Modal Content */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+          <div>
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <span>
+                {step === 'who_for' && 'Step 1 of 3: Profile For'}
+                {step === 'basic_details' && 'Step 2 of 3: Basic & Contact Details'}
+                {step === 'otp_verification' && 'Step 3 of 3: Mobile OTP Verification'}
+                {step === 'success' && 'Account Created!'}
+              </span>
+              <span className="text-crimson-700 font-semibold">
+                {step === 'who_for' && '33%'}
+                {step === 'basic_details' && '66%'}
+                {step === 'otp_verification' && '90%'}
+                {step === 'success' && '100%'}
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-crimson-600 to-navy-900 transition-all duration-300"
+                style={{
+                  width:
+                    step === 'who_for'
+                      ? '33%'
+                      : step === 'basic_details'
+                      ? '66%'
+                      : step === 'otp_verification'
+                      ? '90%'
+                      : '100%',
+                }}
+              />
+            </div>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-crimson-600 to-navy-900 transition-all duration-300"
-              style={{
-                width:
-                  step === 'who_for'
-                    ? '33%'
-                    : step === 'basic_details'
-                    ? '66%'
-                    : step === 'otp_verification'
-                    ? '90%'
-                    : '100%',
-              }}
-            />
-          </div>
-        </div>
 
-        {step === 'who_for' && (
-          <div className="space-y-5 animate-in fade-in">
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-crimson-50 text-crimson-700 border border-crimson-200">
-                <Users className="h-6 w-6" />
+          {step === 'who_for' && (
+            <div className="space-y-4 sm:space-y-5 animate-in fade-in">
+              <div className="text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-crimson-50 text-crimson-700 border border-crimson-200">
+                  <Users className="h-6 w-6" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-navy-950 font-serif">
+                  {t('onboarding.whoForTitle', 'Who are you creating this profile for?')}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  BorKonya supports personal, parental and family-assisted matrimonial matchmaking.
+                </p>
               </div>
-              <h2 className="text-2xl font-bold text-navy-950 font-serif">
-                {t('onboarding.whoForTitle', 'Who are you creating this profile for?')}
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                BorKonya supports personal, parental and family-assisted matrimonial matchmaking.
-              </p>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2.5 pt-2">
-              {profileForOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => handleSelectWhoFor(opt.id)}
-                  className={`flex items-center justify-between p-3.5 rounded-xl border text-sm font-semibold transition-all ${
-                    profileFor === opt.id
-                      ? 'border-crimson-700 bg-crimson-50 text-crimson-950 shadow-xs'
-                      : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white'
-                  }`}
-                >
-                  <span>{opt.label}</span>
-                  <ArrowRight className="h-4 w-4 text-crimson-700" />
-                </button>
-              ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {profileForOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleSelectWhoFor(opt.id)}
+                    className={`flex items-center justify-between min-h-[44px] p-3.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all ${
+                      profileFor === opt.id
+                        ? 'border-crimson-700 bg-crimson-50 text-crimson-950 shadow-xs'
+                        : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white active:bg-slate-100'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    <ArrowRight className="h-4 w-4 text-crimson-700 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {step === 'basic_details' && (
           <form onSubmit={handleSendOtp} className="space-y-4 animate-in fade-in">
-            <div className="text-center mb-2">
-              <h2 className="text-xl font-bold text-navy-950 font-serif">
+            <div className="text-center mb-1">
+              <h2 className="text-lg sm:text-xl font-bold text-navy-950 font-serif">
                 Basic & Contact Information
               </h2>
               <p className="text-xs text-slate-500">
@@ -294,12 +296,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
             </div>
 
             {errorMessage && (
-              <div className="rounded-lg bg-rose-50 p-2.5 text-xs font-semibold text-rose-700 border border-rose-200">
+              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
                 {errorMessage}
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">First Name *</label>
                 <input
@@ -308,7 +310,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   placeholder="e.g. Rohit"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
               <div>
@@ -319,18 +321,18 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   placeholder="e.g. Ghosh"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Gender *</label>
                 <select
                   value={formData.gender}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 >
                   <option value="FEMALE">Female (Bride)</option>
                   <option value="MALE">Male (Groom)</option>
@@ -343,18 +345,18 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   required
                   value={formData.dob}
                   onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Community *</label>
                 <select
                   value={formData.community}
                   onChange={(e) => setFormData({ ...formData, community: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 >
                   <option value="Sadgope">Sadgope</option>
                   <option value="Gowala / Goala">Gowala / Goala</option>
@@ -367,18 +369,18 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   placeholder="e.g. Bardhaman / Medinipur"
                   value={formData.nativePlace}
                   onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Mobile Number (For OTP) *
                 </label>
                 <div className="flex">
-                  <span className="inline-flex items-center rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600">
+                  <span className="inline-flex items-center rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600">
                     +91
                   </span>
                   <input
@@ -403,7 +405,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                       const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
                       setFormData({ ...formData, phone: digitsOnly });
                     }}
-                    className="w-full rounded-r-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                    className="w-full min-h-[44px] rounded-r-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                   />
                 </div>
               </div>
@@ -417,7 +419,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   placeholder="your.email@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
             </div>
@@ -431,25 +433,25 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   placeholder="At least 8 characters"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex space-x-3 pt-2">
+            <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setStep('who_for')}
-                className="w-1/3 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="w-1/3 min-h-[44px] rounded-xl border border-slate-200 py-3 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 py-3 text-xs font-bold text-white shadow-md transition-all"
+                className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 py-3 text-xs sm:text-sm font-bold text-white shadow-md transition-all disabled:opacity-50"
               >
-                <span>{isSubmitting ? 'Sending Verification Code...' : 'Send Verification OTP'}</span>
+                <span>{isSubmitting ? 'Sending Code...' : 'Send Verification OTP'}</span>
                 <ArrowRight className="h-4 w-4 text-white" />
               </button>
             </div>
@@ -457,34 +459,34 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
         )}
 
         {step === 'otp_verification' && (
-          <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in">
+          <form onSubmit={handleVerifyOtp} className="space-y-4 sm:space-y-5 animate-in fade-in">
             <div className="text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <Smartphone className="h-6 w-6" />
               </div>
-              <h2 className="text-xl font-bold text-navy-950 font-serif">
+              <h2 className="text-lg sm:text-xl font-bold text-navy-950 font-serif">
                 Account Verification
               </h2>
               <p className="text-xs text-slate-600 mt-1">
                 Enter the 6-digit OTP sent to{' '}
-                <span className="font-semibold text-navy-900">{formData.email}</span>
+                <span className="font-semibold text-navy-900 break-all">{formData.email}</span>
                 {formData.phone ? ` and +91 ${formData.phone}` : ''}
               </p>
 
               {demoOtp && (
                 <div className="mt-3 inline-block rounded-lg bg-crimson-50 px-3 py-1.5 text-xs text-crimson-900 border border-crimson-200">
-                  Demo Verification Code: <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
+                  Demo Code: <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
                 </div>
               )}
             </div>
 
             {errorMessage && (
-              <div className="rounded-lg bg-rose-50 p-2.5 text-xs font-semibold text-rose-700 border border-rose-200">
+              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
                 {errorMessage}
               </div>
             )}
 
-            <div className="flex justify-center space-x-2.5 py-2">
+            <div className="flex justify-center items-center gap-1.5 sm:gap-2.5 py-2">
               {otp.map((digit, idx) => (
                 <input
                   key={idx}
@@ -493,7 +495,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   maxLength={1}
                   value={digit}
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
-                  className="h-12 w-11 rounded-xl border border-slate-300 text-center text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
+                  className="h-11 sm:h-12 w-9 sm:w-11 max-w-[44px] flex-1 rounded-xl border border-slate-300 text-center text-base sm:text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
                 />
               ))}
             </div>
@@ -505,7 +507,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
             )}
 
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-              <span>Didn't receive the email OTP?</span>
+              <span>Didn't receive code?</span>
               {resendCooldown > 0 ? (
                 <span className="font-semibold text-slate-400">
                   Resend in <span className="font-mono text-crimson-700">{resendCooldown}s</span>
@@ -515,28 +517,28 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   type="button"
                   onClick={handleResendOtp}
                   disabled={isSubmitting}
-                  className="font-bold text-crimson-700 hover:text-crimson-800 hover:underline disabled:opacity-50"
+                  className="min-h-[44px] flex items-center font-bold text-crimson-700 hover:text-crimson-800 hover:underline disabled:opacity-50"
                 >
                   Resend OTP
                 </button>
               )}
             </div>
 
-            <div className="flex space-x-3 pt-2">
+            <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setStep('basic_details')}
-                className="w-1/3 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="w-1/3 min-h-[44px] rounded-xl border border-slate-200 py-3 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 py-3 text-xs font-bold text-white shadow-md transition-all"
+                className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 py-3 text-xs sm:text-sm font-bold text-white shadow-md transition-all disabled:opacity-50"
               >
                 <ShieldCheck className="h-4 w-4" />
-                <span>{isSubmitting ? 'Verifying...' : 'Verify & Complete Profile'}</span>
+                <span>{isSubmitting ? 'Verifying...' : 'Verify & Finish'}</span>
               </button>
             </div>
           </form>
@@ -547,19 +549,20 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 border border-emerald-300 shadow-md">
               <CheckCircle className="h-9 w-9" />
             </div>
-            <h2 className="text-2xl font-bold text-navy-950 font-serif">
+            <h2 className="text-xl sm:text-2xl font-bold text-navy-950 font-serif">
               Welcome to BorKonya!
             </h2>
-            <p className="text-sm text-slate-600 max-w-sm mx-auto">
-              Your mobile number has been verified. Initial profile for{' '}
+            <p className="text-xs sm:text-sm text-slate-600 max-w-sm mx-auto">
+              Your account has been verified. Initial profile for{' '}
               <span className="font-semibold text-navy-950">{formData.firstName}</span> has been created.
             </p>
-            <div className="inline-flex items-center space-x-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+            <div className="inline-flex items-center space-x-2 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
               <ShieldCheck className="h-4 w-4" />
               <span>Mobile Verified Badge Assigned</span>
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

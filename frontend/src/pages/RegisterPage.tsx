@@ -247,19 +247,19 @@ export const RegisterPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
                   {profileForOptions.map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => handleSelectWhoFor(opt.value)}
-                      className={`flex items-center justify-between p-4 rounded-2xl border text-sm font-semibold transition-all ${
+                      className={`flex items-center justify-between min-h-[48px] p-4 rounded-2xl border text-xs sm:text-sm font-semibold transition-all ${
                         profileFor === opt.value
                           ? 'border-crimson-700 bg-crimson-50 text-crimson-950 shadow-xs'
-                          : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white'
+                          : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white active:bg-slate-100'
                       }`}
                     >
                       <span>{opt.label}</span>
-                      <ArrowRight className="h-4 w-4 text-crimson-700" />
+                      <ArrowRight className="h-4 w-4 text-crimson-700 flex-shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -277,7 +277,7 @@ export const RegisterPage: React.FC = () => {
             {step === 'basic_details' && (
               <form onSubmit={handleSendOtp} className="space-y-4 animate-in fade-in">
                 <div className="text-center mb-2">
-                  <h2 className="text-xl font-bold text-navy-950 font-serif">
+                  <h2 className="text-lg sm:text-xl font-bold text-navy-950 font-serif">
                     Basic & Contact Information
                   </h2>
                   <p className="text-xs text-slate-500">
@@ -285,7 +285,7 @@ export const RegisterPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">First Name *</label>
                     <input
@@ -294,7 +294,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="e.g. Subham"
                       value={formData.firstName}
                       onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                   <div>
@@ -305,18 +305,18 @@ export const RegisterPage: React.FC = () => {
                       placeholder="e.g. Pal"
                       value={formData.lastName}
                       onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Gender *</label>
                     <select
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="FEMALE">Female (Bride)</option>
                       <option value="MALE">Male (Groom)</option>
@@ -329,18 +329,18 @@ export const RegisterPage: React.FC = () => {
                       required
                       value={formData.dob}
                       onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Community *</label>
                     <select
                       value={formData.community}
                       onChange={(e) => setFormData({ ...formData, community: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     >
                       <option value="">{communities.length > 0 ? 'Select Community' : 'Loading...'}</option>
                       {communities.map((c) => (
@@ -355,16 +355,16 @@ export const RegisterPage: React.FC = () => {
                       placeholder="e.g. Bardhaman, Medinipur"
                       value={formData.nativePlace}
                       onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile Number (For OTP) *</label>
                     <div className="flex">
-                      <span className="inline-flex items-center rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600">
+                      <span className="inline-flex items-center rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600">
                         +91
                       </span>
                       <input
@@ -389,7 +389,7 @@ export const RegisterPage: React.FC = () => {
                           const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
                           setFormData({ ...formData, phone: digitsOnly });
                         }}
-                        className="w-full rounded-r-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                        className="w-full min-h-[44px] rounded-r-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -401,12 +401,12 @@ export const RegisterPage: React.FC = () => {
                       placeholder="your.email@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Password (min 8 chars) *</label>
                     <input
@@ -415,7 +415,7 @@ export const RegisterPage: React.FC = () => {
                       placeholder="At least 8 characters"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                   <div>
@@ -426,25 +426,25 @@ export const RegisterPage: React.FC = () => {
                       placeholder="Re-enter password"
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-crimson-700 focus:outline-none"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-crimson-700 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="flex space-x-3 pt-2">
+                <div className="flex gap-2.5 pt-2">
                   <button
                     type="button"
                     onClick={() => setStep('who_for')}
-                    className="w-1/3 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="w-1/3 min-h-[44px] rounded-xl border border-slate-200 py-3 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
+                    className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
                   >
-                    <span>{isSubmitting ? 'Sending Verification Code...' : 'Send Verification OTP'}</span>
+                    <span>{isSubmitting ? 'Sending Code...' : 'Send Verification OTP'}</span>
                     <ArrowRight className="h-4 w-4 text-white" />
                   </button>
                 </div>
@@ -453,17 +453,17 @@ export const RegisterPage: React.FC = () => {
 
             {/* Step 3: OTP Verification */}
             {step === 'otp_verification' && (
-              <form onSubmit={handleVerifyOtpAndRegister} className="space-y-5 animate-in fade-in">
+              <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4 sm:space-y-5 animate-in fade-in">
                 <div className="text-center">
                   <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <Smartphone className="h-7 w-7" />
                   </div>
-                  <h2 className="text-xl font-bold text-navy-950 font-serif">
+                  <h2 className="text-lg sm:text-xl font-bold text-navy-950 font-serif">
                     Account Verification
                   </h2>
                   <p className="text-xs text-slate-600 mt-1">
                     Enter the 6-digit OTP sent to{' '}
-                    <span className="font-semibold text-navy-900">{formData.email}</span>
+                    <span className="font-semibold text-navy-900 break-all">{formData.email}</span>
                     {formData.phone ? ` and +91 ${formData.phone}` : ''}
                   </p>
 
@@ -475,7 +475,7 @@ export const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex justify-center space-x-2.5 py-2">
+                <div className="flex justify-center items-center gap-1.5 sm:gap-2.5 py-2">
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
@@ -484,26 +484,26 @@ export const RegisterPage: React.FC = () => {
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      className="h-12 w-11 rounded-xl border border-slate-300 text-center text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
+                      className="h-11 sm:h-12 w-9 sm:w-11 max-w-[44px] flex-1 rounded-xl border border-slate-300 text-center text-base sm:text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
                     />
                   ))}
                 </div>
 
-                <div className="flex space-x-3 pt-2">
+                <div className="flex gap-2.5 pt-2">
                   <button
                     type="button"
                     onClick={() => setStep('basic_details')}
-                    className="w-1/3 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="w-1/3 min-h-[44px] rounded-xl border border-slate-200 py-3 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
+                    className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    <span>{isSubmitting ? 'Verifying & Registering...' : 'Verify & Create Account'}</span>
+                    <span>{isSubmitting ? 'Verifying...' : 'Verify & Create Account'}</span>
                   </button>
                 </div>
               </form>

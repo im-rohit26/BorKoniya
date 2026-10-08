@@ -157,3 +157,25 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Mobile & Touch UX Enhancements */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent unwanted iOS Safari auto-zoom on focus by enforcing 16px minimum on mobile devices */
+@media screen and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe area inset utilities for notched mobile screens */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+.mb-safe {
+  margin-bottom: max(1rem, env(safe-area-inset-bottom));
+}

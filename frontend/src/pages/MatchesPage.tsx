@@ -339,9 +339,9 @@ export const MatchesPage: React.FC = () => {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-navy-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300 border border-crimson-400/40">
+        <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 bg-navy-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300 border border-crimson-400/40">
           <CheckCircle className="w-5 h-5 text-crimson-400 flex-shrink-0" />
-          <span className="text-sm font-medium">{toastMessage}</span>
+          <span className="text-xs sm:text-sm font-medium">{toastMessage}</span>
         </div>
       )}
 
@@ -373,11 +373,11 @@ export const MatchesPage: React.FC = () => {
 
           {/* Sort Control */}
           <div className="flex items-center space-x-2">
-            <ArrowUpDown className="h-4 w-4 text-slate-400" />
+            <ArrowUpDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+              className="min-h-[44px] rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
             >
               <option value="score">Highest Match Score (90%+)</option>
               <option value="age_asc">Age: Youngest First</option>
@@ -397,7 +397,7 @@ export const MatchesPage: React.FC = () => {
           <select
             value={filterCommunity}
             onChange={(e) => setFilterCommunity(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
           >
             <option value="ALL">All Communities</option>
             {communities.map((c) => (
@@ -409,7 +409,7 @@ export const MatchesPage: React.FC = () => {
           <select
             value={filterState}
             onChange={(e) => setFilterState(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
           >
             <option value="ALL">All Locations</option>
             {states.map((s) => (
@@ -421,7 +421,7 @@ export const MatchesPage: React.FC = () => {
           <select
             value={filterMaritalStatus}
             onChange={(e) => setFilterMaritalStatus(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
           >
             <option value="ALL">All Marital Statuses</option>
             {maritalStatuses.map((m) => (
@@ -433,7 +433,7 @@ export const MatchesPage: React.FC = () => {
           <select
             value={filterDiet}
             onChange={(e) => setFilterDiet(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-crimson-700"
           >
             <option value="ALL">All Diets</option>
             {dietOptions.map((d) => (
@@ -444,9 +444,9 @@ export const MatchesPage: React.FC = () => {
           {(filterCommunity !== 'ALL' || filterState !== 'ALL' || filterMaritalStatus !== 'ALL' || filterDiet !== 'ALL') && (
             <button
               onClick={handleResetFilters}
-              className="inline-flex items-center space-x-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors"
+              className="min-h-[44px] inline-flex items-center space-x-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors"
             >
-              <RotateCcw className="h-3 w-3" />
+              <RotateCcw className="h-3.5 w-3.5" />
               <span>Reset</span>
             </button>
           )}
@@ -467,7 +467,7 @@ export const MatchesPage: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as MatchTabId)}
-                className={`flex items-center space-x-2 rounded-2xl px-4 py-2.5 text-xs font-bold whitespace-nowrap transition-all ${
+                className={`min-h-[44px] flex items-center space-x-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                   isActive
                     ? 'bg-navy-900 text-white shadow-md'
                     : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'

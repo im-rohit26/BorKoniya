@@ -96,9 +96,9 @@ export const ShortlistPage: React.FC = () => {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 bg-emerald-700 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
           <CheckCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm font-medium">{toastMessage}</span>
+          <span className="text-xs sm:text-sm font-medium">{toastMessage}</span>
         </div>
       )}
 
@@ -231,10 +231,10 @@ export const ShortlistPage: React.FC = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="p-5 pt-0 grid grid-cols-2 gap-2">
+                  <div className="p-5 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       onClick={() => navigate(`/profile/${p.id}`)}
-                      className="px-3 py-2 text-xs font-semibold text-gray-700 hover:text-navy-950 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors text-center"
+                      className="min-h-[44px] px-3.5 py-2.5 text-xs font-semibold text-gray-700 hover:text-navy-950 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors text-center flex items-center justify-center"
                     >
                       View Profile
                     </button>
@@ -242,10 +242,10 @@ export const ShortlistPage: React.FC = () => {
                     <button
                       onClick={() => handleSendInterest(p.id, formattedName)}
                       disabled={hasSentInterest}
-                      className={`px-3 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm ${
+                      className={`min-h-[44px] px-3.5 py-2.5 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs ${
                         hasSentInterest
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                          : 'bg-crimson-700 hover:bg-crimson-800 text-white'
+                          : 'bg-crimson-700 hover:bg-crimson-800 text-white active:bg-crimson-900'
                       }`}
                     >
                       <Heart className={`w-3.5 h-3.5 ${hasSentInterest ? 'fill-emerald-600' : ''}`} />

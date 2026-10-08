@@ -257,11 +257,11 @@ export const ProfileDetailPage: React.FC = () => {
                   </p>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 pt-3 border-t border-slate-100">
                     {isConnected ? (
                       <button
                         disabled
-                        className="flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default"
+                        className="min-h-[44px] flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default"
                       >
                         <CheckCircle className="h-4 w-4 text-emerald-600" />
                         <span>Connected</span>
@@ -270,10 +270,10 @@ export const ProfileDetailPage: React.FC = () => {
                       <button
                         onClick={handleInterest}
                         disabled={interestSent}
-                        className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                        className={`min-h-[44px] flex items-center space-x-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
                           interestSent
                             ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
-                            : 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-xs'
+                            : 'bg-crimson-700 text-white hover:bg-crimson-800 active:bg-crimson-900 shadow-xs'
                         }`}
                       >
                         {interestSent ? <Check className="h-4 w-4 text-crimson-700" /> : <Heart className="h-4 w-4" />}
@@ -283,7 +283,7 @@ export const ProfileDetailPage: React.FC = () => {
 
                     <button
                       onClick={handleShortlist}
-                      className={`flex items-center space-x-1.5 rounded-xl border px-4 py-2.5 text-xs font-semibold ${
+                      className={`min-h-[44px] flex items-center space-x-1.5 rounded-xl border px-4 py-2.5 text-xs font-semibold ${
                         isShortlisted
                           ? 'border-navy-300 bg-navy-50 text-navy-900'
                           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
@@ -299,7 +299,7 @@ export const ProfileDetailPage: React.FC = () => {
 
                     <button
                       onClick={handleSendMessage}
-                      className="flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="min-h-[44px] flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <MessageCircle className="h-4 w-4 text-navy-700" />
                       <span>Send Message</span>
@@ -307,7 +307,7 @@ export const ProfileDetailPage: React.FC = () => {
 
                     <button
                       onClick={() => setReportModalOpen(true)}
-                      className="flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-500 hover:text-crimson-700 hover:bg-crimson-50 transition-colors"
+                      className="min-h-[44px] flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-500 hover:text-crimson-700 hover:bg-crimson-50 transition-colors"
                       title="Report Profile"
                     >
                       <ShieldAlert className="h-4 w-4" />
@@ -316,7 +316,7 @@ export const ProfileDetailPage: React.FC = () => {
 
                     <button
                       onClick={handleBlock}
-                      className="flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                      className="min-h-[44px] flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                       title="Block Profile"
                     >
                       <Ban className="h-4 w-4" />
@@ -554,15 +554,63 @@ export const ProfileDetailPage: React.FC = () => {
                 </div>
               </aside>
             </div>
+
+            {/* Mobile Sticky Quick Action Bar */}
+            <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 shadow-lg flex items-center gap-2">
+              {isConnected ? (
+                <button
+                  disabled
+                  className="flex-1 min-h-[44px] flex items-center justify-center space-x-1.5 rounded-xl px-4 py-2 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300"
+                >
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  <span>Connected</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleInterest}
+                  disabled={interestSent}
+                  className={`flex-1 min-h-[44px] flex items-center justify-center space-x-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-xs transition-all ${
+                    interestSent
+                      ? 'bg-crimson-50 text-crimson-700 border border-crimson-200'
+                      : 'bg-crimson-700 text-white hover:bg-crimson-800 active:bg-crimson-900'
+                  }`}
+                >
+                  {interestSent ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
+                  <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleShortlist}
+                className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border p-2.5 ${
+                  isShortlisted
+                    ? 'border-crimson-300 bg-crimson-50 text-crimson-800'
+                    : 'border-slate-200 bg-white text-slate-700 active:bg-slate-100'
+                }`}
+                title="Save to Shortlist"
+                aria-label="Save to Shortlist"
+              >
+                <Star className={`h-4 w-4 ${isShortlisted ? 'fill-crimson-700 text-crimson-700' : 'text-slate-400'}`} />
+              </button>
+
+              <button
+                onClick={handleSendMessage}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2.5 text-navy-800 active:bg-slate-100"
+                title="Send Message"
+                aria-label="Send Message"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </button>
+            </div>
           </>
         )}
       </div>
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-28 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 bg-emerald-700 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
           <CheckCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm font-medium">{toastMessage}</span>
+          <span className="text-xs sm:text-sm font-medium">{toastMessage}</span>
         </div>
       )}
 

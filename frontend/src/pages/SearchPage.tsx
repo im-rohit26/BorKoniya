@@ -49,6 +49,7 @@ export const SearchPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 12
   const [totalCount, setTotalCount] = useState(0)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const { user, isAuthenticated } = useAuth()
 
@@ -407,8 +408,22 @@ export const SearchPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Quick Filters Sidebar */}
-          <aside className="lg:col-span-4 space-y-6">
-            <div className="rounded-2xl bg-white p-5 shadow-xs border border-slate-200/80">
+          <aside className="lg:col-span-4 space-y-4">
+            {/* Mobile Collapsible Toggle Button */}
+            <button
+              onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+              className="lg:hidden w-full min-h-[44px] flex items-center justify-between px-4 py-3 bg-white rounded-2xl border border-slate-200 shadow-xs text-xs font-bold text-navy-950"
+            >
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-crimson-700" />
+                <span>{mobileFiltersOpen ? 'Hide Quick Criteria' : 'Show Quick Criteria Filters'}</span>
+              </div>
+              <span className="text-crimson-700 font-semibold">
+                {mobileFiltersOpen ? 'Collapse ▲' : 'Expand ▼'}
+              </span>
+            </button>
+
+            <div className={`rounded-2xl bg-white p-5 shadow-xs border border-slate-200/80 ${mobileFiltersOpen ? 'block' : 'hidden lg:block'}`}>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
                 <span className="font-bold text-sm text-navy-950 flex items-center space-x-2">
                   <Search className="h-4 w-4 text-crimson-700" />
@@ -574,17 +589,17 @@ export const SearchPage: React.FC = () => {
                       <button
                         onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                         disabled={currentPage <= 1}
-                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         Previous
                       </button>
-                      <span className="px-3 py-1.5 text-xs font-bold text-navy-950 bg-slate-100 rounded-xl">
+                      <span className="min-h-[44px] flex items-center px-3.5 py-2 text-xs sm:text-sm font-bold text-navy-950 bg-slate-100 rounded-xl">
                         Page {currentPage} of {Math.max(1, Math.ceil(totalCount / pageSize))}
                       </span>
                       <button
                         onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
                         disabled={currentPage >= Math.ceil(totalCount / pageSize)}
-                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         Next
                       </button>
@@ -601,7 +616,7 @@ export const SearchPage: React.FC = () => {
                 </p>
                 <button
                   onClick={handleResetFilters}
-                  className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white"
+                  className="mt-4 min-h-[44px] rounded-xl bg-slate-900 px-5 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-slate-800 transition-colors"
                 >
                   Reset All Filters
                 </button>
@@ -613,9 +628,9 @@ export const SearchPage: React.FC = () => {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 bg-emerald-700 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
           <CheckCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm font-medium">{toastMessage}</span>
+          <span className="text-xs sm:text-sm font-medium">{toastMessage}</span>
         </div>
       )}
 

@@ -90,7 +90,11 @@ export async function sendInterest(receiverProfileId: string) {
     const err = await res.json().catch(() => ({ detail: 'Failed to send interest' }));
     throw new Error(err.detail || 'Failed to send interest');
   }
-  return res.json();
+  const data = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+  }
+  return data;
 }
 
 export async function getReceivedInterests(statusFilter?: string): Promise<InterestItem[]> {
@@ -174,7 +178,11 @@ export async function acceptInterest(interestId: string) {
     const err = await res.json().catch(() => ({ detail: 'Failed to accept interest' }));
     throw new Error(err.detail || 'Failed to accept interest');
   }
-  return res.json();
+  const data = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+  }
+  return data;
 }
 
 export async function declineInterest(interestId: string) {
@@ -186,7 +194,11 @@ export async function declineInterest(interestId: string) {
     const err = await res.json().catch(() => ({ detail: 'Failed to decline interest' }));
     throw new Error(err.detail || 'Failed to decline interest');
   }
-  return res.json();
+  const data = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+  }
+  return data;
 }
 
 export async function cancelInterest(interestId: string) {
@@ -198,7 +210,11 @@ export async function cancelInterest(interestId: string) {
     const err = await res.json().catch(() => ({ detail: 'Failed to cancel interest' }));
     throw new Error(err.detail || 'Failed to cancel interest');
   }
-  return res.json();
+  const data = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+  }
+  return data;
 }
 
 export async function getInterestsSummary(): Promise<InterestsSummary> {
@@ -414,7 +430,12 @@ export async function markConversationRead(conversationId: string) {
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) return null;
-  return res.json();
+  const data = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:messages-read'));
+    window.dispatchEvent(new CustomEvent('borkonya:unread-updated'));
+  }
+  return data;
 }
 
 // 4. Safety APIs (Block & Report)

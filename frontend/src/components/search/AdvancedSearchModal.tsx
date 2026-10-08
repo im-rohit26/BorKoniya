@@ -71,32 +71,37 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-5 sm:p-8 shadow-2xl border border-slate-200">
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
-        <div className="flex items-center space-x-2.5 pb-4 border-b border-slate-100 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-crimson-50 flex items-center justify-center text-crimson-700 border border-crimson-200">
-            <SlidersHorizontal className="h-5 w-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-3xl max-h-[92dvh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-slate-100 flex-shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="h-10 w-10 rounded-xl bg-crimson-50 flex items-center justify-center text-crimson-700 border border-crimson-200 flex-shrink-0">
+              <SlidersHorizontal className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-navy-950 font-serif">
+                Advanced Matrimonial Criteria Filter
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-500">
+                Granular filtering tailored to Sadgope & Gowala traditions
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-navy-950 font-serif">
-              Advanced Matrimonial Criteria Filter
-            </h2>
-            <p className="text-xs text-slate-500">
-              Granular filtering tailored to Sadgope & Gowala matrimonial traditions
-            </p>
-          </div>
+          <button
+            onClick={onClose}
+            className="min-h-[44px] min-w-[44px] -mr-2 rounded-full p-2 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <form onSubmit={handleApply} className="space-y-6">
-          {/* Section 1: Looking For & Age / Height */}
-          <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200/80 space-y-4">
+        {/* Scrollable Form Body */}
+        <div className="p-5 sm:p-8 overflow-y-auto flex-1 space-y-6">
+          <form id="advanced-search-form" onSubmit={handleApply} className="space-y-6">
+            {/* Section 1: Looking For & Age / Height */}
+            <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200/80 space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
               <span>Personal & Age Criteria</span>
             </h3>
@@ -306,62 +311,65 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
             </label>
           </div>
 
-          {/* Action Row */}
-          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="w-full sm:w-auto">
-              {!showSaveInput ? (
-                <button
-                  type="button"
-                  onClick={() => setShowSaveInput(true)}
-                  className="inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-navy-900"
-                >
-                  <Bookmark className="h-4 w-4 text-crimson-700" />
-                  <span>Save this search query</span>
-                </button>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    placeholder="Search name (e.g. Kolkata Sadgope)"
-                    value={saveSearchName}
-                    onChange={(e) => setSaveSearchName(e.target.value)}
-                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-800 focus:border-crimson-600 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveSearchSubmit}
-                    className="rounded-xl bg-crimson-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-crimson-800"
-                  >
-                    Save
-                  </button>
-                  {isSavedSuccess && (
-                    <span className="text-xs text-crimson-700 font-bold flex items-center space-x-1">
-                      <Check className="h-3.5 w-3.5" />
-                      <span>Saved!</span>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+          </form>
+        </div>
 
-            <div className="flex items-center space-x-3 w-full sm:w-auto">
+        {/* Sticky Action Footer */}
+        <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 backdrop-blur-xs flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+          <div className="w-full sm:w-auto">
+            {!showSaveInput ? (
               <button
                 type="button"
-                onClick={onClose}
-                className="w-1/2 sm:w-auto rounded-xl border border-slate-300 px-5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => setShowSaveInput(true)}
+                className="min-h-[44px] inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-navy-900"
               >
-                Cancel
+                <Bookmark className="h-4 w-4 text-crimson-700" />
+                <span>Save this search query</span>
               </button>
-              <button
-                type="submit"
-                className="w-1/2 sm:w-auto flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-2.5 text-xs font-bold text-white shadow-md"
-              >
-                <Sparkles className="h-4 w-4 text-crimson-100" />
-                <span>Apply Advanced Filters</span>
-              </button>
-            </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  placeholder="Search name (e.g. Kolkata Sadgope)"
+                  value={saveSearchName}
+                  onChange={(e) => setSaveSearchName(e.target.value)}
+                  className="min-h-[40px] rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-800 focus:border-crimson-600 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveSearchSubmit}
+                  className="min-h-[40px] rounded-xl bg-crimson-700 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-crimson-800"
+                >
+                  Save
+                </button>
+                {isSavedSuccess && (
+                  <span className="text-xs text-crimson-700 font-bold flex items-center space-x-1">
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Saved!</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-        </form>
+
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-1/2 sm:w-auto min-h-[44px] rounded-xl border border-slate-300 px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="advanced-search-form"
+              className="w-1/2 sm:w-auto min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md transition-all active:bg-crimson-900"
+            >
+              <Sparkles className="h-4 w-4 text-crimson-100" />
+              <span>Apply Filters</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

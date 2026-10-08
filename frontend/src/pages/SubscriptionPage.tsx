@@ -334,21 +334,21 @@ export const SubscriptionPage: React.FC = () => {
             </p>
 
             {/* Coupon Form */}
-            <form onSubmit={handleApplyCoupon} className="flex gap-2 max-w-md pt-2">
+            <form onSubmit={handleApplyCoupon} className="flex flex-col sm:flex-row gap-2 max-w-md pt-2">
               <div className="relative flex-1">
-                <Tag className="w-4 h-4 text-crimson-700 absolute left-3 top-3" />
+                <Tag className="w-4 h-4 text-crimson-700 absolute left-3 top-3.5" />
                 <input
                   type="text"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   placeholder="Enter code (e.g. BOR50)"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs font-mono font-bold uppercase rounded-xl border border-slate-300 focus:border-crimson-700 focus:outline-none"
+                  className="w-full min-h-[44px] pl-9 pr-3 py-2.5 text-xs font-mono font-bold uppercase rounded-xl border border-slate-300 focus:border-crimson-700 focus:outline-none"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isApplyingCoupon}
-                className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5"
+                className="min-h-[44px] px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1.5"
               >
                 {isApplyingCoupon ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Apply Code</span>
@@ -398,14 +398,14 @@ export const SubscriptionPage: React.FC = () => {
 
             <button
               onClick={() => setCheckoutModalOpen(true)}
-              className="w-full py-3.5 bg-crimson-700 hover:bg-crimson-800 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-[48px] py-3.5 bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
               <CreditCard className="w-4 h-4" />
               <span>Proceed to Pay ₹{netPayable.toFixed(0)}</span>
             </button>
 
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-              <Lock className="w-3 h-3 text-slate-400" />
+              <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />
               <span>Secure Indian Payment Gateway (UPI / Cards / NetBanking)</span>
             </div>
           </div>
@@ -465,24 +465,25 @@ export const SubscriptionPage: React.FC = () => {
 
       {/* Modern Payment Gateway Modal */}
       {checkoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92dvh] flex flex-col overflow-hidden border border-slate-200">
             {/* Modal Header */}
-            <div className="bg-navy-950 text-white p-5 flex items-center justify-between border-b border-navy-900">
+            <div className="bg-navy-950 text-white p-4 sm:p-5 flex items-center justify-between border-b border-navy-900 flex-shrink-0">
               <div className="flex items-center gap-2.5">
                 <Shield className="w-5 h-5 text-crimson-400" />
                 <span className="font-bold text-sm">BorKonya Secure Payment Gateway</span>
               </div>
               <button
                 onClick={() => setCheckoutModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="min-h-[44px] min-w-[44px] -mr-2 rounded-full p-2 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                aria-label="Close modal"
               >
                 ✕
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5">
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-5">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-navy-950">{selectedPlan.name}</h4>
@@ -507,7 +508,7 @@ export const SubscriptionPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('UPI')}
-                    className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
+                    className={`min-h-[56px] p-2.5 sm:p-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
                       paymentMethod === 'UPI'
                         ? 'border-crimson-700 bg-crimson-50 text-crimson-900'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -520,7 +521,7 @@ export const SubscriptionPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('CARD')}
-                    className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
+                    className={`min-h-[56px] p-2.5 sm:p-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
                       paymentMethod === 'CARD'
                         ? 'border-navy-700 bg-navy-50 text-navy-900'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -533,7 +534,7 @@ export const SubscriptionPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('NETBANKING')}
-                    className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
+                    className={`min-h-[56px] p-2.5 sm:p-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
                       paymentMethod === 'NETBANKING'
                         ? 'border-navy-700 bg-navy-50 text-navy-900'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -554,7 +555,7 @@ export const SubscriptionPage: React.FC = () => {
                     value={upiId}
                     onChange={(e) => setUpiId(e.target.value)}
                     placeholder="yourname@upi / phonepe / paytm"
-                    className="w-full px-3 py-2 bg-white rounded-lg border border-navy-300 text-xs font-mono"
+                    className="w-full min-h-[44px] px-3 py-2 bg-white rounded-lg border border-navy-300 text-xs font-mono"
                   />
                   <p className="text-[10px] text-navy-700">
                     Supports Google Pay, PhonePe, Paytm, BHIM, Cred, and Indian bank UPI apps.
@@ -568,20 +569,20 @@ export const SubscriptionPage: React.FC = () => {
                     type="text"
                     defaultValue="•••• •••• •••• 4242"
                     disabled
-                    className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-mono"
+                    className="w-full min-h-[44px] px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-mono"
                   />
                   <div className="flex gap-2">
                     <input
                       type="text"
                       defaultValue="12/28"
                       disabled
-                      className="w-1/2 px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-mono"
+                      className="w-1/2 min-h-[44px] px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-mono"
                     />
                     <input
                       type="text"
                       defaultValue="•••"
                       disabled
-                      className="w-1/2 px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-mono"
+                      className="w-1/2 min-h-[44px] px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-mono"
                     />
                   </div>
                   <span className="text-[10px] text-slate-400">All Indian RuPay, Visa & Mastercard cards accepted.</span>
@@ -590,7 +591,7 @@ export const SubscriptionPage: React.FC = () => {
 
               {paymentMethod === 'NETBANKING' && (
                 <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                  <select className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-semibold">
+                  <select className="w-full min-h-[44px] px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-semibold">
                     <option>State Bank of India (SBI)</option>
                     <option>HDFC Bank</option>
                     <option>ICICI Bank</option>
@@ -605,7 +606,7 @@ export const SubscriptionPage: React.FC = () => {
                 type="button"
                 onClick={handleConfirmPayment}
                 disabled={isProcessing}
-                className="w-full py-3.5 bg-crimson-700 hover:bg-crimson-800 disabled:opacity-50 text-white rounded-2xl text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2"
+                className="w-full min-h-[48px] py-3.5 bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 disabled:opacity-50 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-all flex items-center justify-center gap-2"
               >
                 {isProcessing ? (
                   <>

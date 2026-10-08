@@ -54,24 +54,25 @@ export const ReportProfileModal: React.FC<ReportProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92dvh] flex flex-col overflow-hidden border border-slate-200">
         {/* Header */}
-        <div className="bg-crimson-50 px-6 py-4 border-b border-crimson-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-crimson-700 font-semibold">
-            <ShieldAlert className="w-5 h-5" />
-            <span>Report Member Profile: {profileName}</span>
+        <div className="bg-crimson-50 px-4 sm:px-6 py-4 border-b border-crimson-100 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2.5 text-crimson-700 font-semibold text-sm sm:text-base truncate mr-2">
+            <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+            <span className="truncate">Report Profile: {profileName}</span>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-crimson-100/50 transition-colors"
+            className="text-gray-400 hover:text-gray-600 p-2 min-h-[44px] min-w-[44px] rounded-full hover:bg-crimson-100/50 transition-colors flex items-center justify-center flex-shrink-0"
+            aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {successMessage ? (
             <div className="py-8 text-center space-y-3">
               <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
@@ -117,7 +118,7 @@ export const ReportProfileModal: React.FC<ReportProfileModalProps> = ({
                         onChange={() => setSelectedReason(r.id)}
                         className="mt-0.5 text-crimson-700 focus:ring-crimson-700"
                       />
-                      <span>{r.label}</span>
+                      <span className="text-xs sm:text-sm leading-relaxed">{r.label}</span>
                     </label>
                   ))}
                 </div>
@@ -133,23 +134,23 @@ export const ReportProfileModal: React.FC<ReportProfileModalProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Provide any additional context or incident timestamps..."
-                  className="w-full text-sm rounded-xl border border-gray-200 p-3 focus:border-crimson-700 focus:ring-1 focus:ring-crimson-700 outline-none"
+                  className="w-full text-sm rounded-xl border border-gray-200 p-3 focus:border-crimson-700 focus:ring-1 focus:ring-crimson-700 outline-none resize-none"
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 rounded-xl hover:bg-slate-100 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 text-sm font-semibold text-white bg-crimson-700 hover:bg-crimson-800 rounded-xl shadow-sm transition-colors disabled:opacity-50"
+                  className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 text-sm font-semibold text-white bg-crimson-700 hover:bg-crimson-800 rounded-xl shadow-sm transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {isSubmitting ? 'Submitting Report...' : 'Submit Confidential Report'}
                 </button>

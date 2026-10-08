@@ -1,11 +1,27 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Users, Search, Heart, MessageSquare, Crown } from 'lucide-react'
+import { useNotificationBadges } from '../../hooks/useNotificationBadges'
 
 export const MobileBottomNav: React.FC = () => {
   const { t } = useTranslation()
   const location = useLocation()
+  const { unreadMessagesCount, pendingInterestsCount } = useNotificationBadges()
+  const [hasActiveChat, setHasActiveChat] = useState(false)
+
+  useEffect(() => {
+    const checkActiveChat = () => {
+      setHasActiveChat(document.body.getAttribute('data-active-chat') === 'true')
+    }
+    checkActiveChat()
+
+    const handleChatStateChange = () => checkActiveChat()
+    window.addEventListener('borkonya:chat-state-changed', handleChatStateChange)
+    return () => {
+      window.removeEventListener('borkonya:chat-state-changed', handleChatStateChange)
+    }
+  }, [])
 
   // Navigation items optimized for matrimonial discovery and engagement
   const navItems = [
@@ -25,13 +41,13 @@ export const MobileBottomNav: React.FC = () => {
       label: t('nav.interests', 'Interests'),
       path: '/interests',
       icon: Heart,
-      badge: '3',
+      badge: pendingInterestsCount > 0 ? (pendingInterestsCount > 99 ? '99+' : String(pendingInterestsCount)) : null,
     },
     {
       label: t('nav.messages', 'Chat'),
       path: '/messages',
       icon: MessageSquare,
-      badge: '2',
+      badge: unreadMessagesCount > 0 ? (unreadMessagesCount > 99 ? '99+' : String(unreadMessagesCount)) : null,
     },
     {
       label: t('nav.upgrade', 'Upgrade'),
@@ -47,7 +63,8 @@ export const MobileBottomNav: React.FC = () => {
     location.pathname.startsWith('/profile/create') ||
     location.pathname.startsWith('/profile/edit') ||
     location.pathname.startsWith('/onboarding') ||
-    location.pathname.match(/^\/messages\/[a-zA-Z0-9_-]+/)
+    location.pathname.match(/^\/messages\/[a-zA-Z0-9_-]+/) ||
+    (location.pathname.startsWith('/messages') && hasActiveChat)
   ) {
     return null
   }
@@ -89,10 +106,10 @@ export const MobileBottomNav: React.FC = () => {
                   />
                 </div>
 
-                {/* Optional notification or coupon badge */}
+                {/* Live notification or coupon badge */}
                 {item.badge && (
                   <span
-                    className="absolute -top-1 -right-2 px-1.5 py-0.2 text-[9px] font-bold rounded-full text-white shadow-xs bg-crimson-700 ring-1 ring-white"
+                    className="absolute -top-1 -right-2 px-1.5 py-0.2 text-[9px] font-bold rounded-full text-white shadow-xs bg-crimson-700 ring-1 ring-white leading-tight min-w-[16px] text-center"
                   >
                     {item.badge}
                   </span>

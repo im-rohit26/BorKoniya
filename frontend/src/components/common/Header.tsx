@@ -1,9 +1,29 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Globe, Menu, X, Sparkles, LogOut, ChevronDown, Trash2, LayoutDashboard, User } from 'lucide-react'
+import {
+  Globe,
+  Menu,
+  X,
+  Sparkles,
+  LogOut,
+  ChevronDown,
+  ChevronRight,
+  Settings,
+  LayoutGrid,
+  User,
+  Heart,
+  MessageSquare,
+  MessageSquareMore,
+  Calendar,
+  Home,
+  Search,
+  Phone,
+} from 'lucide-react'
 import { languages } from './LanguageSelectorModal'
 import { useAuth } from '../../context/AuthContext'
+import { useNotificationBadges } from '../../hooks/useNotificationBadges'
+import { AccountSettingsModal } from './AccountSettingsModal'
 import { getDefaultAvatar } from '../../lib/utils'
 import logoImg from '../../assets/logo.jpeg'
 
@@ -18,10 +38,26 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
-  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false)
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
-  const { user, isAuthenticated, logout, deleteMyAccount } = useAuth()
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
+  const { user, isAuthenticated, logout } = useAuth()
+  const { unreadMessagesCount, pendingInterestsCount } = useNotificationBadges()
+
+  // Prevent background scrolling when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileMenuOpen])
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
 
   const handleLogout = () => {
     logout()
@@ -30,226 +66,159 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
     navigate('/login')
   }
 
-  const handleConfirmDeleteAccount = async () => {
-    setIsDeletingAccount(true)
-    setDeleteError(null)
-    try {
-      await deleteMyAccount()
-      setDeleteAccountModalOpen(false)
-      setUserDropdownOpen(false)
-      setMobileMenuOpen(false)
-      navigate('/login')
-    } catch (err: any) {
-      setDeleteError(err.message || 'Failed to delete account. Please try again.')
-    } finally {
-      setIsDeletingAccount(false)
-    }
-  }
-
   const currentLang = languages.find((l) => i18n.language.startsWith(l.code)) || languages[0]
 
-  const navLinks = [
+  const desktopNavLinks = [
     { name: t('nav.home', 'Home'), path: '/' },
     { name: t('nav.matches', 'Matches'), path: '/matches' },
     { name: t('nav.search', 'Search'), path: '/search' },
-    { name: t('nav.interests', 'Interests'), path: '/interests' },
+    {
+      name: t('nav.interests', 'Interests'),
+      path: '/interests',
+      badge: pendingInterestsCount > 0 ? (pendingInterestsCount > 99 ? '99+' : String(pendingInterestsCount)) : null,
+    },
     { name: t('nav.shortlist', 'Shortlist'), path: '/shortlist' },
-    { name: t('nav.messages', 'Messages'), path: '/messages' },
+    {
+      name: t('nav.messages', 'Messages'),
+      path: '/messages',
+      badge: unreadMessagesCount > 0 ? (unreadMessagesCount > 99 ? '99+' : String(unreadMessagesCount)) : null,
+    },
     { name: t('nav.plans', 'Plans'), path: '/subscription' },
   ]
 
+  // Mobile menu items matching exact design reference
+  const mobileMenuItems = [
+    {
+      name: t('nav.dashboard', 'Dashboard'),
+      path: '/dashboard',
+      icon: LayoutGrid,
+      iconColor: 'text-slate-800',
+    },
+    {
+      name: t('nav.myProfile', 'My Profile'),
+      path: '/profile/edit',
+      icon: User,
+      iconColor: 'text-slate-800',
+    },
+    {
+      name: t('nav.upgradePlan', 'Upgrade Plan'),
+      path: '/subscription',
+      icon: Sparkles,
+      iconColor: 'text-amber-500',
+    },
+    {
+      name: t('nav.accountSettings', 'Account Settings'),
+      path: '#settings',
+      icon: Settings,
+      iconColor: 'text-slate-800',
+      isAction: true,
+      action: () => {
+        setMobileMenuOpen(false)
+        setSettingsModalOpen(true)
+      },
+    },
+    {
+      name: t('nav.interests', 'Interests'),
+      path: '/interests',
+      icon: Heart,
+      iconColor: 'text-slate-800',
+      badge: pendingInterestsCount > 0 ? (pendingInterestsCount > 99 ? '99+' : String(pendingInterestsCount)) : null,
+    },
+    {
+      name: t('nav.shortlist', 'Shortlist'),
+      path: '/shortlist',
+      icon: MessageSquareMore,
+      iconColor: 'text-slate-800',
+    },
+    {
+      name: t('nav.messages', 'Messages'),
+      path: '/messages',
+      icon: MessageSquare,
+      iconColor: 'text-slate-800',
+      badge: unreadMessagesCount > 0 ? (unreadMessagesCount > 99 ? '99+' : String(unreadMessagesCount)) : null,
+    },
+    {
+      name: t('nav.plans', 'Plans'),
+      path: '/subscription',
+      icon: Calendar,
+      iconColor: 'text-slate-800',
+    },
+    {
+      isDivider: true,
+    },
+    {
+      name: t('nav.home', 'Home'),
+      path: '/',
+      icon: Home,
+      iconColor: 'text-slate-800',
+    },
+    {
+      name: t('nav.search', 'Search'),
+      path: '/search',
+      icon: Search,
+      iconColor: 'text-slate-800',
+    },
+  ]
+
+  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Dhurjoti Ghosh'
+  const displayPhone = user?.phone_number || (isAuthenticated ? '+91 8457845555' : '')
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Brand Logo */}
-        <Link to="/" className="flex items-center space-x-3 group flex-shrink-0">
-          <img
-            src={logoImg}
-            alt="BorKoniya - Amar Parampara, Amar Saathi"
-            className="h-11 sm:h-13 w-auto object-contain transition-transform group-hover:scale-102"
-          />
-        </Link>
+    <>
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* Brand Logo */}
+          <Link to="/" className="flex items-center space-x-3 group flex-shrink-0">
+            <img
+              src={logoImg}
+              alt="BorKoniya"
+              className="h-11 sm:h-13 w-auto object-contain transition-transform group-hover:scale-102"
+            />
+          </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center space-x-5 lg:space-x-7">
-          {navLinks.map((link) => {
-            const isActive = location.pathname === link.path
-            return (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`text-sm font-semibold transition-colors ${
-                  isActive
-                    ? 'text-crimson-700 border-b-2 border-crimson-700 pb-1 font-bold'
-                    : 'text-slate-600 hover:text-navy-900'
-                }`}
-              >
-                {link.name}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Right Action Controls */}
-        <div className="hidden lg:flex items-center space-x-3.5 flex-shrink-0">
-          <button
-            onClick={onOpenLanguageModal}
-            className="flex items-center space-x-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-            title="Change Language"
-          >
-            <Globe className="h-4 w-4 text-crimson-700" />
-            <span>{currentLang.native}</span>
-          </button>
-
-          {isAuthenticated ? (
-            <div className="relative">
-              <button
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center space-x-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100 py-1.5 px-3 transition-colors text-left"
-              >
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shadow-xs flex-shrink-0">
-                  <img
-                    src={user?.photo_url || getDefaultAvatar(user?.gender)}
-                    alt={user?.first_name || 'Member'}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      const target = e.currentTarget
-                      const fallback = getDefaultAvatar(user?.gender)
-                      if (target.src !== fallback) target.src = fallback
-                    }}
-                  />
-                </div>
-                <div className="max-w-[120px] truncate">
-                  <div className="text-xs font-bold text-navy-900 truncate">
-                    {user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Member'}
-                  </div>
-                  <div className="text-[10px] text-crimson-700 font-semibold uppercase tracking-wider">
-                    {user?.role || 'Member'}
-                  </div>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {userDropdownOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-60 rounded-2xl bg-white p-2 shadow-xl border border-slate-100 text-sm z-50 transition-all duration-150 animate-in fade-in zoom-in-95"
-                  onMouseLeave={() => setUserDropdownOpen(false)}
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center space-x-5 lg:space-x-7">
+            {desktopNavLinks.map((link) => {
+              const isActive = location.pathname === link.path
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`relative text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                    isActive
+                      ? 'text-crimson-700 border-b-2 border-crimson-700 pb-1 font-bold'
+                      : 'text-slate-600 hover:text-navy-900'
+                  }`}
                 >
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-slate-500" />
-                    <span>Dashboard</span>
-                  </Link>
+                  <span>{link.name}</span>
+                  {link.badge && (
+                    <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full text-white bg-crimson-700 leading-tight">
+                      {link.badge}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
+          </nav>
 
-                  <Link
-                    to="/profile/edit"
-                    onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
-                  >
-                    <User className="w-4 h-4 text-slate-500" />
-                    <span>My Profile</span>
-                  </Link>
+          {/* Desktop Right Action Controls */}
+          <div className="hidden lg:flex items-center space-x-3.5 flex-shrink-0">
+            <button
+              onClick={onOpenLanguageModal}
+              className="flex items-center space-x-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              title="Change Language"
+            >
+              <Globe className="h-4 w-4 text-crimson-700" />
+              <span>{currentLang.native}</span>
+            </button>
 
-                  <Link
-                    to="/subscription"
-                    onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>Upgrade Plan</span>
-                  </Link>
-
-                  <div className="my-1.5 border-t border-slate-100" />
-
-                  <button
-                    onClick={() => {
-                      setUserDropdownOpen(false)
-                      setDeleteAccountModalOpen(true)
-                    }}
-                    className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
-                  >
-                    <Trash2 className="w-4 h-4 flex-shrink-0" />
-                    <span className="whitespace-nowrap">Delete Account Permanently</span>
-                  </button>
-
-                  <div className="my-1.5 border-t border-slate-100" />
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-crimson-700 hover:bg-crimson-50 font-medium transition-colors text-left"
-                  >
-                    <LogOut className="w-4 h-4 flex-shrink-0" />
-                    <span>Logout</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                className="text-sm font-semibold text-navy-900 hover:text-crimson-700 px-3 py-2 transition-colors"
-              >
-                {t('nav.login', 'Login')}
-              </Link>
-
-              <button
-                onClick={onOpenRegister}
-                className="flex items-center space-x-1.5 rounded-xl bg-crimson-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-crimson-800 hover:shadow-md transition-all active:scale-95"
-              >
-                <Sparkles className="h-4 w-4 text-crimson-200" />
-                <span>{t('nav.register', 'Register Free')}</span>
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Mobile menu trigger */}
-        <div className="flex md:hidden items-center space-x-2 flex-shrink-0">
-          <button
-            onClick={onOpenLanguageModal}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-            aria-label="Language selector"
-          >
-            <Globe className="h-5 w-5 text-crimson-700" />
-          </button>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-lg p-2 text-slate-700 hover:bg-slate-100"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-        </div>
-      </div>
-
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-100 bg-white px-4 pt-3 pb-6 space-y-3 shadow-lg max-h-[calc(100vh-5rem)] overflow-y-auto">
-          <div className="flex flex-col space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`rounded-lg px-3 py-2 text-base font-semibold transition-colors ${
-                  location.pathname === link.path
-                    ? 'bg-crimson-50 text-crimson-800'
-                    : 'text-slate-800 hover:bg-slate-50'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 flex flex-col space-y-2">
             {isAuthenticated ? (
-              <>
-                <div className="px-3 py-2 bg-slate-50 rounded-lg flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+              <div className="relative">
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center space-x-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100 py-1.5 px-3 transition-colors text-left"
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shadow-xs flex-shrink-0">
                     <img
                       src={user?.photo_url || getDefaultAvatar(user?.gender)}
                       alt={user?.first_name || 'Member'}
@@ -261,137 +230,313 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-navy-900 truncate">
+                  <div className="max-w-[120px] truncate">
+                    <div className="text-xs font-bold text-navy-900 truncate">
                       {user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Member'}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate">{user?.phone_number || user?.email}</p>
+                    </div>
+                    <div className="text-[10px] text-crimson-700 font-semibold uppercase tracking-wider">
+                      {user?.role || 'Member'}
+                    </div>
                   </div>
-                </div>
-                <Link
-                  to="/dashboard"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center space-x-2.5"
-                >
-                  <LayoutDashboard className="w-4 h-4 text-slate-500" />
-                  <span>Dashboard</span>
-                </Link>
-
-                <Link
-                  to="/profile/edit"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center space-x-2.5"
-                >
-                  <User className="w-4 h-4 text-slate-500" />
-                  <span>My Profile</span>
-                </Link>
-
-                <Link
-                  to="/subscription"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center space-x-2.5"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Upgrade Plan</span>
-                </Link>
-
-                <div className="my-1 border-t border-slate-100" />
-
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    setDeleteAccountModalOpen(true)
-                  }}
-                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 flex items-center space-x-2.5"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Account Permanently</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
-                <div className="my-1 border-t border-slate-100" />
+                {userDropdownOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-60 rounded-2xl bg-white p-2 shadow-xl border border-slate-100 text-sm z-50 transition-all duration-150 animate-in fade-in zoom-in-95"
+                    onMouseLeave={() => setUserDropdownOpen(false)}
+                  >
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
+                    >
+                      <LayoutGrid className="w-4 h-4 text-slate-500" />
+                      <span>Dashboard</span>
+                    </Link>
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm font-semibold text-crimson-700 hover:bg-crimson-50 flex items-center space-x-2.5"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
-                </button>
-              </>
+                    <Link
+                      to="/profile/edit"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
+                    >
+                      <User className="w-4 h-4 text-slate-500" />
+                      <span>My Profile</span>
+                    </Link>
+
+                    <Link
+                      to="/subscription"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <span>Upgrade Plan</span>
+                    </Link>
+
+                    <div className="my-1.5 border-t border-slate-100" />
+
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false)
+                        setSettingsModalOpen(true)
+                      }}
+                      className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors text-left"
+                    >
+                      <Settings className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                      <span>Account Settings</span>
+                    </button>
+
+                    <div className="my-1.5 border-t border-slate-100" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-crimson-700 hover:bg-crimson-50 font-medium transition-colors text-left"
+                    >
+                      <LogOut className="w-4 h-4 flex-shrink-0" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Link
                   to="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center rounded-lg border border-slate-300 py-2.5 text-sm font-semibold text-navy-900 hover:bg-slate-50"
+                  className="text-sm font-semibold text-navy-900 hover:text-crimson-700 px-3 py-2 transition-colors"
                 >
                   {t('nav.login', 'Login')}
                 </Link>
+
                 <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    onOpenRegister()
-                  }}
-                  className="w-full rounded-lg bg-crimson-700 py-2.5 text-sm font-semibold text-white shadow hover:bg-crimson-800"
+                  onClick={onOpenRegister}
+                  className="flex items-center space-x-1.5 rounded-xl bg-crimson-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-crimson-800 hover:shadow-md transition-all active:scale-95"
                 >
-                  {t('nav.register', 'Register Free')}
+                  <Sparkles className="h-4 w-4 text-crimson-200" />
+                  <span>{t('nav.register', 'Register Free')}</span>
                 </button>
               </>
             )}
           </div>
-        </div>
-      )}
 
-      {/* ================= DELETE ACCOUNT CONFIRMATION MODAL ================= */}
-      {deleteAccountModalOpen && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#0b2a5b]/45 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-[#e3e9f5] overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-[#fde8ee] flex items-center justify-center mx-auto mb-4 text-[#e0102f]">
-              <Trash2 className="w-7 h-7" />
+          {/* Mobile Menu Trigger */}
+          <div className="flex md:hidden items-center space-x-2 flex-shrink-0">
+            <button
+              onClick={onOpenLanguageModal}
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+              aria-label="Language selector"
+            >
+              <Globe className="h-5 w-5 text-crimson-700" />
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="rounded-lg p-2 text-slate-700 hover:bg-slate-100"
+              aria-label="Open menu"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ================= FULL SCREEN MOBILE MENU DRAWER ================= */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-white flex flex-col animate-in fade-in duration-200">
+          {/* Top Bar of Drawer: Logo + Language Selector + Close Button */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white flex-shrink-0">
+            <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center">
+              <img
+                src={logoImg}
+                alt="BorKoniya"
+                className="h-9 w-auto object-contain"
+              />
+            </Link>
+
+            <div className="flex items-center space-x-3">
+              {/* Language Pill Selector */}
+              <button
+                onClick={onOpenLanguageModal}
+                className="flex items-center space-x-1.5 rounded-full border border-slate-200 bg-slate-50/70 hover:bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+              >
+                <Globe className="h-4 w-4 text-crimson-700" />
+                <span>{currentLang.label || currentLang.native || 'English'}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400 ml-0.5" />
+              </button>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-1.5 text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="h-6 w-6 stroke-[2.2]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable Content Container */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            {/* User Profile Gradient Card */}
+            <div
+              className="relative overflow-hidden px-5 py-5 text-white"
+              style={{
+                background: 'linear-gradient(115deg, #d31027 0%, #b30c1e 32%, #581c87 75%, #1e1b4b 100%)',
+              }}
+            >
+              {/* Subtle background glow effect */}
+              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-radial from-purple-400/10 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none blur-xl" />
+
+              <div className="relative z-10 flex items-center gap-4">
+                {/* Profile Photo Avatar */}
+                <div className="w-18 h-18 rounded-full overflow-hidden border-2 border-white ring-2 ring-white/20 shadow-md flex-shrink-0 bg-white/10">
+                  <img
+                    src={user?.photo_url || getDefaultAvatar(user?.gender)}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      const fallback = getDefaultAvatar(user?.gender)
+                      if (target.src !== fallback) target.src = fallback
+                    }}
+                  />
+                </div>
+
+                {/* Profile Info */}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-bold text-white tracking-tight truncate leading-tight">
+                    {isAuthenticated ? displayName : t('nav.welcomeGuest', 'Welcome to BorKoniya')}
+                  </h2>
+                  <div className="mt-1">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white bg-crimson-700/80 shadow-2xs border border-white/20">
+                      {isAuthenticated ? (user?.role || 'MEMBER') : 'GUEST'}
+                    </span>
+                  </div>
+                  {displayPhone ? (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-white/90 font-medium truncate">
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0 text-white/90" />
+                      <span className="truncate">{displayPhone}</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
 
-            <h3 className="font-bold text-[#0b2a5b] text-lg mb-2">
-              Delete Account Permanently?
-            </h3>
+            {/* Menu List Items */}
+            <div className="px-4 py-3 space-y-1">
+              {mobileMenuItems.map((item, index) => {
+                if (item.isDivider) {
+                  return <div key={`div-${index}`} className="my-2 border-t border-slate-100" />
+                }
 
-            <p className="text-xs text-[#6b7a99] leading-relaxed mb-4">
-              Are you sure you want to permanently delete your account? This action cannot be undone. All your profile information, matches, chats, and subscriptions will be permanently removed.
-            </p>
+                const isActive = !item.isAction && location.pathname === item.path
+                const IconComponent = item.icon!
 
-            {deleteError && (
-              <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 font-medium">
-                {deleteError}
-              </div>
-            )}
+                if (item.isAction) {
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={item.action}
+                      className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl transition-colors hover:bg-slate-50 text-left min-h-[48px]"
+                    >
+                      <div className="flex items-center space-x-3.5 min-w-0">
+                        <IconComponent className="h-5 w-5 text-slate-800 flex-shrink-0" />
+                        <span className="text-[15px] font-medium text-slate-800 truncate">
+                          {item.name}
+                        </span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-slate-400 flex-shrink-0 ml-2" />
+                    </button>
+                  )
+                }
 
-            <div className="flex items-center gap-3 justify-center">
-              <button
-                type="button"
-                disabled={isDeletingAccount}
-                onClick={() => {
-                  setDeleteAccountModalOpen(false)
-                  setDeleteError(null)
-                }}
-                className="flex-1 py-2.5 px-4 text-xs font-semibold text-[#0b2a5b] bg-[#f1f4fb] hover:bg-[#e4ebf8] rounded-full transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isDeletingAccount}
-                onClick={handleConfirmDeleteAccount}
-                className="flex-1 py-2.5 px-4 text-xs font-bold text-white bg-[#e0102f] hover:bg-[#c70a27] rounded-full transition-colors shadow-md shadow-[#e0102f]/25 disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                {isDeletingAccount ? (
-                  <span>Deleting...</span>
-                ) : (
-                  <span>Delete Permanently</span>
-                )}
-              </button>
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.path!}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center justify-between px-3.5 py-3 rounded-2xl transition-colors min-h-[48px] ${
+                      isActive
+                        ? 'bg-[#FFF1F2] text-crimson-700'
+                        : 'text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <IconComponent
+                        className={`h-5 w-5 flex-shrink-0 ${
+                          isActive ? 'text-crimson-700' : item.iconColor || 'text-slate-800'
+                        }`}
+                      />
+                      <span
+                        className={`text-[15px] truncate ${
+                          isActive ? 'font-bold text-crimson-700' : 'font-medium text-slate-800'
+                        }`}
+                      >
+                        {item.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                      {item.badge && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full text-white bg-crimson-700">
+                          {item.badge}
+                        </span>
+                      )}
+                      <ChevronRight
+                        className={`h-4 w-4 ${
+                          isActive ? 'text-crimson-700' : 'text-slate-400'
+                        }`}
+                      />
+                    </div>
+                  </Link>
+                )
+              })}
+
+              {/* Bottom Logout Button / Auth Action */}
+              {isAuthenticated ? (
+                <button
+                  onClick={handleLogout}
+                  className="w-full mt-3 mb-6 rounded-2xl bg-[#FFF1F2] hover:bg-[#ffe4e6] px-4 py-3.5 flex items-center justify-between text-crimson-700 transition-colors text-left active:scale-[0.99] cursor-pointer"
+                >
+                  <div className="flex items-center space-x-3.5">
+                    <LogOut className="h-5 w-5 text-crimson-700 flex-shrink-0" />
+                    <span className="font-bold text-[15px] text-crimson-700">
+                      {t('nav.logout', 'Logout')}
+                    </span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-crimson-700 flex-shrink-0" />
+                </button>
+              ) : (
+                <div className="mt-4 mb-6 space-y-2">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      onOpenRegister()
+                    }}
+                    className="w-full rounded-2xl bg-crimson-700 hover:bg-crimson-800 text-white font-bold py-3.5 px-4 flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99]"
+                  >
+                    <Sparkles className="h-4 w-4 text-crimson-200" />
+                    <span>{t('nav.register', 'Register Free')}</span>
+                  </button>
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-navy-900 font-bold py-3 px-4 flex items-center justify-center transition-colors"
+                  >
+                    <span>{t('nav.login', 'Login')}</span>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
-    </header>
+
+      {/* ================= ACCOUNT SETTINGS MODAL ================= */}
+      <AccountSettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+      />
+    </>
   )
 }
+

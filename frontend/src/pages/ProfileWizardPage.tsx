@@ -451,28 +451,29 @@ export const ProfileWizardPage: React.FC = () => {
             />
           </div>
 
-          {/* Step Pills */}
-          <div className="hidden sm:grid grid-cols-7 gap-1 mt-4 text-[10px] font-bold text-center">
+          {/* Step Pills - Responsive Horizontal Scroll on Mobile, Grid on sm+ */}
+          <div className="flex sm:grid sm:grid-cols-7 gap-1.5 mt-4 text-[10px] font-bold overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {stepTitles.map((title, idx) => {
               const isPast = idx + 1 < currentStep
               const isCurrent = idx + 1 === currentStep
               return (
-                <div
+                <button
+                  type="button"
                   key={idx}
                   onClick={async () => {
                     await saveProfileData(false)
                     setCurrentStep(idx + 1)
                   }}
-                  className={`cursor-pointer py-1.5 px-1 rounded-lg transition-all truncate ${
+                  className={`flex-shrink-0 sm:flex-shrink py-2 sm:py-1.5 px-3 sm:px-1 rounded-xl sm:rounded-lg transition-all text-center whitespace-nowrap sm:truncate min-h-[36px] sm:min-h-0 flex items-center justify-center ${
                     isCurrent
-                      ? 'bg-crimson-700 text-white shadow-xs'
+                      ? 'bg-crimson-700 text-white shadow-xs font-bold ring-2 ring-crimson-200'
                       : isPast
-                      ? 'bg-navy-50 text-navy-900 font-bold'
-                      : 'text-slate-400 hover:text-slate-700'
+                      ? 'bg-navy-50 text-navy-900 font-bold hover:bg-navy-100'
+                      : 'bg-slate-50 text-slate-400 hover:text-slate-700'
                   }`}
                 >
                   {idx + 1}. {title.split(' ')[0]}
-                </div>
+                </button>
               )
             })}
           </div>
@@ -1348,26 +1349,26 @@ export const ProfileWizardPage: React.FC = () => {
           )}
 
           {/* Navigation Controls */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between gap-3">
+          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3">
             {currentStep > 1 ? (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all"
+                className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-5 py-3 sm:py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all active:scale-98 min-h-[44px]"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Previous Step</span>
               </button>
             ) : (
-              <div />
+              <div className="hidden sm:block" />
             )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => saveProfileData(false)}
                 disabled={isSaving}
-                className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition-all disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-3 sm:py-2.5 text-xs font-semibold text-slate-700 transition-all disabled:opacity-50 active:scale-98 min-h-[44px]"
               >
                 <CheckCircle className="h-4 w-4 text-emerald-600" />
                 <span>{isSaving ? 'Saving...' : 'Save Progress'}</span>
@@ -1377,7 +1378,7 @@ export const ProfileWizardPage: React.FC = () => {
                 type="button"
                 onClick={handleNext}
                 disabled={isSaving}
-                className="inline-flex items-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-98 disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 hover:bg-crimson-800 px-6 py-3.5 sm:py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-98 disabled:opacity-50 min-h-[44px]"
               >
                 <span>{isSaving ? 'Saving Profile...' : currentStep === totalSteps ? 'Finish & Save Profile' : 'Save & Continue'}</span>
                 <ArrowRight className="h-4 w-4 text-white" />
@@ -1389,7 +1390,7 @@ export const ProfileWizardPage: React.FC = () => {
 
       {saveToast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300 text-white ${
+          className={`fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center justify-center sm:justify-start gap-3 animate-in slide-in-from-bottom duration-300 text-white ${
             saveToast.type === 'success' ? 'bg-emerald-700' : 'bg-red-700'
           }`}
         >
