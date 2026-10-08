@@ -220,16 +220,26 @@ def get_conversations(
 
     from app.websocket.call_manager import call_manager
 
+    # Batch load photos for all conversation participants
+    other_profile_ids = [other_profile.id for _, other_profile, _, _, _ in rows]
+    photo_map = {}
+    if other_profile_ids:
+        all_photos = (
+            db.query(ProfilePhoto)
+            .filter(ProfilePhoto.profile_id.in_(other_profile_ids))
+            .order_by(ProfilePhoto.is_primary.desc())
+            .all()
+        )
+        for p in all_photos:
+            if p.profile_id not in photo_map:
+                photo_map[p.profile_id] = p.storage_path
+
     results = []
     for conv, other_profile, last_msg_content, last_msg_time, unread in rows:
         can_chat = is_premium or (other_profile.id in mutual_ids)
         last_name_display = other_profile.last_name if can_chat else f"{other_profile.last_name[0]}."
 
-        # Fetch other_profile primary photo if exists
-        other_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == other_profile.id, ProfilePhoto.is_primary == True).first()
-        if not other_photo:
-            other_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == other_profile.id).first()
-        other_photo_url = other_photo.storage_path if other_photo else None
+        other_photo_url = photo_map.get(other_profile.id)
 
         results.append(
             ConversationSummaryResponse(

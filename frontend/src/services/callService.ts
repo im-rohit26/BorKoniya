@@ -1,6 +1,5 @@
 import { getAuthHeaders } from '../lib/authApi';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '../lib/config';
 
 export interface CallHistoryEntry {
   id: string;
@@ -34,7 +33,20 @@ export async function fetchWebRTCConfiguration(): Promise<RTCConfiguration> {
     .filter(Boolean);
 
   const fallbackConfig: RTCConfiguration = {
-    iceServers: defaultStunUrls.map((urls: string) => ({ urls })),
+    iceServers: [
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      ...defaultStunUrls.map((urls: string) => ({ urls })),
+      {
+        urls: [
+          'turn:global.relay.metered.ca:80',
+          'turn:global.relay.metered.ca:80?transport=tcp',
+          'turn:global.relay.metered.ca:443',
+          'turns:global.relay.metered.ca:443?transport=tcp',
+        ],
+        username: '2d6f532140885f340c97d232',
+        credential: 'lYAb1mssOpEcBNHC',
+      },
+    ],
     iceCandidatePoolSize: 10,
   };
 

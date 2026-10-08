@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import or_
 from datetime import datetime, timezone
 from typing import List, Optional
 from app.core.database import get_db
@@ -201,6 +202,7 @@ def get_received_interests(
         db.query(Interest, Profile, User)
         .join(Profile, Profile.id == Interest.sender_profile_id)
         .join(User, User.id == Profile.user_id)
+        .options(selectinload(Profile.photos))
         .filter(Interest.receiver_profile_id == current_profile.id)
     )
     if status_filter:
@@ -239,6 +241,7 @@ def get_sent_interests(
         db.query(Interest, Profile, User)
         .join(Profile, Profile.id == Interest.receiver_profile_id)
         .join(User, User.id == Profile.user_id)
+        .options(selectinload(Profile.photos))
         .filter(Interest.sender_profile_id == current_profile.id)
     )
     if status_filter:
@@ -290,23 +293,18 @@ def get_connected_interest_ids(
     db: Session = Depends(get_db),
 ):
     """Returns all profile IDs where mutual connection is established (status == ACCEPTED)."""
-    rows1 = (
-        db.query(Interest.receiver_profile_id)
+    rows = (
+        db.query(Interest.sender_profile_id, Interest.receiver_profile_id)
         .filter(
-            Interest.sender_profile_id == current_profile.id,
             Interest.status == "ACCEPTED",
+            or_(
+                Interest.sender_profile_id == current_profile.id,
+                Interest.receiver_profile_id == current_profile.id,
+            ),
         )
         .all()
     )
-    rows2 = (
-        db.query(Interest.sender_profile_id)
-        .filter(
-            Interest.receiver_profile_id == current_profile.id,
-            Interest.status == "ACCEPTED",
-        )
-        .all()
-    )
-    return list({r[0] for r in rows1}.union({r[0] for r in rows2}))
+    return list({r[1] if r[0] == current_profile.id else r[0] for r in rows})
 
 
 @router.post("/{interest_id}/accept", response_model=InterestActionResponse)

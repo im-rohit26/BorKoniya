@@ -1,9 +1,12 @@
 import os
+import io
 import uuid
 import shutil
+import logging
+from PIL import Image, ImageOps
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from typing import List, Optional
+from sqlalchemy.orm import Session, joinedload, selectinload
+from typing import List, Optional, Tuple
 from datetime import date, datetime, timezone
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_optional_current_user
@@ -11,28 +14,58 @@ from app.models.entities import Profile, ProfilePrivacy, User, Subscription, Int
 from app.schemas.profile import ProfileResponse, PrivacySettingsUpdate, ProfileUpdate, PhotoItemResponse
 from app.services.matching_service import matching_service
 from app.core.supabase import get_supabase_client
+from app.core.config import settings
+
+logger = logging.getLogger("borkonya.profiles")
 
 router = APIRouter(prefix="/profile", tags=["Matrimonial Profiles"])
 
 
-def save_photo_file(file: UploadFile, filename: str) -> str:
+def optimize_image_bytes(raw_bytes: bytes, max_dimension: int = 1200, quality: int = 85) -> Tuple[bytes, str]:
+    """
+    Auto-rotates mobile photos based on EXIF, resizes large photos,
+    and converts to highly optimized WebP format to save 70-95% bandwidth.
+    """
+    try:
+        img = Image.open(io.BytesIO(raw_bytes))
+        img = ImageOps.exif_transpose(img)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        w, h = img.size
+        if max(w, h) > max_dimension:
+            ratio = max_dimension / max(w, h)
+            new_size = (max(1, int(w * ratio)), max(1, int(h * ratio)))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format="WEBP", quality=quality, method=6)
+        return out.getvalue(), "image/webp"
+    except Exception as e:
+        logger.warning(f"Image optimization fallback: {e}")
+        return raw_bytes, "image/jpeg"
+
+
+def save_photo_file(file: UploadFile, base_id: str) -> str:
+    file_bytes = file.file.read()
+    file.file.seek(0)
+
+    # Compress and convert to modern WebP
+    optimized_bytes, content_type = optimize_image_bytes(file_bytes, max_dimension=1200, quality=85)
+    unique_filename = f"{base_id}_{uuid.uuid4().hex[:8]}.webp"
+
     # 1. Try Supabase Storage first
     supabase = get_supabase_client()
     if supabase:
         try:
-            file_bytes = file.file.read()
-            file.file.seek(0)
             res = supabase.storage.from_("profile-photos").upload(
-                filename,
-                file_bytes,
-                {"content-type": file.content_type or "image/jpeg", "upsert": "true"},
+                unique_filename,
+                optimized_bytes,
+                {"content-type": content_type, "upsert": "true"},
             )
-            public_url = supabase.storage.from_("profile-photos").get_public_url(filename)
+            public_url = supabase.storage.from_("profile-photos").get_public_url(unique_filename)
             if public_url:
                 return public_url
         except Exception as e:
-            print(f"Supabase photo upload warning: {e}")
-            file.file.seek(0)
+            logger.warning(f"Supabase photo upload warning: {e}")
 
     # 2. Local fallback
     upload_dir = os.path.join(
@@ -41,10 +74,14 @@ def save_photo_file(file: UploadFile, filename: str) -> str:
         "photos",
     )
     os.makedirs(upload_dir, exist_ok=True)
-    local_path = os.path.join(upload_dir, filename)
+    local_path = os.path.join(upload_dir, unique_filename)
     with open(local_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return f"http://localhost:8000/uploads/photos/{filename}"
+        buffer.write(optimized_bytes)
+
+    base_url = settings.BACKEND_PUBLIC_URL.rstrip("/") if settings.BACKEND_PUBLIC_URL else (
+        os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/") or f"http://localhost:{settings.PORT}"
+    )
+    return f"{base_url}/uploads/photos/{unique_filename}"
 
 
 def is_user_premium(user_id: str, db: Session) -> bool:
@@ -252,7 +289,12 @@ def get_my_dashboard_stats(
     db: Session = Depends(get_db),
 ):
     """Calculates all real user and application statistics directly from the database."""
-    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    profile = (
+        db.query(Profile)
+        .options(selectinload(Profile.photos))
+        .filter(Profile.user_id == current_user.id)
+        .first()
+    )
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -264,21 +306,22 @@ def get_my_dashboard_stats(
 
     target_gender = "MALE" if (profile.gender and profile.gender.upper() == "FEMALE") else "FEMALE"
 
-    # Query all connected profile IDs (accepted interest in either direction)
-    connected_ids = set(
-        [
-            r[0]
-            for r in db.query(Interest.receiver_profile_id)
-            .filter(Interest.sender_profile_id == profile.id, Interest.status == "ACCEPTED")
-            .all()
-        ]
-        + [
-            r[0]
-            for r in db.query(Interest.sender_profile_id)
-            .filter(Interest.receiver_profile_id == profile.id, Interest.status == "ACCEPTED")
-            .all()
-        ]
+    # Query all connected profile IDs in a single query (accepted interest in either direction)
+    connected_rows = (
+        db.query(Interest.sender_profile_id, Interest.receiver_profile_id)
+        .filter(
+            Interest.status == "ACCEPTED",
+            or_(
+                Interest.sender_profile_id == profile.id,
+                Interest.receiver_profile_id == profile.id,
+            ),
+        )
+        .all()
     )
+    connected_ids = {
+        r[1] if r[0] == profile.id else r[0]
+        for r in connected_rows
+    }
     exclude_ids = connected_ids.union({profile.id})
 
     # 1. Total matches count in DB (excluding self and connected members)
@@ -324,9 +367,10 @@ def get_my_dashboard_stats(
     if profile_views_count == 0:
         profile_views_count = max(total_matches_count, 1)
 
-    # 8. Top 6 real recommendations (strictly excluding connected profiles)
+    # 8. Top 6 real recommendations (strictly excluding connected profiles) with eager loading
     top_profiles = (
         db.query(Profile)
+        .options(joinedload(Profile.user), selectinload(Profile.photos))
         .filter(
             Profile.status == "ACTIVE",
             Profile.gender == target_gender,
@@ -336,20 +380,39 @@ def get_my_dashboard_stats(
         .all()
     )
 
+    # Batch load match scores if top profiles exist
+    score_map = {}
+    if top_profiles:
+        target_ids = [m.id for m in top_profiles]
+        score_records = db.query(MatchScore).filter(
+            or_(
+                (MatchScore.profile_a_id == profile.id) & (MatchScore.profile_b_id.in_(target_ids)),
+                (MatchScore.profile_b_id == profile.id) & (MatchScore.profile_a_id.in_(target_ids)),
+            )
+        ).all()
+        for s in score_records:
+            other_id = s.profile_b_id if s.profile_a_id == profile.id else s.profile_a_id
+            score_map[other_id] = s.score
+
     top_matches = []
     for m in top_profiles:
-        u = db.query(User).filter(User.id == m.user_id).first()
-        res = format_profile_response(m, user=u)
-        score, breakdown = matching_service.evaluate_match(profile, m)
-        res.match_score = score
-        res.match_breakdown = breakdown
+        res = format_profile_response(m, user=m.user)
+        cached_score = score_map.get(m.id)
+        if cached_score is not None:
+            res.match_score = cached_score
+            _, res.match_breakdown = matching_service.evaluate_match(profile, m)
+        else:
+            score, breakdown = matching_service.evaluate_match(profile, m)
+            res.match_score = score
+            res.match_breakdown = breakdown
         top_matches.append(res)
 
     completion_pct = profile.profile_completion_pct or calculate_profile_completion(profile)
 
-    primary_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id, ProfilePhoto.is_primary == True).first()
-    if not primary_photo:
-        primary_photo = db.query(ProfilePhoto).filter(ProfilePhoto.profile_id == profile.id).first()
+    # Get primary photo from eagerly loaded profile.photos (no query)
+    primary_photo = next((p for p in profile.photos if p.is_primary), None)
+    if not primary_photo and profile.photos:
+        primary_photo = profile.photos[0]
     photo_url = primary_photo.storage_path if primary_photo else None
 
     is_premium = is_user_premium(current_user.id, db)

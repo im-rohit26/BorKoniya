@@ -55,11 +55,15 @@ export const LandingPage: React.FC = () => {
   }, [isAuthenticated, user?.user_id])
 
   useEffect(() => {
-    getSubscriptionStatus()
-      .then((status) => {
-        if (status.is_active) setIsPremiumUser(true)
-      })
-      .catch(() => {})
+    if (isAuthenticated) {
+      getSubscriptionStatus()
+        .then((status) => {
+          if (status.is_active) setIsPremiumUser(true)
+        })
+        .catch(() => {})
+    } else {
+      setIsPremiumUser(false)
+    }
 
     const fetchProfiles = async () => {
       setLoading(true)
@@ -68,16 +72,18 @@ export const LandingPage: React.FC = () => {
         let sIds: string[] = []
         let sentIds: string[] = []
         let connIds: string[] = []
-        try {
-          [sIds, sentIds, connIds] = await Promise.all([
-            getShortlistedIds().catch(() => []),
-            getSentInterestIds().catch(() => []),
-            getConnectedProfileIds().catch(() => []),
-          ])
-        } catch {
-          sIds = []
-          sentIds = []
-          connIds = []
+        if (isAuthenticated) {
+          try {
+            [sIds, sentIds, connIds] = await Promise.all([
+              getShortlistedIds().catch(() => []),
+              getSentInterestIds().catch(() => []),
+              getConnectedProfileIds().catch(() => []),
+            ])
+          } catch {
+            sIds = []
+            sentIds = []
+            connIds = []
+          }
         }
         const sSet = new Set(sIds)
         const sentSet = new Set(sentIds)

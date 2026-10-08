@@ -59,6 +59,7 @@ import {
   uploadChatAttachment,
 } from '../lib/interactionApi';
 import type { ConversationSummary, MessageItem } from '../lib/interactionApi';
+import { BACKEND_ROOT_URL } from '../lib/config';
 import { supabase } from '../lib/supabase';
 import { ProtectedPhoto } from '../components/security/ProtectedPhoto';
 import { ScreenCaptureProtection } from '../components/security/ScreenCaptureProtection';
@@ -97,6 +98,7 @@ export const ChatPage: React.FC = () => {
   const { startVoiceCall: initiateVoiceCall, startVideoCall: initiateVideoCall, callState } = useCall();
   const [langModalOpen, setLangModalOpen] = useState(false);
   const wsConnectedRef = useRef(false);
+  const currentChannelRef = useRef<any>(null);
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -194,6 +196,12 @@ export const ChatPage: React.FC = () => {
       });
       setMessages((prev) => [...prev, sentMsg]);
       setTimeout(scrollToBottom, 100);
+      fetchConversations(true);
+      currentChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { conversation_id: activeConvId, message_id: sentMsg.id },
+      });
     } catch (err: any) {
       alert(err.message || 'Failed to upload attachment.');
     } finally {
@@ -265,8 +273,8 @@ export const ChatPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const fetchConversations = async () => {
-    setIsLoadingConvs(true);
+  const fetchConversations = async (silent = false) => {
+    if (!silent) setIsLoadingConvs(true);
     try {
       const convs = await getConversations();
       setConversations(convs);
@@ -276,7 +284,7 @@ export const ChatPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to load conversations:', err);
     } finally {
-      setIsLoadingConvs(false);
+      if (!silent) setIsLoadingConvs(false);
     }
   };
 
@@ -292,6 +300,13 @@ export const ChatPage: React.FC = () => {
           'আশা করি আপনি ভালো আছেন!',
         ]);
       });
+
+    // Background poll for conversations list so unread counts/snippets stay fresh
+    const convPoll = setInterval(() => {
+      fetchConversations(true);
+    }, 8000);
+
+    return () => clearInterval(convPoll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -372,28 +387,37 @@ export const ChatPage: React.FC = () => {
         .on(
           'postgres_changes',
           {
-            event: 'INSERT',
+            event: '*',
             schema: 'public',
             table: 'messages',
             filter: `conversation_id=eq.${activeConvId}`,
           },
-          () => fetchChatMessages(true)
+          () => {
+            fetchChatMessages(true);
+            fetchConversations(true);
+          }
         )
+        .on('broadcast', { event: 'new_message' }, () => {
+          fetchChatMessages(true);
+          fetchConversations(true);
+        })
         .subscribe((status: string) => {
           wsConnectedRef.current = status === 'SUBSCRIBED';
         });
+
+      currentChannelRef.current = channel;
     } catch (e) {
       console.warn('Realtime channel error:', e);
     }
 
-    // Fallback polling only while realtime is not connected
+    // Unconditional silent poll every 2.5 seconds to guarantee zero missed messages
     const pollInterval = setInterval(() => {
-      if (!wsConnectedRef.current) fetchChatMessages(true);
-    }, 4000);
+      fetchChatMessages(true);
+    }, 2500);
 
     const handleCallEnded = () => {
       fetchChatMessages(true);
-      fetchConversations();
+      fetchConversations(true);
     };
     window.addEventListener('borkonya:call-ended', handleCallEnded);
 
@@ -401,7 +425,12 @@ export const ChatPage: React.FC = () => {
       isMounted = false;
       clearInterval(pollInterval);
       window.removeEventListener('borkonya:call-ended', handleCallEnded);
-      if (channel) supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+        if (currentChannelRef.current === channel) {
+          currentChannelRef.current = null;
+        }
+      }
     };
   }, [activeConvId]);
 
@@ -474,7 +503,12 @@ export const ChatPage: React.FC = () => {
       setReplyingTo(null);
       setShowEmojiPicker(false);
       setTimeout(scrollToBottom, 50);
-      fetchConversations();
+      fetchConversations(true);
+      currentChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { conversation_id: activeConvId, message_id: newMsg.id },
+      });
     } catch (err: any) {
       setErrorBanner(err.message || 'Failed to send message.');
     } finally {
@@ -1866,16 +1900,16 @@ export const ChatPage: React.FC = () => {
                                 {m.media_url && (m.message_type === 'image' || /\.(jpe?g|png|webp|gif)$/i.test(m.media_url)) ? (
                                   <div className="mb-2 rounded-2xl overflow-hidden max-w-xs sm:max-w-sm border border-black/10 bg-black/5 shadow-xs">
                                     <img
-                                      src={m.media_url.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`}
+                                      src={m.media_url.startsWith('http') ? m.media_url : `${BACKEND_ROOT_URL}${m.media_url}`}
                                       alt="Attachment"
                                       className="max-h-72 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                                      onClick={() => window.open(m.media_url?.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`, '_blank')}
+                                      onClick={() => window.open(m.media_url?.startsWith('http') ? m.media_url : `${BACKEND_ROOT_URL}${m.media_url}`, '_blank')}
                                     />
                                   </div>
                                 ) : m.media_url ? (
                                   <div className="mb-2">
                                     <a
-                                      href={m.media_url.startsWith('http') ? m.media_url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'}${m.media_url}`}
+                                      href={m.media_url.startsWith('http') ? m.media_url : `${BACKEND_ROOT_URL}${m.media_url}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${

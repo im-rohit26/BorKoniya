@@ -75,14 +75,26 @@ def test_auth_me_authorized(client, auth_headers):
 
 
 def test_send_and_verify_otp(client):
-    send_res = client.post("/api/v1/auth/send-otp", json={"phone_number": "9876543210"})
+    test_phone = "9876500001"
+    send_res = client.post("/api/v1/auth/send-otp", json={"phone_number": test_phone})
     assert send_res.status_code == 200
     data = send_res.json()
-    assert data["phone_number"] == "9876543210"
-    otp_code = data.get("demo_otp", "749201")
+    assert data["phone_number"] == test_phone
+
+    from app.core.database import SessionLocal
+    from app.models.entities import OTPStore
+    with SessionLocal() as db:
+        otp_entry = (
+            db.query(OTPStore)
+            .filter(OTPStore.identifier == test_phone, OTPStore.purpose == "VERIFY")
+            .order_by(OTPStore.created_at.desc())
+            .first()
+        )
+        assert otp_entry is not None
+        otp_code = otp_entry.otp_code
 
     verify_res = client.post("/api/v1/auth/verify-otp", json={
-        "phone_number": "9876543210",
+        "phone_number": test_phone,
         "otp_code": otp_code,
     })
     assert verify_res.status_code == 200
@@ -95,7 +107,18 @@ def test_forgot_and_reset_password(client):
         "phone_or_email": "9876543210"
     })
     assert forgot_res.status_code == 200
-    otp = forgot_res.json().get("demo_otp", "749201")
+
+    from app.core.database import SessionLocal
+    from app.models.entities import OTPStore
+    with SessionLocal() as db:
+        otp_entry = (
+            db.query(OTPStore)
+            .filter(OTPStore.identifier == "9876543210", OTPStore.purpose == "RESET_PASSWORD")
+            .order_by(OTPStore.created_at.desc())
+            .first()
+        )
+        assert otp_entry is not None
+        otp = otp_entry.otp_code
 
     # Reset password with password too short (< 8 chars)
     short_res = client.post("/api/v1/auth/reset-password", json={

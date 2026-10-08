@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Lock } from 'lucide-react'
 import { getDefaultAvatar } from '../../lib/utils'
+import { getOptimizedImageUrl } from '../../lib/imageUtils'
 
 interface ProtectedPhotoProps {
   src?: string
@@ -14,6 +15,9 @@ interface ProtectedPhotoProps {
   imgClassName?: string
   objectFit?: 'cover' | 'contain'
   watermarkText?: string
+  width?: number
+  height?: number
+  preset?: 'thumbnail' | 'card' | 'detail' | 'avatar'
 }
 
 export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
@@ -26,8 +30,39 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
   className = '',
   imgClassName = '',
   objectFit = 'cover',
+  width,
+  height,
+  preset = 'card',
 }) => {
-  const imageSource = src || photoUrl || getDefaultAvatar(gender)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [hasError, setHasError] = useState(false)
+
+  // Determine preset dimensions
+  let targetWidth = width
+  let targetHeight = height
+  if (!targetWidth && !targetHeight) {
+    if (preset === 'thumbnail' || preset === 'avatar') {
+      targetWidth = 160
+      targetHeight = 160
+    } else if (preset === 'card') {
+      targetWidth = 450
+      targetHeight = 560
+    } else if (preset === 'detail') {
+      targetWidth = 800
+      targetHeight = 1000
+    }
+  }
+
+  const rawSource = src || photoUrl
+  const imageSource = rawSource
+    ? getOptimizedImageUrl(rawSource, {
+        width: targetWidth,
+        height: targetHeight,
+        quality: 82,
+        resize: 'cover',
+      })
+    : getDefaultAvatar(gender)
+
   const imageAlt = alt || altText || 'Member Photo'
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -53,14 +88,22 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
         userSelect: 'none',
       }}
     >
+      {/* Skeleton loader placeholder while loading */}
+      {!isLoaded && !hasError && (
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 animate-pulse z-5" />
+      )}
+
       {/* Underlying Image with pointer-events-none to prevent drag & context menu */}
       <img
-        src={imageSource}
+        src={hasError ? getDefaultAvatar(gender) : imageSource}
         alt={imageAlt}
         loading="lazy"
+        decoding="async"
         draggable={false}
+        onLoad={() => setIsLoaded(true)}
         onError={(e) => {
-          // If custom photo fails to load, fallback safely to default gender avatar
+          setHasError(true)
+          setIsLoaded(true)
           const target = e.currentTarget
           const fallback = getDefaultAvatar(gender)
           if (target.src !== fallback) {
@@ -69,9 +112,9 @@ export const ProtectedPhoto: React.FC<ProtectedPhotoProps> = ({
         }}
         className={`h-full w-full ${
           objectFit === 'contain' ? 'object-contain' : 'object-cover object-top'
-        } transition-transform duration-500 pointer-events-none select-none ${
-          isProtected ? 'blur-md scale-105' : ''
-        } ${imgClassName}`}
+        } transition-opacity duration-300 pointer-events-none select-none ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        } ${isProtected ? 'blur-md scale-105' : ''} ${imgClassName}`}
       />
 
       {/* Transparent Protective Shield (catches all clicks/taps so raw image cannot be touched) */}

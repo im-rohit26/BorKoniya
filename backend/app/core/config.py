@@ -21,11 +21,23 @@ class Settings(BaseSettings):
     @field_validator("ALLOWED_ORIGINS", mode="before")
     def parse_allowed_origins(cls, v):
         if isinstance(v, str):
-            return [i.strip() for i in v.split(",") if i.strip()]
+            origins = set()
+            for i in v.split(","):
+                stripped = i.strip()
+                if stripped:
+                    origins.add(stripped)
+                    origins.add(stripped.rstrip("/"))
+            return list(origins)
         return v
 
     # Database
     DATABASE_URL: str
+
+    @field_validator("DATABASE_URL", mode="before")
+    def fix_database_url(cls, v):
+        if isinstance(v, str) and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
 
     # Supabase (Optional in dev, required in production)
     SUPABASE_URL: str = "https://mock.supabase.co"
@@ -45,8 +57,28 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "BorKonya"
     OTP_EXPIRY_MINUTES: int = 10
+    OTP_RESEND_COOLDOWN_SECONDS: int = 60
     OTP_PROVIDER_KEY: str = "mock_otp_provider_key"
     SMS_SENDER_ID: str = "BORKON"
+    BACKEND_PUBLIC_URL: str = ""
+
+    @field_validator("SMTP_USER", mode="before")
+    def clean_smtp_user(cls, v):
+        if isinstance(v, str):
+            return v.strip().replace('"', '').replace("'", '').replace(" ", "")
+        return v
+
+    @field_validator("SMTP_PASSWORD", mode="before")
+    def clean_smtp_password(cls, v):
+        if isinstance(v, str):
+            return v.strip().replace('"', '').replace("'", '').replace(" ", "")
+        return v
+
+    @field_validator("SMTP_HOST", mode="before")
+    def clean_smtp_host(cls, v):
+        if isinstance(v, str):
+            return v.strip().replace('"', '').replace("'", '').replace(" ", "")
+        return v
 
     # Payment
     PAYMENT_PROVIDER: str = "MOCK"
@@ -54,11 +86,11 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER_SECRET: str = "mock_payment_secret"
 
     # WebRTC (STUN / TURN) & Calling Signaling
-    STUN_URLS: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
-    TURN_URLS: str = ""
+    STUN_URLS: str = "stun:stun.relay.metered.ca:80,stun:stun.l.google.com:19302"
+    TURN_URLS: str = "turn:global.relay.metered.ca:80,turn:global.relay.metered.ca:80?transport=tcp,turn:global.relay.metered.ca:443,turns:global.relay.metered.ca:443?transport=tcp"
     TURN_SHARED_SECRET: str = ""
-    TURN_STATIC_USERNAME: str = ""
-    TURN_STATIC_CREDENTIAL: str = ""
+    TURN_STATIC_USERNAME: str = "2d6f532140885f340c97d232"
+    TURN_STATIC_CREDENTIAL: str = "lYAb1mssOpEcBNHC"
     TURN_CREDENTIAL_TTL_SECONDS: int = 3600
     CALL_RING_TIMEOUT_SECONDS: int = 45
     CALL_RATE_LIMIT_PER_MINUTE: int = 10

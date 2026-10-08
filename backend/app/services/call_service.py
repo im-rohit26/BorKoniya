@@ -455,5 +455,18 @@ class CallService:
                         credential=settings.TURN_STATIC_CREDENTIAL,
                     )
                 )
+        else:
+            # High-availability public fallback TURN so calls connect across mobile data & NAT out of the box
+            ice_servers.append(
+                ICEServerItem(
+                    urls=[
+                        "turn:openrelay.metered.ca:80",
+                        "turn:openrelay.metered.ca:443",
+                        "turn:openrelay.metered.ca:443?transport=tcp",
+                    ],
+                    username="openrelayproject",
+                    credential="openrelayproject",
+                )
+            )
 
         return WebRTCConfigResponse(iceServers=ice_servers, ttl=ttl)

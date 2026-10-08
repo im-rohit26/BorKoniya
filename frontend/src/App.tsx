@@ -1,26 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { CallProvider } from './context/CallContext'
 import { CallNotification } from './components/calling/CallNotification'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
-import { LandingPage } from './pages/LandingPage'
-import { LoginPage } from './pages/LoginPage'
-import { RegisterPage } from './pages/RegisterPage'
-import { SearchPage } from './pages/SearchPage'
-import { MatchesPage } from './pages/MatchesPage'
-import { ProfileDetailPage } from './pages/ProfileDetailPage'
-import { SubscriptionPage } from './pages/SubscriptionPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { ProfileWizardPage } from './pages/ProfileWizardPage'
-import { InterestsPage } from './pages/InterestsPage'
-import { ShortlistPage } from './pages/ShortlistPage'
-import { ChatPage } from './pages/ChatPage'
-import { NotFoundPage } from './pages/NotFoundPage'
 import { LanguageSelectorModal } from './components/common/LanguageSelectorModal'
 import { ScreenCaptureProtection } from './components/security/ScreenCaptureProtection'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { MobileBottomNav } from './components/common/MobileBottomNav'
+
+// Route Code-Splitting: Lazy load each page on demand
+const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })))
+const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })))
+const RegisterPage = lazy(() => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })))
+const SearchPage = lazy(() => import('./pages/SearchPage').then((m) => ({ default: m.SearchPage })))
+const MatchesPage = lazy(() => import('./pages/MatchesPage').then((m) => ({ default: m.MatchesPage })))
+const ProfileDetailPage = lazy(() => import('./pages/ProfileDetailPage').then((m) => ({ default: m.ProfileDetailPage })))
+const SubscriptionPage = lazy(() => import('./pages/SubscriptionPage').then((m) => ({ default: m.SubscriptionPage })))
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const ProfileWizardPage = lazy(() => import('./pages/ProfileWizardPage').then((m) => ({ default: m.ProfileWizardPage })))
+const InterestsPage = lazy(() => import('./pages/InterestsPage').then((m) => ({ default: m.InterestsPage })))
+const ShortlistPage = lazy(() => import('./pages/ShortlistPage').then((m) => ({ default: m.ShortlistPage })))
+const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
+
+const PageLoader = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-3 border-crimson-700 border-t-transparent" />
+  </div>
+)
 
 export default function App() {
   const [showInitialLangModal, setShowInitialLangModal] = useState(false)
@@ -51,6 +59,7 @@ export default function App() {
           isInitial={true}
         />
 
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
@@ -148,6 +157,7 @@ export default function App() {
           {/* 404 Catch-All */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </Suspense>
 
         {/* Persistent App-Like Mobile Bottom Navigation Bar */}
         <MobileBottomNav />
