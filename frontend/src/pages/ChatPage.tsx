@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Send,
   MessageSquare,
@@ -57,6 +57,7 @@ import {
   markConversationRead,
   getBlockedProfiles,
   uploadChatAttachment,
+  startOrGetConversation,
 } from '../lib/interactionApi';
 import type { ConversationSummary, MessageItem } from '../lib/interactionApi';
 import { BACKEND_ROOT_URL } from '../lib/config';
@@ -94,6 +95,10 @@ const BLUE_BUBBLE = 'bg-gradient-to-br from-[#0a56e0] to-[#0a3fc0] text-white sh
 export const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const queryProfileId = searchParams.get('profileId') || searchParams.get('profile_id');
+  const resolvingProfileRef = useRef<string | null>(null);
   const { user: currentUser } = useAuth();
   const { startVoiceCall: initiateVoiceCall, startVideoCall: initiateVideoCall, callState } = useCall();
   const [langModalOpen, setLangModalOpen] = useState(false);
@@ -299,7 +304,7 @@ export const ChatPage: React.FC = () => {
     try {
       const convs = await getConversations();
       setConversations(convs);
-      if (!activeConvId && convs.length > 0 && window.innerWidth >= 768) {
+      if (!activeConvId && !queryProfileId && convs.length > 0 && window.innerWidth >= 768) {
         setActiveConvId(convs[0].id);
       }
     } catch (err) {
@@ -308,6 +313,62 @@ export const ChatPage: React.FC = () => {
       if (!silent) setIsLoadingConvs(false);
     }
   };
+
+  // Resolve chat when opened with ?profileId=... or ?profile_id=...
+  useEffect(() => {
+    if (!queryProfileId) return;
+    if (resolvingProfileRef.current === queryProfileId) return;
+
+    let isMounted = true;
+    resolvingProfileRef.current = queryProfileId;
+
+    const resolveProfileChat = async () => {
+      try {
+        setIsLoadingConvs(true);
+        setErrorBanner(null);
+
+        // Check if existing conversation is already loaded
+        const existing = conversations.find(
+          (c) => c.other_profile?.profile_id === queryProfileId
+        );
+        if (existing) {
+          if (isMounted) {
+            setActiveConvId(existing.id);
+            const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+            navigate(`${basePath}/${existing.id}`, { replace: true });
+          }
+          return;
+        }
+
+        // Start or get conversation via backend API
+        const res = await startOrGetConversation(queryProfileId);
+        if (res?.conversation_id && isMounted) {
+          const freshConvs = await getConversations();
+          if (isMounted) {
+            setConversations(freshConvs);
+            setActiveConvId(res.conversation_id);
+            const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+            navigate(`${basePath}/${res.conversation_id}`, { replace: true });
+          }
+        }
+      } catch (err: any) {
+        console.error('Failed to resolve conversation for profile:', err);
+        if (isMounted) {
+          setErrorBanner(err.message || 'Unable to open conversation with this member.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingConvs(false);
+        }
+      }
+    };
+
+    resolveProfileChat();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [queryProfileId, conversations, location.pathname, navigate]);
 
   useEffect(() => {
     fetchConversations();

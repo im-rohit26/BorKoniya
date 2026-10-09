@@ -53,6 +53,7 @@ import {
   getShortlistedIds,
   getSentInterestIds,
   getConnectedProfileIds,
+  startOrGetConversation,
 } from '../lib/interactionApi'
 import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import { masterDataApi, type Community } from '../lib/masterDataApi'
@@ -301,11 +302,20 @@ export const ProfileDetailPage: React.FC = () => {
     }
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!profile) return
-    if (!isPremiumUser) {
+    if (!isPremiumUser && !isConnected) {
       openUpgradeModal('Unlimited Direct Messaging')
       return
+    }
+    try {
+      const res = await startOrGetConversation(profile.id)
+      if (res?.conversation_id) {
+        navigate(`/chat/${res.conversation_id}`)
+        return
+      }
+    } catch (err: any) {
+      console.warn('Direct start conversation fallback:', err)
     }
     navigate(`/chat?profileId=${profile.id}`)
   }

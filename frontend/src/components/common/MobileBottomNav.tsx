@@ -64,7 +64,9 @@ export const MobileBottomNav: React.FC = () => {
     location.pathname.startsWith('/profile/edit') ||
     location.pathname.startsWith('/onboarding') ||
     location.pathname.match(/^\/messages\/[a-zA-Z0-9_-]+/) ||
-    (location.pathname.startsWith('/messages') && hasActiveChat)
+    (location.pathname.startsWith('/messages') && hasActiveChat) ||
+    location.pathname.match(/^\/chat\/[a-zA-Z0-9_-]+/) ||
+    (location.pathname.startsWith('/chat') && hasActiveChat)
   ) {
     return null
   }
@@ -79,7 +81,7 @@ export const MobileBottomNav: React.FC = () => {
           const isActive =
             location.pathname === item.path ||
             (item.path === '/matches' && location.pathname === '/') ||
-            (item.path === '/messages' && location.pathname.startsWith('/messages'))
+            (item.path === '/messages' && (location.pathname.startsWith('/messages') || location.pathname.startsWith('/chat')))
 
           const Icon = item.icon
 
