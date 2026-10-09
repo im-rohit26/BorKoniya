@@ -19,12 +19,15 @@ import {
   Home,
   Search,
   Phone,
+  Pencil,
+  Loader2,
 } from 'lucide-react'
 import { languages } from './LanguageSelectorModal'
 import { useAuth } from '../../context/AuthContext'
 import { useNotificationBadges } from '../../hooks/useNotificationBadges'
 import { AccountSettingsModal } from './AccountSettingsModal'
 import { getDefaultAvatar } from '../../lib/utils'
+import { uploadProfilePhoto } from '../../lib/profileApi'
 import logoImg from '../../assets/logo.jpeg'
 
 interface HeaderProps {
@@ -39,8 +42,31 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, logout, refreshUser } = useAuth()
   const { unreadMessagesCount, pendingInterestsCount } = useNotificationBadges()
+
+  const [isUploadingMobilePhoto, setIsUploadingMobilePhoto] = useState(false)
+  const mobileFileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  const handleMobilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size must be less than 10MB.')
+      return
+    }
+    setIsUploadingMobilePhoto(true)
+    try {
+      await uploadProfilePhoto(file, true, user?.profile_id || undefined)
+      await refreshUser()
+    } catch (err: any) {
+      console.error('Mobile DP upload failed:', err)
+      alert(err.message || 'Failed to update photo. Please try again.')
+    } finally {
+      setIsUploadingMobilePhoto(false)
+      if (mobileFileInputRef.current) mobileFileInputRef.current.value = ''
+    }
+  }
 
   // Prevent background scrolling when mobile menu is open
   useEffect(() => {
@@ -96,15 +122,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
     },
     {
       name: t('nav.myProfile', 'My Profile'),
-      path: '/profile/edit',
+      path: '/myprofile',
       icon: User,
+      iconColor: 'text-slate-800',
+    },
+     {
+      name: t('nav.home', 'Home'),
+      path: '/',
+      icon: Home,
       iconColor: 'text-slate-800',
     },
     {
       name: t('nav.upgradePlan', 'Upgrade Plan'),
       path: '/subscription',
       icon: Sparkles,
-      iconColor: 'text-amber-500',
+      iconColor: 'text-crimson-700',
     },
     {
       name: t('nav.accountSettings', 'Account Settings'),
@@ -146,12 +178,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
     {
       isDivider: true,
     },
-    {
-      name: t('nav.home', 'Home'),
-      path: '/',
-      icon: Home,
-      iconColor: 'text-slate-800',
-    },
+   
     {
       name: t('nav.search', 'Search'),
       path: '/search',
@@ -256,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
                     </Link>
 
                     <Link
-                      to="/profile/edit"
+                      to="/myprofile"
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
                     >
@@ -269,7 +296,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-navy-900 font-medium transition-colors"
                     >
-                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <Sparkles className="w-4 h-4 text-crimson-700" />
                       <span>Upgrade Plan</span>
                     </Link>
 
@@ -375,30 +402,56 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
 
           {/* Scrollable Content Container */}
           <div className="flex-1 overflow-y-auto overscroll-contain">
-            {/* User Profile Gradient Card */}
+            {/* User Profile Gradient Card matching 2 Logo Brand Colors */}
             <div
               className="relative overflow-hidden px-5 py-5 text-white"
               style={{
-                background: 'linear-gradient(115deg, #d31027 0%, #b30c1e 32%, #581c87 75%, #1e1b4b 100%)',
+                background: 'linear-gradient(135deg, #c40d0f 0%, #a80a0c 35%, #003572 80%, #00224d 100%)',
               }}
             >
               {/* Subtle background glow effect */}
-              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-radial from-purple-400/10 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-radial from-navy-300/10 via-transparent to-transparent pointer-events-none" />
               <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none blur-xl" />
 
               <div className="relative z-10 flex items-center gap-4">
-                {/* Profile Photo Avatar */}
-                <div className="w-18 h-18 rounded-full overflow-hidden border-2 border-white ring-2 ring-white/20 shadow-md flex-shrink-0 bg-white/10">
+                {/* Profile Photo Avatar with Edit Icon */}
+                <div className="relative w-18 h-18 rounded-full border-2 border-white ring-2 ring-white/20 shadow-md flex-shrink-0 bg-white/10 group">
                   <img
                     src={user?.photo_url || getDefaultAvatar(user?.gender)}
                     alt={displayName}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-full"
                     onError={(e) => {
                       const target = e.currentTarget
                       const fallback = getDefaultAvatar(user?.gender)
                       if (target.src !== fallback) target.src = fallback
                     }}
                   />
+
+                  {isAuthenticated && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => mobileFileInputRef.current?.click()}
+                        disabled={isUploadingMobilePhoto}
+                        aria-label="Change Profile Photo"
+                        title="Change Profile Photo"
+                        className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-crimson-700 hover:bg-crimson-800 text-white shadow-md border-2 border-white transition-all transform hover:scale-110 active:scale-95 cursor-pointer"
+                      >
+                        {isUploadingMobilePhoto ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Pencil className="w-3 h-3" />
+                        )}
+                      </button>
+                      <input
+                        ref={mobileFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleMobilePhotoUpload}
+                      />
+                    </>
+                  )}
                 </div>
 
                 {/* Profile Info */}

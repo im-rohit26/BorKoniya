@@ -19,6 +19,7 @@ const ProfileDetailPage = lazy(() => import('./pages/ProfileDetailPage').then((m
 const SubscriptionPage = lazy(() => import('./pages/SubscriptionPage').then((m) => ({ default: m.SubscriptionPage })))
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const ProfileWizardPage = lazy(() => import('./pages/ProfileWizardPage').then((m) => ({ default: m.ProfileWizardPage })))
+const MyProfilePage = lazy(() => import('./pages/MyProfilePage').then((m) => ({ default: m.MyProfilePage })))
 const InterestsPage = lazy(() => import('./pages/InterestsPage').then((m) => ({ default: m.InterestsPage })))
 const ShortlistPage = lazy(() => import('./pages/ShortlistPage').then((m) => ({ default: m.ShortlistPage })))
 const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
@@ -94,6 +95,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProfileWizardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/myprofile"
+            element={
+              <ProtectedRoute>
+                <MyProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/me"
+            element={
+              <ProtectedRoute>
+                <MyProfilePage />
               </ProtectedRoute>
             }
           />

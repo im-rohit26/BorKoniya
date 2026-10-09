@@ -94,5 +94,6 @@ class ProfileUpdate(BaseModel):
     is_manglik: Optional[str] = None
     about_me: Optional[str] = None
     profile_for: Optional[str] = None
+    status: Optional[str] = None
     photo_url: Optional[str] = None
     profile_completion_pct: Optional[int] = None

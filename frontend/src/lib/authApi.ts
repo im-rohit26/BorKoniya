@@ -241,8 +241,9 @@ export async function getMyProfile(): Promise<any> {
   return res.json();
 }
 
-export async function updateMyProfile(payload: Record<string, any>): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/profile/me`, {
+export async function updateMyProfile(payload: Record<string, any>, profileId?: string): Promise<any> {
+  const endpoint = profileId ? `${API_BASE_URL}/profile/${profileId}` : `${API_BASE_URL}/profile/me`;
+  const res = await fetch(endpoint, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',

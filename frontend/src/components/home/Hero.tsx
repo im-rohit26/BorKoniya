@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ShieldCheck,
@@ -10,11 +10,15 @@ import {
   LayoutDashboard,
   UserCheck,
   ArrowRight,
+  Pencil,
+  Loader2,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ProfileResponse } from '../../lib/profileApi'
+import { uploadProfilePhoto } from '../../lib/profileApi'
 import type { UserMe } from '../../lib/authApi'
 import { getDefaultAvatar } from '../../lib/utils'
+import { useAuth } from '../../context/AuthContext'
 
 interface HeroProps {
   onStartRegistration: () => void
@@ -36,6 +40,31 @@ export const Hero: React.FC<HeroProps> = ({
   onNavigateProfileWizard,
 }) => {
   const { t } = useTranslation()
+  const { refreshUser } = useAuth()
+  const [isUploadingHomePhoto, setIsUploadingHomePhoto] = useState(false)
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null)
+  const homeFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleHomePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size must be less than 10MB.')
+      return
+    }
+    setIsUploadingHomePhoto(true)
+    try {
+      const uploaded = await uploadProfilePhoto(file, true, myProfile?.id || user?.profile_id || undefined)
+      setCurrentPhotoUrl(uploaded.storage_path)
+      await refreshUser()
+    } catch (err: any) {
+      console.error('Home DP upload failed:', err)
+      alert(err.message || 'Failed to update photo. Please try again.')
+    } finally {
+      setIsUploadingHomePhoto(false)
+      if (homeFileInputRef.current) homeFileInputRef.current.value = ''
+    }
+  }
 
   const hasProfile = !!myProfile || !!user?.profile_id
 
@@ -150,16 +179,41 @@ export const Hero: React.FC<HeroProps> = ({
               {isAuthenticated && (myProfile || user) ? (
                 /* Authenticated Member's Own Profile Card */
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-crimson-50/60 via-white to-navy-50/50 p-6 text-center border border-slate-100">
-                  <div className="mx-auto mb-4 h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-crimson-700 p-1 shadow-xs overflow-hidden">
-                    <img
-                      src={myProfile?.photo_url || user?.photo_url || getDefaultAvatar(myProfile?.gender || user?.gender)}
-                      alt={myProfile?.first_name || user?.first_name || 'Member'}
-                      className="h-full w-full rounded-full object-cover"
-                      onError={(e) => {
-                        const target = e.currentTarget
-                        const fallback = getDefaultAvatar(myProfile?.gender || user?.gender)
-                        if (target.src !== fallback) target.src = fallback
-                      }}
+                  <div className="relative mx-auto mb-4 h-24 w-24 sm:h-28 sm:w-28 group">
+                    <div className="h-full w-full rounded-full border-2 border-crimson-700 p-1 shadow-xs overflow-hidden bg-white">
+                      <img
+                        src={currentPhotoUrl || myProfile?.photo_url || user?.photo_url || getDefaultAvatar(myProfile?.gender || user?.gender)}
+                        alt={myProfile?.first_name || user?.first_name || 'Member'}
+                        className="h-full w-full rounded-full object-cover"
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          const fallback = getDefaultAvatar(myProfile?.gender || user?.gender)
+                          if (target.src !== fallback) target.src = fallback
+                        }}
+                      />
+                    </div>
+
+                    {/* Pencil Edit Icon to Change DP */}
+                    <button
+                      type="button"
+                      onClick={() => homeFileInputRef.current?.click()}
+                      disabled={isUploadingHomePhoto}
+                      aria-label="Change Profile Photo"
+                      title="Change Profile Photo"
+                      className="absolute -bottom-1 -right-1 p-2 rounded-full bg-crimson-700 hover:bg-crimson-800 text-white shadow-md border-2 border-white transition-all transform hover:scale-110 active:scale-95 cursor-pointer z-10"
+                    >
+                      {isUploadingHomePhoto ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Pencil className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <input
+                      ref={homeFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleHomePhotoUpload}
                     />
                   </div>
 
@@ -206,7 +260,7 @@ export const Hero: React.FC<HeroProps> = ({
 
                   <div className="mt-4 flex items-center justify-center gap-3">
                     <Link
-                      to={myProfile?.id ? `/profile/${myProfile.id}` : '/profile/edit'}
+                      to={myProfile?.id ? `/profile/${myProfile.id}` : (user?.profile_id ? `/profile/${user.profile_id}` : '/profile/8d18f513-5f7d-492a-80bd-6f55ebffdab3')}
                       className="inline-flex items-center space-x-1.5 text-xs font-bold text-crimson-700 hover:text-crimson-800"
                     >
                       <span>View Full Profile</span>

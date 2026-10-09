@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
-import { ReportProfileModal } from '../components/safety/ReportProfileModal'
-import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import {
   User,
   Users,
@@ -21,7 +18,6 @@ import {
   MessageSquare,
   Ruler,
   CheckCircle2,
-  CheckCircle,
   Pencil,
   Copy,
   Check,
@@ -31,30 +27,17 @@ import {
   X,
   AlertCircle,
   Lock,
-  ArrowLeft,
   Sparkles,
   ShieldCheck,
-  Bookmark,
-  MessageCircle,
-  Flag,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import {
-  getProfileById,
+  getMyProfile,
   formatHeight,
   uploadProfilePhoto,
   type ProfileResponse,
 } from '../lib/profileApi'
 import { updateMyProfile } from '../lib/authApi'
-import {
-  sendInterest,
-  addToShortlist,
-  removeFromShortlist,
-  getShortlistedIds,
-  getSentInterestIds,
-  getConnectedProfileIds,
-} from '../lib/interactionApi'
-import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import { masterDataApi, type Community } from '../lib/masterDataApi'
 import { getDefaultAvatar } from '../lib/utils'
 
@@ -89,83 +72,48 @@ const LeafWatermark: React.FC<{ className?: string }> = ({ className = '' }) => 
   </svg>
 )
 
-export const ProfileDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+export const MyProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
-  const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
-  const [upgradeFeature, setUpgradeFeature] = useState('Premium Profile Information')
-  const [isPremiumUser, setIsPremiumUser] = useState(false)
-
   const [profile, setProfile] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
-
-  // Visitor interaction state
-  const [interestSent, setInterestSent] = useState(false)
-  const [isShortlisted, setIsShortlisted] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
-
-  // Editing state for Owner view
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Active section edit modal
   type ModalType = 'header' | 'about' | 'education' | 'family' | 'horoscope' | 'contact' | 'lifestyle' | null
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Master Data Options
+  // Master Data Options for Dropdowns
   const [communities, setCommunities] = useState<Community[]>([])
+
+  // Modal Form State
   const [editForm, setEditForm] = useState<Record<string, any>>({})
 
-  // Determine if viewer is the owner of this profile or editing target demo profile
-  const isOwner = Boolean(
-    (user &&
-      profile &&
-      (user.profile_id === profile.id ||
-        user.user_id === profile.user_id ||
-        (user.phone_number && profile.revealed_phone === user.phone_number) ||
-        (user.email && profile.revealed_email === user.email))) ||
-      id === '8d18f513-5f7d-492a-80bd-6f55ebffdab3'
-  )
-
+  // Fetch current user's profile
   useEffect(() => {
-    getSubscriptionStatus()
-      .then((status) => {
-        if (status.is_active) setIsPremiumUser(true)
-      })
-      .catch(() => {})
-
-    const loadProfileData = async () => {
-      if (!id) return
+    const fetchProfile = async () => {
       setLoading(true)
       setError(null)
       try {
-        const [data, shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
-          getProfileById(id),
-          getShortlistedIds().catch((): string[] => []),
-          getSentInterestIds().catch((): string[] => []),
-          getConnectedProfileIds().catch((): string[] => []),
-        ])
-
+        const data = await getMyProfile()
         setProfile(data)
-        setIsShortlisted(shortlistedIds.includes(data.id))
-        setInterestSent(sentInterestIds.includes(data.id))
-        setIsConnected(connectedIds.includes(data.id))
       } catch (err: any) {
-        console.error('Failed to load profile details:', err)
-        setError(err.message || 'Profile could not be loaded.')
+        console.error('Failed to load profile:', err)
+        setError(err.message || 'Failed to load your profile.')
       } finally {
         setLoading(false)
       }
     }
 
-    loadProfileData()
-  }, [id])
+    fetchProfile()
+  }, [])
 
+  // Load master data for modals
   useEffect(() => {
     masterDataApi.getCommunities().then(setCommunities).catch(() => {})
   }, [])
@@ -183,6 +131,7 @@ export const ProfileDetailPage: React.FC = () => {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
+  // Handle Photo Upload directly via pencil icon
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -212,7 +161,7 @@ export const ProfileDetailPage: React.FC = () => {
     }
   }
 
-  // Modal open & close
+  // Open modal and pre-fill current values
   const openModal = (type: ModalType) => {
     if (!profile) return
     setActiveModal(type)
@@ -270,62 +219,18 @@ export const ProfileDetailPage: React.FC = () => {
     }
   }
 
-  // Visitor interaction actions
-  const handleInterest = async () => {
-    if (!profile || interestSent) return
-    try {
-      await sendInterest(profile.id)
-      setInterestSent(true)
-      showToast('success', `Express Interest sent to ${profile.first_name}!`)
-    } catch (err: any) {
-      setInterestSent(true)
-      showToast('success', err.message || `Express Interest sent to ${profile.first_name}!`)
-    }
-  }
-
-  const handleShortlist = async () => {
-    if (!profile) return
-    try {
-      if (isShortlisted) {
-        await removeFromShortlist(profile.id)
-        setIsShortlisted(false)
-        showToast('success', `${profile.first_name} removed from your shortlist.`)
-      } else {
-        await addToShortlist(profile.id)
-        setIsShortlisted(true)
-        showToast('success', `${profile.first_name} added to your shortlist!`)
-      }
-    } catch (err: any) {
-      console.error(err)
-      showToast('error', 'Failed to update shortlist.')
-    }
-  }
-
-  const handleSendMessage = () => {
-    if (!profile) return
-    if (!isPremiumUser) {
-      openUpgradeModal('Unlimited Direct Messaging')
-      return
-    }
-    navigate(`/chat?profileId=${profile.id}`)
-  }
-
-  const openUpgradeModal = (feature: string) => {
-    setUpgradeFeature(feature)
-    setUpgradeModalOpen(true)
-  }
-
-  const displayName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : 'Dhurjoti Ghosh'
+  // Display fields
+  const displayName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : 'Priyanka Pal'
   const displayAge = profile?.age || 28
-  const displayHeight = profile ? formatHeight(profile.height_cm) : "5'5\" (165 cm)"
-  const displayProfileId = profile?.id ? profile.id.slice(0, 9) : '8b1f8e513'
+  const displayHeight = profile ? formatHeight(profile.height_cm) : "5'4\" (163 cm)"
+  const displayProfileId = profile?.id ? profile.id.slice(0, 8) : 'a086cdc5'
   const displayGender = profile?.gender === 'FEMALE' ? 'Female (Bride / কনে)' : 'Male (Groom / পাত্র)'
   const displayLocation = profile?.current_city
     ? `${profile.current_city}, ${profile.current_state}`
     : 'Kolkata, West Bengal'
   const displayPhoto = profile?.photo_url || getDefaultAvatar(profile?.gender)
-  const displayEmail = profile?.revealed_email || profile?.contact_email_masked || (isOwner ? user?.email : '•••••••@gmail.com')
-  const displayPhone = profile?.revealed_phone || profile?.contact_phone_masked || (isOwner ? user?.phone_number : '+91 98••••••10')
+  const displayEmail = profile?.revealed_email || user?.email || 'priyanka.ghosh@demo.com'
+  const displayPhone = profile?.revealed_phone || user?.phone_number || '+91 9876543210'
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 antialiased">
@@ -334,7 +239,7 @@ export const ProfileDetailPage: React.FC = () => {
         onOpenRegister={() => {}}
       />
 
-      {/* Hidden File Input for DP Upload (Active when owner) */}
+      {/* Hidden File Input for DP Upload */}
       <input
         type="file"
         ref={fileInputRef}
@@ -356,40 +261,27 @@ export const ProfileDetailPage: React.FC = () => {
       )}
 
       <main className="flex-1 mx-auto max-w-6xl 2xl:max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
-        {/* Back to Search Results Button */}
-        <div className="mb-6">
-          <button
-            type="button"
-            // onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/search'))}
-            onClick={() => navigate('/search')}
-            className="inline-flex items-center space-x-2 text-xs font-semibold text-navy-800 hover:text-crimson-700 transition-colors group cursor-pointer bg-white px-3.5 py-2 rounded-xl border border-slate-200/90 shadow-2xs hover:border-crimson-200"
-          >
-            <ArrowLeft className="h-4 w-4 text-crimson-700 group-hover:-translate-x-0.5 transition-transform" />
-            <span>Back to Search Results</span>
-          </button>
-        </div>
-
         {loading ? (
           <div className="flex flex-col items-center justify-center p-24 text-slate-500 bg-white rounded-3xl border border-slate-200 shadow-sm">
             <Loader2 className="w-10 h-10 animate-spin text-crimson-700 mb-4" />
             <p className="text-base font-semibold text-navy-950 font-sans">Loading Profile Details...</p>
           </div>
-        ) : error || !profile ? (
+        ) : error ? (
           <div className="rounded-3xl bg-white p-8 text-center border border-crimson-200 shadow-sm max-w-lg mx-auto">
             <AlertCircle className="w-12 h-12 text-crimson-700 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-navy-950 font-sans">Profile Not Found</h3>
-            <p className="text-sm text-slate-600 mt-1">{error || 'The requested profile does not exist or has been removed.'}</p>
-            <Link
-              to="/search"
-              className="inline-block mt-5 px-6 py-2.5 bg-crimson-700 hover:bg-crimson-800 text-white font-semibold rounded-xl text-xs shadow-md transition-colors"
+            <h3 className="text-lg font-bold text-navy-950 font-sans">Failed to load profile</h3>
+            <p className="text-sm text-slate-600 mt-1">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-5 px-6 py-2.5 bg-crimson-700 hover:bg-crimson-800 text-white font-semibold rounded-xl text-xs shadow-md transition-colors"
             >
-              Back to Search
-            </Link>
+              Retry
+            </button>
           </div>
         ) : (
           <>
             {/* ======================================================== */}
-            {/* 1. TOP PROFILE SUMMARY CARD                              */}
+            {/* 1. TOP PROFILE SUMMARY CARD (Exact 2-Color Theme)        */}
             {/* ======================================================== */}
             <section
               aria-label="Profile Header"
@@ -421,19 +313,17 @@ export const ProfileDetailPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* DP Pencil Button (Only visible for Owner) */}
-                  {isOwner && (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingPhoto}
-                      className="absolute -bottom-1 -left-1 sm:bottom-0 sm:left-0 z-20 w-9 h-9 bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white rounded-full flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95 cursor-pointer border-2 border-white"
-                      title="Change Profile Photo"
-                      aria-label="Change Profile Photo"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* DP Pencil Button (Direct Photo Upload) */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    className="absolute -bottom-1 -left-1 sm:bottom-0 sm:left-0 z-20 w-9 h-9 bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white rounded-full flex items-center justify-center shadow-md transition-all hover:scale-110 active:scale-95 cursor-pointer border-2 border-white"
+                    title="Change Profile Photo"
+                    aria-label="Change Profile Photo"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                 </div>
 
                 {/* Profile Header Details */}
@@ -457,18 +347,16 @@ export const ProfileDetailPage: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Header Card Pencil Edit Button (Only visible for Owner) */}
-                    {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => openModal('header')}
-                        className="self-center sm:self-auto p-2.5 rounded-full bg-crimson-50 hover:bg-crimson-100 text-crimson-700 transition-colors shadow-2xs cursor-pointer"
-                        title="Edit Basic Details"
-                        aria-label="Edit Basic Details"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    {/* Header Card Pencil Edit Button */}
+                    <button
+                      type="button"
+                      onClick={() => openModal('header')}
+                      className="self-center sm:self-auto p-2.5 rounded-full bg-crimson-50 hover:bg-crimson-100 text-crimson-700 transition-colors shadow-2xs cursor-pointer"
+                      title="Edit Basic Details"
+                      aria-label="Edit Basic Details"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
 
                   {/* Row 3: Height, Profile ID, Gender */}
@@ -489,13 +377,13 @@ export const ProfileDetailPage: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Row 4: Pills / Tags */}
+                  {/* Row 4: Pills / Tags in Consistent 2-Color Palette */}
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-crimson-50 px-3 py-1 text-xs font-semibold text-crimson-800 border border-crimson-200">
                       <MapPin className="w-3.5 h-3.5 text-crimson-700" />
                       <span>
-                        {profile.community || 'Sadgope'}{' '}
-                        {profile.sub_community ? `(${profile.sub_community})` : ''}
+                        {profile?.community || 'Sadgope'}{' '}
+                        {profile?.sub_community ? `(${profile.sub_community})` : ''}
                       </span>
                     </span>
 
@@ -506,72 +394,15 @@ export const ProfileDetailPage: React.FC = () => {
 
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800 border border-navy-200">
                       <Home className="w-3.5 h-3.5 text-navy-800" />
-                      <span>Native: {profile.native_place || 'Bardhaman'}</span>
+                      <span>Native: {profile?.native_place || 'Bardhaman'}</span>
                     </span>
                   </div>
 
                   {/* Row 5: Header Bio paragraph */}
                   <p className="text-xs sm:text-sm text-slate-600 leading-relaxed pt-1.5 line-clamp-3">
-                    {profile.about_me ||
+                    {profile?.about_me ||
                       'Working as a software engineering professional in Kolkata. Grounded in traditional cultural values while maintaining an open, progressive worldview. In my free time, I enjoy reading literature, exploring heritage sites, and spending quality time with family.'}
                   </p>
-
-                  {/* VISITOR ACTION BUTTONS (Shown strictly when NOT owner) */}
-                  {!isOwner && (
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 pt-3 border-t border-slate-200/60">
-                      {isConnected ? (
-                        <button
-                          disabled
-                          className="min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold bg-navy-50 text-navy-800 border border-navy-300 cursor-default"
-                        >
-                          <CheckCircle className="h-4 w-4 text-navy-800" />
-                          <span>Connected</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleInterest}
-                          disabled={interestSent}
-                          className={`min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                            interestSent
-                              ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
-                              : 'bg-crimson-700 text-white hover:bg-crimson-800 active:bg-crimson-900 shadow-xs'
-                          }`}
-                        >
-                          {interestSent ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-                          <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
-                        </button>
-                      )}
-
-                      <button
-                        onClick={handleShortlist}
-                        className={`min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold border transition-all cursor-pointer ${
-                          isShortlisted
-                            ? 'bg-navy-50 text-navy-800 border-navy-300 shadow-xs'
-                            : 'bg-white text-navy-800 border-navy-200 hover:bg-navy-50 active:bg-navy-100'
-                        }`}
-                      >
-                        <Bookmark className={`h-4 w-4 ${isShortlisted ? 'fill-navy-800 text-navy-800' : 'text-navy-800'}`} />
-                        <span>{isShortlisted ? 'Shortlisted' : 'Shortlist'}</span>
-                      </button>
-
-                      <button
-                        onClick={handleSendMessage}
-                        className="min-h-[40px] flex items-center space-x-2 rounded-xl bg-navy-800 hover:bg-navy-900 active:bg-navy-950 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        <span>Send Message</span>
-                      </button>
-
-                      <button
-                        onClick={() => setReportModalOpen(true)}
-                        className="min-h-[40px] flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                        title="Report Profile"
-                      >
-                        <Flag className="h-3.5 w-3.5" />
-                        <span>Report</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </section>
@@ -591,20 +422,18 @@ export const ProfileDetailPage: React.FC = () => {
                       </div>
                       <h2 className="text-base sm:text-lg font-bold text-navy-950 font-sans">About Me</h2>
                     </div>
-                    {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => openModal('about')}
-                        className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
-                        title="Edit About Me"
-                        aria-label="Edit About Me"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openModal('about')}
+                      className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
+                      title="Edit About Me"
+                      aria-label="Edit About Me"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
                   <p className="mt-4 text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                    {profile.about_me ||
+                    {profile?.about_me ||
                       'Working as a software engineering professional in Kolkata. Grounded in traditional cultural values while maintaining an open, progressive worldview. In my free time, I enjoy reading literature, exploring heritage sites, and spending quality time with family.'}
                   </p>
                 </div>
@@ -620,17 +449,15 @@ export const ProfileDetailPage: React.FC = () => {
                         Education & Career
                       </h2>
                     </div>
-                    {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => openModal('education')}
-                        className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
-                        title="Edit Education & Career"
-                        aria-label="Edit Education & Career"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openModal('education')}
+                      className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
+                      title="Edit Education & Career"
+                      aria-label="Edit Education & Career"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
@@ -644,7 +471,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Highest Qualification
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile.highest_qualification || "Bachelor's Degree"}
+                          {profile?.highest_qualification || "Bachelor's Degree"}
                         </span>
                       </div>
                     </div>
@@ -659,7 +486,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Occupation
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile.occupation || 'Senior Software Engineer'}
+                          {profile?.occupation || 'Senior Software Engineer'}
                         </span>
                       </div>
                     </div>
@@ -674,7 +501,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Organization / Company
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile.company_name || 'Tata Consultancy Services'}
+                          {profile?.company_name || 'Tata Consultancy Services'}
                         </span>
                       </div>
                     </div>
@@ -707,17 +534,15 @@ export const ProfileDetailPage: React.FC = () => {
                         Family Background
                       </h2>
                     </div>
-                    {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => openModal('family')}
-                        className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
-                        title="Edit Family Background"
-                        aria-label="Edit Family Background"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openModal('family')}
+                      className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
+                      title="Edit Family Background"
+                      aria-label="Edit Family Background"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
@@ -731,7 +556,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Community
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile.community || 'Sadgope'}
+                          {profile?.community || 'Sadgope'}
                         </span>
                       </div>
                     </div>
@@ -746,7 +571,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Sub-Community
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile.sub_community || 'Kulin Sadgope'}
+                          {profile?.sub_community || 'Kulin Sadgope'}
                         </span>
                       </div>
                     </div>
@@ -761,7 +586,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Native Place
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile.native_place || 'Bardhaman'}
+                          {profile?.native_place || 'Bardhaman'}
                         </span>
                       </div>
                     </div>
@@ -794,17 +619,15 @@ export const ProfileDetailPage: React.FC = () => {
                         Horoscope & Astrology Details
                       </h2>
                     </div>
-                    {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => openModal('horoscope')}
-                        className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
-                        title="Edit Horoscope Details"
-                        aria-label="Edit Horoscope Details"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openModal('horoscope')}
+                      className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
+                      title="Edit Horoscope Details"
+                      aria-label="Edit Horoscope Details"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
@@ -818,7 +641,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Rashi (Moon Sign)
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {(profile as any).rashi || 'Tula (Libra)'}
+                          {(profile as any)?.rashi || 'Tula (Libra)'}
                         </span>
                       </div>
                     </div>
@@ -833,7 +656,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Nakshatra
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {(profile as any).nakshatra || 'Swati'}
+                          {(profile as any)?.nakshatra || 'Swati'}
                         </span>
                       </div>
                     </div>
@@ -848,7 +671,7 @@ export const ProfileDetailPage: React.FC = () => {
                           Manglik Status
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {(profile as any).is_manglik === 'YES' ? 'Manglik' : (profile as any).is_manglik === 'NO' ? 'Non-Manglik' : 'Not Known'}
+                          {(profile as any)?.is_manglik === 'YES' ? 'Manglik' : (profile as any)?.is_manglik === 'NO' ? 'Non-Manglik' : 'Not Known'}
                         </span>
                       </div>
                     </div>
@@ -856,7 +679,7 @@ export const ProfileDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* RIGHT COLUMN: Contact Information & Photo Promo / Visitor Warning */}
+              {/* RIGHT COLUMN: Contact Information & Add Profile Photo Promo */}
               <div className="lg:col-span-5 xl:col-span-5 space-y-6">
                 {/* ------------- CONTACT INFORMATION CARD ------------- */}
                 <div className="rounded-2xl bg-white p-5 sm:p-6 shadow-2xs border border-slate-200/90 transition-shadow hover:shadow-sm">
@@ -870,173 +693,140 @@ export const ProfileDetailPage: React.FC = () => {
                       </h2>
                     </div>
                     {/* Pencil Edit Icon for Contact Information (Address editable) */}
-                    {isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => openModal('contact')}
+                      className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
+                      title="Edit Address Details"
+                      aria-label="Edit Address Details"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="mt-5 space-y-4">
+                    {/* Row 1: Email (Read-Only) */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0">
+                          <Mail className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="block text-[11px] font-semibold text-navy-800">
+                            Email
+                          </span>
+                          <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                            {displayEmail}
+                          </span>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => openModal('contact')}
-                        className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
-                        title="Edit Address Details"
-                        aria-label="Edit Address Details"
+                        onClick={() => handleCopy(displayEmail, 'Email')}
+                        className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
+                        title="Copy Email"
+                        aria-label="Copy Email"
+                      >
+                        {copiedField === 'Email' ? (
+                          <Check className="w-4 h-4 text-crimson-700" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Row 2: Family Phone (Read-Only) */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0">
+                          <Phone className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="block text-[11px] font-medium text-slate-400">
+                            Family Phone
+                          </span>
+                          <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                            {displayPhone}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(displayPhone, 'Phone')}
+                        className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
+                        title="Copy Phone"
+                        aria-label="Copy Phone"
+                      >
+                        {copiedField === 'Phone' ? (
+                          <Check className="w-4 h-4 text-crimson-700" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Row 3: Address (Editable via pencil!) */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-crimson-50 text-crimson-700 flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="block text-[11px] font-medium text-slate-400">
+                            Address
+                          </span>
+                          <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                            Family Address: {displayLocation}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(`Family Address: ${displayLocation}`, 'Address')}
+                        className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
+                        title="Copy Address"
+                        aria-label="Copy Address"
+                      >
+                        {copiedField === 'Address' ? (
+                          <Check className="w-4 h-4 text-crimson-700" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* PHOTO PROMO BANNER (Exact 2-Color Design) */}
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy-50 to-slate-50 border border-navy-100 p-4 flex items-center justify-between shadow-2xs mt-4">
+                      {/* Leaf Watermark */}
+                      <LeafWatermark className="absolute -bottom-4 -right-4 w-32 h-32 text-navy-800/10" />
+
+                      <div className="relative z-10 flex items-center space-x-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-navy-100 text-navy-800 flex items-center justify-center flex-shrink-0">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-xs sm:text-sm font-bold text-navy-950 font-sans">
+                            You can add your profile photo
+                          </h3>
+                          <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
+                            Make your profile more personal and help others know you better.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Pencil Button for Photo Upload */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingPhoto}
+                        className="relative z-10 w-9 h-9 rounded-xl bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 flex-shrink-0 ml-3 cursor-pointer"
+                        title="Upload Profile Photo"
+                        aria-label="Upload Profile Photo"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
                   </div>
-
-                  {isOwner || isPremiumUser ? (
-                    <div className="mt-5 space-y-4">
-                      {/* Row 1: Email (Read-Only) */}
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-                        <div className="flex items-center space-x-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0">
-                            <Mail className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-semibold text-navy-800">
-                              Email
-                            </span>
-                            <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                              {displayEmail}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(displayEmail || '', 'Email')}
-                          className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
-                          title="Copy Email"
-                          aria-label="Copy Email"
-                        >
-                          {copiedField === 'Email' ? (
-                            <Check className="w-4 h-4 text-crimson-700" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Row 2: Family Phone (Read-Only) */}
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-                        <div className="flex items-center space-x-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0">
-                            <Phone className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-medium text-slate-400">
-                              Family Phone
-                            </span>
-                            <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                              {displayPhone}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(displayPhone || '', 'Phone')}
-                          className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
-                          title="Copy Phone"
-                          aria-label="Copy Phone"
-                        >
-                          {copiedField === 'Phone' ? (
-                            <Check className="w-4 h-4 text-crimson-700" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Row 3: Address (Editable via pencil!) */}
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
-                        <div className="flex items-center space-x-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-crimson-50 text-crimson-700 flex items-center justify-center flex-shrink-0">
-                            <MapPin className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-medium text-slate-400">
-                              Address
-                            </span>
-                            <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
-                              Family Address: {displayLocation}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(`Family Address: ${displayLocation}`, 'Address')}
-                          className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
-                          title="Copy Address"
-                          aria-label="Copy Address"
-                        >
-                          {copiedField === 'Address' ? (
-                            <Check className="w-4 h-4 text-crimson-700" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* PHOTO PROMO BANNER (Only when Owner) */}
-                      {isOwner && (
-                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy-50 to-slate-50 border border-navy-100 p-4 flex items-center justify-between shadow-2xs mt-4">
-                          <LeafWatermark className="absolute -bottom-4 -right-4 w-32 h-32 text-navy-800/10" />
-
-                          <div className="relative z-10 flex items-center space-x-3 min-w-0">
-                            <div className="w-10 h-10 rounded-full bg-navy-100 text-navy-800 flex items-center justify-center flex-shrink-0">
-                              <User className="w-5 h-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <h3 className="text-xs sm:text-sm font-bold text-navy-950 font-sans">
-                                You can add your profile photo
-                              </h3>
-                              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
-                                Make your profile more personal and help others know you better.
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploadingPhoto}
-                            className="relative z-10 w-9 h-9 rounded-xl bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 flex-shrink-0 ml-3 cursor-pointer"
-                            title="Upload Profile Photo"
-                            aria-label="Upload Profile Photo"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* VISITOR PROTECTED CONTACT DETAILS */
-                    <div className="mt-5 space-y-4">
-                      <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 text-center">
-                        <Lock className="w-8 h-8 text-crimson-700 mx-auto mb-2" />
-                        <h4 className="text-xs font-bold text-navy-950 mb-1">Protected Contact Details</h4>
-                        <p className="text-[11px] text-slate-600 mb-3">
-                          Direct phone numbers and verified emails are hidden to maintain family privacy.
-                        </p>
-                        <button
-                          onClick={() => openUpgradeModal('Direct Contact Numbers')}
-                          className="w-full py-2.5 px-4 rounded-xl bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center space-x-1.5"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>Upgrade to View Verified Contacts</span>
-                        </button>
-                      </div>
-
-                      {/* Trust Advice */}
-                      <div className="rounded-xl bg-navy-50/70 p-3.5 border border-navy-100 text-xs text-navy-950">
-                        <h5 className="font-bold mb-1 flex items-center space-x-1.5 text-navy-900">
-                          <ShieldCheck className="h-4 w-4 text-crimson-700" />
-                          <span>Trust & Safety Advice</span>
-                        </h5>
-                        <p className="text-[11px] text-slate-600 leading-relaxed">
-                          Always communicate via BorKoniya in-app chat first. Never transfer funds or disclose banking OTPs to anyone.
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -1057,17 +847,16 @@ export const ProfileDetailPage: React.FC = () => {
                     Personal Details & Lifestyle
                   </h2>
                 </div>
-                {isOwner && (
-                  <button
-                    type="button"
-                    onClick={() => openModal('lifestyle')}
-                    className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
-                    title="Edit Personal Details & Lifestyle"
-                    aria-label="Edit Personal Details & Lifestyle"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                )}
+                {/* Pencil Edit Icon for Personal Details & Lifestyle */}
+                <button
+                  type="button"
+                  onClick={() => openModal('lifestyle')}
+                  className="p-2 text-crimson-700 hover:text-crimson-800 hover:bg-crimson-50 rounded-full transition-colors cursor-pointer"
+                  title="Edit Personal Details & Lifestyle"
+                  aria-label="Edit Personal Details & Lifestyle"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
               </div>
 
               {/* 6 Grid Items horizontally aligned in consistent 2-Color Palette */}
@@ -1080,7 +869,7 @@ export const ProfileDetailPage: React.FC = () => {
                   <div className="min-w-0">
                     <span className="block text-[11px] font-medium text-slate-400">Diet</span>
                     <span className="block text-xs font-bold text-slate-800 uppercase tracking-tight truncate">
-                      {profile.diet || 'NON_VEGETARIAN'}
+                      {profile?.diet || 'NON_VEGETARIAN'}
                     </span>
                   </div>
                 </div>
@@ -1093,7 +882,7 @@ export const ProfileDetailPage: React.FC = () => {
                   <div className="min-w-0">
                     <span className="block text-[11px] font-medium text-slate-400">Marital Status</span>
                     <span className="block text-xs font-bold text-slate-800 uppercase tracking-tight truncate">
-                      {(profile.marital_status || 'NEVER_MARRIED').replace('_', ' ')}
+                      {(profile?.marital_status || 'NEVER_MARRIED').replace('_', ' ')}
                     </span>
                   </div>
                 </div>
@@ -1106,7 +895,7 @@ export const ProfileDetailPage: React.FC = () => {
                   <div className="min-w-0">
                     <span className="block text-[11px] font-medium text-slate-400">Mother Tongue</span>
                     <span className="block text-xs font-bold text-slate-800 truncate">
-                      {profile.mother_tongue || 'Bengali'}
+                      {profile?.mother_tongue || 'Bengali'}
                     </span>
                   </div>
                 </div>
@@ -1132,7 +921,7 @@ export const ProfileDetailPage: React.FC = () => {
                   <div className="min-w-0">
                     <span className="block text-[11px] font-medium text-slate-400">Profile Managed By</span>
                     <span className="block text-xs font-bold text-slate-800 uppercase tracking-tight truncate">
-                      {(profile.profile_for || 'MYSELF').toUpperCase()}
+                      {(profile?.profile_for || 'MYSELF').toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -1145,7 +934,7 @@ export const ProfileDetailPage: React.FC = () => {
                   <div className="min-w-0">
                     <span className="block text-[11px] font-medium text-slate-400">Status</span>
                     <span className="block text-xs font-bold text-crimson-700 uppercase tracking-tight truncate">
-                      {(profile.status || 'ACTIVE').toUpperCase()}
+                      {(profile?.status || 'ACTIVE').toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -1160,25 +949,8 @@ export const ProfileDetailPage: React.FC = () => {
       {/* Language Selector Modal */}
       <LanguageSelectorModal isOpen={langModalOpen} onClose={() => setLangModalOpen(false)} />
 
-      {/* Report Profile Modal (Visitor Mode) */}
-      {reportModalOpen && profile && (
-        <ReportProfileModal
-          isOpen={reportModalOpen}
-          onClose={() => setReportModalOpen(false)}
-          profileId={profile.id}
-          profileName={displayName}
-        />
-      )}
-
-      {/* Upgrade to Prime Modal */}
-      <UpgradeToPrimeModal
-        isOpen={upgradeModalOpen}
-        onClose={() => setUpgradeModalOpen(false)}
-        featureName={upgradeFeature}
-      />
-
       {/* ======================================================== */}
-      {/* 4. EDIT SECTION MODALS (For Owner)                       */}
+      {/* 4. EDIT SECTION MODALS                                  */}
       {/* ======================================================== */}
       {activeModal && (
         <div

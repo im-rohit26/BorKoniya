@@ -272,13 +272,16 @@ export async function getMyProfile(): Promise<ProfileResponse> {
   return res.json();
 }
 
-export async function uploadProfilePhoto(file: File, isPrimary = false): Promise<PhotoItem> {
+export async function uploadProfilePhoto(file: File, isPrimary = false, profileId?: string): Promise<PhotoItem> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('is_primary', String(isPrimary));
 
   const authHeaders = getAuthHeaders();
-  const res = await fetch(`${API_BASE_URL}/profile/me/photos/upload`, {
+  const endpoint = profileId
+    ? `${API_BASE_URL}/profile/${profileId}/photos/upload`
+    : `${API_BASE_URL}/profile/me/photos/upload`;
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       ...(authHeaders.Authorization ? { Authorization: authHeaders.Authorization } : {}),
