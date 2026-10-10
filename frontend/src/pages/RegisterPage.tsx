@@ -43,7 +43,6 @@ export const RegisterPage: React.FC = () => {
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [profileForOptions, setProfileForOptions] = useState<any[]>([]);
@@ -93,12 +92,7 @@ export const RegisterPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const res = await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail });
-      if (res.demo_otp) {
-        setDemoOtp(res.demo_otp);
-      } else {
-        setDemoOtp(null);
-      }
+      await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail });
       setStep('otp_verification');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to send verification OTP. Please try again.');
@@ -467,12 +461,6 @@ export const RegisterPage: React.FC = () => {
                     {formData.phone ? ` and +91 ${formData.phone}` : ''}
                   </p>
 
-                  {demoOtp && (
-                    <div className="mt-3 inline-block rounded-lg bg-crimson-50 px-3 py-1.5 text-xs text-crimson-900 border border-crimson-200">
-                      Demo Verification Code:{' '}
-                      <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex justify-center items-center gap-1.5 sm:gap-2.5 py-2">

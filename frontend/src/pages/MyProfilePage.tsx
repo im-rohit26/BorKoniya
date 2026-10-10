@@ -166,27 +166,27 @@ export const MyProfilePage: React.FC = () => {
       first_name: profile.first_name || '',
       last_name: profile.last_name || '',
       gender: profile.gender || 'MALE',
-      date_of_birth: profile.date_of_birth ? String(profile.date_of_birth).split('T')[0] : '1998-05-14',
-      height_cm: profile.height_cm || 165,
+      date_of_birth: profile.date_of_birth ? String(profile.date_of_birth).split('T')[0] : '',
+      height_cm: profile.height_cm || '',
       profile_for: profile.profile_for || 'MYSELF',
       about_me: profile.about_me || '',
-      highest_qualification: profile.highest_qualification || "Bachelor's Degree",
-      occupation: profile.occupation || 'Senior Software Engineer',
-      company_name: profile.company_name || 'Tata Consultancy Services',
-      annual_income: profile.annual_income || '₹15 – 25 Lakhs',
-      community: profile.community || 'Sadgope',
-      sub_community: profile.sub_community || 'Kulin Sadgope',
-      native_place: profile.native_place || 'Bardhaman',
-      current_city: profile.current_city || 'Kolkata',
-      current_state: profile.current_state || 'West Bengal',
-      diet: profile.diet || 'NON_VEGETARIAN',
-      marital_status: profile.marital_status || 'NEVER_MARRIED',
+      highest_qualification: profile.highest_qualification || '',
+      occupation: profile.occupation || '',
+      company_name: profile.company_name || '',
+      annual_income: profile.annual_income || '',
+      community: profile.community || '',
+      sub_community: profile.sub_community || '',
+      native_place: profile.native_place || '',
+      current_city: profile.current_city || '',
+      current_state: profile.current_state || '',
+      diet: profile.diet || '',
+      marital_status: profile.marital_status || '',
       mother_tongue: profile.mother_tongue || 'Bengali',
       status: profile.status || 'ACTIVE',
       smoking: (profile as any).smoking || 'NO',
       drinking: (profile as any).drinking || 'NO',
-      rashi: (profile as any).rashi || 'Tula (Libra)',
-      nakshatra: (profile as any).nakshatra || 'Swati',
+      rashi: (profile as any).rashi || '',
+      nakshatra: (profile as any).nakshatra || '',
       is_manglik: (profile as any).is_manglik || 'NO',
     })
   }
@@ -220,17 +220,17 @@ export const MyProfilePage: React.FC = () => {
   }
 
   // Display fields
-  const displayName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : 'Priyanka Pal'
-  const displayAge = profile?.age || 28
-  const displayHeight = profile ? formatHeight(profile.height_cm) : "5'4\" (163 cm)"
-  const displayProfileId = profile?.id ? profile.id.slice(0, 8) : 'a086cdc5'
-  const displayGender = profile?.gender === 'FEMALE' ? 'Female (Bride / কনে)' : 'Male (Groom / পাত্র)'
+  const displayName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : (user?.phone_number || 'My Profile')
+  const displayAge = profile?.age ? `${profile.age} yrs` : 'Not specified'
+  const displayHeight = profile?.height_cm ? formatHeight(profile.height_cm) : 'Not specified'
+  const displayProfileId = profile?.id ? profile.id.slice(0, 8).toUpperCase() : ''
+  const displayGender = profile?.gender === 'FEMALE' ? 'Female (Bride / কনে)' : (profile?.gender === 'MALE' ? 'Male (Groom / পাত্র)' : 'Not specified')
   const displayLocation = profile?.current_city
-    ? `${profile.current_city}, ${profile.current_state}`
-    : 'Kolkata, West Bengal'
+    ? `${profile.current_city}${profile.current_state ? `, ${profile.current_state}` : ''}`
+    : 'Not specified'
   const displayPhoto = profile?.photo_url || getDefaultAvatar(profile?.gender)
-  const displayEmail = profile?.revealed_email || user?.email || 'priyanka.ghosh@demo.com'
-  const displayPhone = profile?.revealed_phone || user?.phone_number || '+91 9876543210'
+  const displayEmail = profile?.revealed_email || user?.email || 'Not specified'
+  const displayPhone = profile?.revealed_phone || user?.phone_number || 'Not specified'
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 antialiased">
@@ -379,7 +379,7 @@ export const MyProfilePage: React.FC = () => {
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-crimson-50 px-3 py-1 text-xs font-semibold text-crimson-800 border border-crimson-200">
                       <MapPin className="w-3.5 h-3.5 text-crimson-700" />
                       <span>
-                        {profile?.community || 'Sadgope'}{' '}
+                        {profile?.community || 'Not specified'}{' '}
                         {profile?.sub_community ? `(${profile.sub_community})` : ''}
                       </span>
                     </span>
@@ -391,14 +391,13 @@ export const MyProfilePage: React.FC = () => {
 
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800 border border-navy-200">
                       <Home className="w-3.5 h-3.5 text-navy-800" />
-                      <span>Native: {profile?.native_place || 'Bardhaman'}</span>
+                      <span>Native: {profile?.native_place || 'Not specified'}</span>
                     </span>
                   </div>
 
                   {/* Row 5: Header Bio paragraph */}
                   <p className="text-xs sm:text-sm text-slate-600 leading-relaxed pt-1.5 line-clamp-3">
-                    {profile?.about_me ||
-                      'Working as a software engineering professional in Kolkata. Grounded in traditional cultural values while maintaining an open, progressive worldview. In my free time, I enjoy reading literature, exploring heritage sites, and spending quality time with family.'}
+                    {profile?.about_me || 'No description provided yet.'}
                   </p>
                 </div>
               </div>
@@ -430,8 +429,7 @@ export const MyProfilePage: React.FC = () => {
                     </button>
                   </div>
                   <p className="mt-4 text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                    {profile?.about_me ||
-                      'Working as a software engineering professional in Kolkata. Grounded in traditional cultural values while maintaining an open, progressive worldview. In my free time, I enjoy reading literature, exploring heritage sites, and spending quality time with family.'}
+                    {profile?.about_me || 'No description provided yet.'}
                   </p>
                 </div>
 
@@ -468,7 +466,7 @@ export const MyProfilePage: React.FC = () => {
                           Highest Qualification
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile?.highest_qualification || "Bachelor's Degree"}
+                          {profile?.highest_qualification || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -483,7 +481,7 @@ export const MyProfilePage: React.FC = () => {
                           Occupation
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile?.occupation || 'Senior Software Engineer'}
+                          {profile?.occupation || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -498,7 +496,7 @@ export const MyProfilePage: React.FC = () => {
                           Organization / Company
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile?.company_name || 'Tata Consultancy Services'}
+                          {profile?.company_name || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -553,7 +551,7 @@ export const MyProfilePage: React.FC = () => {
                           Community
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile?.community || 'Sadgope'}
+                          {profile?.community || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -568,7 +566,7 @@ export const MyProfilePage: React.FC = () => {
                           Sub-Community
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile?.sub_community || 'Kulin Sadgope'}
+                          {profile?.sub_community || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -583,7 +581,7 @@ export const MyProfilePage: React.FC = () => {
                           Native Place
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {profile?.native_place || 'Bardhaman'}
+                          {profile?.native_place || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -638,7 +636,7 @@ export const MyProfilePage: React.FC = () => {
                           Rashi (Moon Sign)
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {(profile as any)?.rashi || 'Tula (Libra)'}
+                          {(profile as any)?.rashi || 'Not specified'}
                         </span>
                       </div>
                     </div>
@@ -653,7 +651,7 @@ export const MyProfilePage: React.FC = () => {
                           Nakshatra
                         </span>
                         <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                          {(profile as any)?.nakshatra || 'Swati'}
+                          {(profile as any)?.nakshatra || 'Not specified'}
                         </span>
                       </div>
                     </div>

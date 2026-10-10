@@ -18,7 +18,6 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -46,10 +45,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     setResendSuccess(null);
 
     try {
-      const res = await forgotPassword(phoneOrEmail.trim());
-      if (res.demo_otp) {
-        setDemoOtp(res.demo_otp);
-      }
+      await forgotPassword(phoneOrEmail.trim());
       setResendCooldown(60);
       setStep('verify_and_reset');
     } catch (err: any) {
@@ -65,10 +61,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     setErrorMessage(null);
     setResendSuccess(null);
     try {
-      const res = await forgotPassword(phoneOrEmail.trim());
-      if (res.demo_otp) {
-        setDemoOtp(res.demo_otp);
-      }
+      await forgotPassword(phoneOrEmail.trim());
       setResendCooldown(60);
       setResendSuccess('New verification code sent successfully.');
       setOtpCode('');
@@ -175,12 +168,6 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
               <p className="text-xs text-slate-500 mt-1">
                 Verification code sent for <span className="font-semibold text-slate-800 break-all">{phoneOrEmail}</span>
               </p>
-
-              {demoOtp && (
-                <div className="mt-2 inline-block rounded-lg bg-crimson-50 px-3 py-1 text-xs text-crimson-900 border border-crimson-200">
-                  Demo Code: <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
-                </div>
-              )}
             </div>
 
             {errorMessage && (

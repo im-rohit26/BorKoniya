@@ -171,15 +171,15 @@ def format_profile_response(
         photo_url = primary_photo.storage_path
 
     # Mask contact information unless authorized (owner or active premium member)
-    phone_raw = user.phone_number if user else "+919876543210"
-    email_raw = user.email if (user and user.email) else "candidate@borkonya.com"
+    phone_raw = user.phone_number if user else ""
+    email_raw = user.email if (user and user.email) else ""
 
     if len(phone_raw) >= 10:
         masked_phone = phone_raw[:3] + "••••••" + phone_raw[-2:]
     else:
-        masked_phone = "+91 98••••••10"
+        masked_phone = "••••••••••"
 
-    masked_email = f"{email_raw[:2]}••••••@{email_raw.split('@')[-1]}" if "@" in email_raw else "c••••@borkonya.com"
+    masked_email = f"{email_raw[:2]}••••••@{email_raw.split('@')[-1]}" if "@" in email_raw else "••••••@•••••.com"
 
     can_view_contact = is_owner or is_premium
     completion_pct = profile.profile_completion_pct or calculate_profile_completion(profile)

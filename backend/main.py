@@ -53,8 +53,8 @@ def init_db_and_seed():
 
         db.commit()
 
-        # Seed demo interactions only if not already seeded
-        if "profiles" in existing_tables:
+        # Seed demo interactions only in development mode if explicitly enabled
+        if settings.ENVIRONMENT == "development" and settings.DEBUG and "profiles" in existing_tables:
             debjit = db.query(Profile).filter(Profile.first_name == "Debjit").first()
             if not debjit:
                 seed_interactions_and_more_profiles()

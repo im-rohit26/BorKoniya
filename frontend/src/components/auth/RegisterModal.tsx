@@ -45,7 +45,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
 
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [demoOtp, setDemoOtp] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
   const [resendSuccess, setResendSuccess] = useState<string | null>(null)
@@ -103,12 +102,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     setIsSubmitting(true)
 
     try {
-      const res = await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail })
-      if (res.demo_otp) {
-        setDemoOtp(res.demo_otp)
-      } else {
-        setDemoOtp(null)
-      }
+      await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail })
       setResendCooldown(60)
       setStep('otp_verification')
     } catch (err: any) {
@@ -127,12 +121,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     setIsSubmitting(true)
 
     try {
-      const res = await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail })
-      if (res.demo_otp) {
-        setDemoOtp(res.demo_otp)
-      } else {
-        setDemoOtp(null)
-      }
+      await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail })
       setResendCooldown(60)
       setResendSuccess('New verification code sent successfully to your email.')
       setOtp(['', '', '', '', '', ''])
@@ -473,11 +462,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                 {formData.phone ? ` and +91 ${formData.phone}` : ''}
               </p>
 
-              {demoOtp && (
-                <div className="mt-3 inline-block rounded-lg bg-crimson-50 px-3 py-1.5 text-xs text-crimson-900 border border-crimson-200">
-                  Demo Code: <span className="font-mono font-bold text-crimson-700">{demoOtp}</span>
-                </div>
-              )}
             </div>
 
             {errorMessage && (

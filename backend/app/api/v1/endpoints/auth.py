@@ -123,7 +123,7 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
         db.add(new_otp)
     db.commit()
 
-    is_dev = settings.DEBUG or settings.ENVIRONMENT == "development"
+    is_dev = settings.DEBUG and settings.ENVIRONMENT == "development"
     return SendOtpResponse(
         message="Verification code sent successfully." + (" Check your email inbox and spam folder." if clean_email else ""),
         phone_number=clean_phone,
@@ -446,7 +446,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     db.add(new_otp)
     db.commit()
 
-    is_dev = settings.DEBUG or settings.ENVIRONMENT == "development"
+    is_dev = settings.DEBUG and settings.ENVIRONMENT == "development"
     res = {
         "status": "OTP_SENT",
         "message": "If an account exists with this mobile number or email, a verification code has been sent.",

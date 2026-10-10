@@ -43,55 +43,54 @@ export const ProfileWizardPage: React.FC = () => {
   const [formData, setFormData] = useState({
     // Step 1: Basic
     profileFor: 'MYSELF',
-    firstName: 'Priyanka',
-    lastName: 'Ghosh',
-    gender: 'FEMALE',
-    dob: '1998-05-14',
-    heightCm: '163',
+    firstName: '',
+    lastName: '',
+    gender: 'MALE',
+    dob: '',
+    heightCm: '',
     maritalStatus: 'NEVER_MARRIED',
     hasChildren: 'NO',
     motherTongue: 'Bengali',
 
     // Step 2: Community
-    community: 'Sadgope',
-    subCommunity: 'Kulin Sadgope',
-    nativePlace: 'Bardhaman',
-    familyOriginState: 'West Bengal',
-    currentState: 'West Bengal',
-    currentCity: 'Kolkata',
-    gotra: 'Kashyapa',
+    community: '',
+    subCommunity: '',
+    nativePlace: '',
+    familyOriginState: '',
+    currentState: '',
+    currentCity: '',
+    gotra: '',
 
     // Step 3: Education & Career
-    highestQualification: 'M.Tech in Computer Science',
-    college: 'Jadavpur University',
-    occupation: 'Senior Software Engineer',
-    company: 'Tata Consultancy Services',
-    annualIncome: '₹15 – 25 Lakhs',
-    workLocation: 'Kolkata',
+    highestQualification: '',
+    college: '',
+    occupation: '',
+    company: '',
+    annualIncome: '',
+    workLocation: '',
 
     // Step 4: Family
-    fatherOccupation: 'Retired Government Officer',
-    motherOccupation: 'Homemaker',
-    brothersCount: '1',
+    fatherOccupation: '',
+    motherOccupation: '',
+    brothersCount: '0',
     sistersCount: '0',
     familyType: 'NUCLEAR',
     familyValues: 'TRADITIONAL',
-    familyLocation: 'Bardhaman, West Bengal',
+    familyLocation: '',
 
     // Step 5: Lifestyle & Bio
     diet: 'NON_VEGETARIAN',
     smoking: 'NO',
     drinking: 'NO',
-    hobbies: ['Classical Music', 'Traveling', 'Bengali Literature', 'Cooking'],
-    aboutMe:
-      'Working as a software engineering professional in Kolkata. Grounded in traditional cultural values while maintaining an open, progressive worldview. In my free time, I enjoy reading literature, exploring heritage sites, and spending quality time with family.',
+    hobbies: [] as string[],
+    aboutMe: '',
 
     // Step 6: Horoscope (Optional)
-    includeHoroscope: true,
-    timeOfBirth: '06:45',
-    placeOfBirth: 'Bardhaman',
-    rashi: 'Tula (Libra)',
-    nakshatra: 'Swati',
+    includeHoroscope: false,
+    timeOfBirth: '',
+    placeOfBirth: '',
+    rashi: '',
+    nakshatra: '',
     isManglik: 'NO',
 
     // Step 7: Privacy & Photos
@@ -255,25 +254,7 @@ export const ProfileWizardPage: React.FC = () => {
     })
   }
 
-  const handleAddSamplePhoto = () => {
-    if (photos.length >= 5) {
-      setPhotoError('Maximum of 5 photos reached.')
-      return
-    }
-    const samples = [
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600',
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=600',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600',
-    ]
-    const next = samples[photos.length % samples.length]
-    setPhotos((prev) => [
-      ...prev,
-      {
-        url: next,
-        isPrimary: prev.length === 0,
-      },
-    ])
-  }
+
 
   useEffect(() => {
     getMyPhotos()
@@ -1168,16 +1149,7 @@ export const ProfileWizardPage: React.FC = () => {
                       <span>{isUploadingPhoto ? 'Uploading Photo...' : 'Upload Photo from Device'}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleAddSamplePhoto}
-                      disabled={photos.length >= 5}
-                      className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                      title="Add a sample photo for demo"
-                    >
-                      <Sparkles className="h-3 w-3 text-amber-600" />
-                      <span>Use Demo Sample</span>
-                    </button>
+
                   </div>
                 </div>
 

@@ -166,20 +166,6 @@ export const LoginPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Demo Credentials Tip */}
-              <div className="rounded-xl bg-navy-50/70 p-2.5 border border-navy-200/80 text-[11px] text-navy-950 flex items-center justify-between">
-                <span>Demo: <span className="font-semibold">9876543210</span> / <span className="font-semibold">borkonya123</span></span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhoneOrEmail('9876543210');
-                    setPassword('borkonya123');
-                  }}
-                  className="font-bold text-crimson-700 hover:underline"
-                >
-                  Auto-fill
-                </button>
-              </div>
 
               {/* Submit CTA */}
               <button

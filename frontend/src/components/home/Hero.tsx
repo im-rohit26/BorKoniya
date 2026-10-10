@@ -260,7 +260,7 @@ export const Hero: React.FC<HeroProps> = ({
 
                   <div className="mt-4 flex items-center justify-center gap-3">
                     <Link
-                      to={myProfile?.id ? `/profile/${myProfile.id}` : (user?.profile_id ? `/profile/${user.profile_id}` : '/profile/8d18f513-5f7d-492a-80bd-6f55ebffdab3')}
+                      to={myProfile?.id ? `/profile/${myProfile.id}` : (user?.profile_id ? `/profile/${user.profile_id}` : '/myprofile')}
                       className="inline-flex items-center space-x-1.5 text-xs font-bold text-crimson-700 hover:text-crimson-800"
                     >
                       <span>View Full Profile</span>
