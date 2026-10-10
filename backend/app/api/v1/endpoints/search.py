@@ -113,7 +113,7 @@ def search_profiles(
                 )
             ).order_by(MatchScore.score.desc().nulls_last())
 
-    total_count = query.count()
+    total_count = query.order_by(None).count()
     response.headers["X-Total-Count"] = str(total_count)
 
     offset_val = (page - 1) * limit

@@ -11,18 +11,20 @@ from app.seeds.seed_interactions import seed_interactions_and_more_profiles
 
 
 def init_db_and_seed():
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-
-    # Seed Initial Data if empty
     db = SessionLocal()
     try:
-        # DB connectivity health check log
-        from sqlalchemy import text
+        from sqlalchemy import text, inspect
         db.execute(text("SELECT 1"))
-        print("Database connected successfully.")
 
-        if db.query(Community).count() == 0:
+        # Fast table existence check: skip expensive create_all if schema already initialized
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+
+        if not existing_tables or "profiles" not in existing_tables:
+            Base.metadata.create_all(bind=engine)
+            existing_tables = set(inspector.get_table_names())
+
+        if "communities" in existing_tables and db.query(Community).count() == 0:
             c1 = Community(name="Sadgope", is_active=True)
             c2 = Community(name="Gowala / Goala", is_active=True)
             db.add_all([c1, c2])
@@ -39,7 +41,7 @@ def init_db_and_seed():
             ]
             db.add_all(sc_list)
 
-        if db.query(Coupon).filter(Coupon.code == "BOR50").count() == 0:
+        if "coupons" in existing_tables and db.query(Coupon).filter(Coupon.code == "BOR50").count() == 0:
             c = Coupon(
                 code="BOR50",
                 discount_type="PERCENTAGE",
@@ -50,16 +52,17 @@ def init_db_and_seed():
             db.add(c)
 
         db.commit()
+
+        # Seed demo interactions only if not already seeded
+        if "profiles" in existing_tables:
+            debjit = db.query(Profile).filter(Profile.first_name == "Debjit").first()
+            if not debjit:
+                seed_interactions_and_more_profiles()
     except Exception as e:
         db.rollback()
-        print(f"Startup error: {e}")
+        print(f"Startup initialization note: {e}")
     finally:
         db.close()
-
-    try:
-        seed_interactions_and_more_profiles()
-    except Exception as e:
-        print(f"Interactions seed error: {e}")
 
 
 @asynccontextmanager
@@ -79,6 +82,10 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# GZip Response Compression (saves 70-85% bandwidth on profiles & messages)
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS
 app.add_middleware(

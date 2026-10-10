@@ -72,6 +72,7 @@ import { masterDataApi } from '../lib/masterDataApi';
 import { useAuth } from '../context/AuthContext';
 import { useCall } from '../hooks/useCall';
 import { PhoneMissed, PhoneCall } from 'lucide-react';
+import { ConversationListSkeleton, ChatMessageSkeleton } from '../components/skeletons';
 
 /*
   THEME (BorKonya reference design)
@@ -1505,11 +1506,8 @@ export const ChatPage: React.FC = () => {
 
             {/* Conversation list */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden divide-y divide-[#eef2fa] mt-1">
-              {isLoadingConvs ? (
-                <div className="p-8 text-center space-y-3">
-                  <RefreshCw className="w-7 h-7 animate-spin text-[#e0102f] mx-auto" />
-                  <p className="text-xs text-[#6b7a99] font-medium">Loading chats...</p>
-                </div>
+              {isLoadingConvs && filteredConversations.length === 0 ? (
+                <ConversationListSkeleton count={6} />
               ) : filteredConversations.length === 0 ? (
                 <div className="p-8 text-center space-y-3">
                   <div className="w-14 h-14 bg-[#fde8ee] text-[#e0102f] rounded-full flex items-center justify-center mx-auto">
@@ -2166,11 +2164,8 @@ export const ChatPage: React.FC = () => {
                 onScroll={handleScrollChat}
                 className="flex-1 min-h-0 px-2 py-3 sm:px-6 sm:py-4 overflow-y-auto overflow-x-hidden space-y-3 z-10"
               >
-                {isLoadingMessages ? (
-                  <div className="py-16 text-center text-xs text-[#6b7a99] font-medium">
-                    <RefreshCw className="w-6 h-6 animate-spin text-[#e0102f] mx-auto mb-2" />
-                    Loading conversation...
-                  </div>
+                {isLoadingMessages && messages.length === 0 ? (
+                  <ChatMessageSkeleton count={6} />
                 ) : messages.length === 0 ? (
                   <div className="py-12 text-center space-y-3">
                     <div className="w-14 h-14 bg-white text-[#e0102f] rounded-full flex items-center justify-center mx-auto shadow-md border border-[#fbd5d9]">

@@ -14,6 +14,7 @@ import {
   getCurrentUser,
   deleteAccount,
 } from '../lib/authApi';
+import { clearUserCache } from '../lib/queryClient';
 
 interface AuthContextType {
   user: UserMe | null;
@@ -136,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     removeRefreshToken();
     setTokenState(null);
     setUser(null);
+    clearUserCache();
   };
 
   const deleteMyAccount = async () => {
@@ -144,6 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     removeRefreshToken();
     setTokenState(null);
     setUser(null);
+    clearUserCache();
   };
 
   const value: AuthContextType = {

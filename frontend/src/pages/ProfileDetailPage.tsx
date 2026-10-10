@@ -50,14 +50,12 @@ import {
   sendInterest,
   addToShortlist,
   removeFromShortlist,
-  getShortlistedIds,
-  getSentInterestIds,
-  getConnectedProfileIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
-import { getSubscriptionStatus } from '../lib/subscriptionApi'
-import { masterDataApi, type Community } from '../lib/masterDataApi'
 import { getDefaultAvatar } from '../lib/utils'
+import { useInteractionStatus, useUserSubscription, useMasterData } from '../hooks/useSharedData'
+import { invalidateInteractionCache } from '../lib/queryClient'
+import { ProfileDetailsSkeleton } from '../components/skeletons'
 
 // Decorative Botanical Leaf SVG Watermark matching 2-color brand theme (Navy Blue subtle tint)
 const LeafWatermark: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -98,7 +96,9 @@ export const ProfileDetailPage: React.FC = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState('Premium Profile Information')
-  const [isPremiumUser, setIsPremiumUser] = useState(false)
+  const { isPremium: isPremiumUser } = useUserSubscription()
+  const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
+  const { communities } = useMasterData()
 
   const [profile, setProfile] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -117,9 +117,6 @@ export const ProfileDetailPage: React.FC = () => {
   type ModalType = 'header' | 'about' | 'education' | 'family' | 'horoscope' | 'contact' | 'lifestyle' | null
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [isSaving, setIsSaving] = useState(false)
-
-  // Master Data Options
-  const [communities, setCommunities] = useState<Community[]>([])
   const [editForm, setEditForm] = useState<Record<string, any>>({})
 
   // Determine if viewer is the owner of this profile or editing target demo profile
@@ -134,28 +131,16 @@ export const ProfileDetailPage: React.FC = () => {
   )
 
   useEffect(() => {
-    getSubscriptionStatus()
-      .then((status) => {
-        if (status.is_active) setIsPremiumUser(true)
-      })
-      .catch(() => {})
-
     const loadProfileData = async () => {
       if (!id) return
       setLoading(true)
       setError(null)
       try {
-        const [data, shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
-          getProfileById(id),
-          getShortlistedIds().catch((): string[] => []),
-          getSentInterestIds().catch((): string[] => []),
-          getConnectedProfileIds().catch((): string[] => []),
-        ])
-
+        const data = await getProfileById(id)
         setProfile(data)
-        setIsShortlisted(shortlistedIds.includes(data.id))
-        setInterestSent(sentInterestIds.includes(data.id))
-        setIsConnected(connectedIds.includes(data.id))
+        setIsShortlisted(shortlistedSet.has(data.id))
+        setInterestSent(sentInterestSet.has(data.id))
+        setIsConnected(connectedSet.has(data.id))
       } catch (err: any) {
         console.error('Failed to load profile details:', err)
         setError(err.message || 'Profile could not be loaded.')
@@ -165,11 +150,7 @@ export const ProfileDetailPage: React.FC = () => {
     }
 
     loadProfileData()
-  }, [id])
-
-  useEffect(() => {
-    masterDataApi.getCommunities().then(setCommunities).catch(() => {})
-  }, [])
+  }, [id, shortlistedSet, sentInterestSet, connectedSet])
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
@@ -278,9 +259,11 @@ export const ProfileDetailPage: React.FC = () => {
       await sendInterest(profile.id)
       setInterestSent(true)
       showToast('success', `Express Interest sent to ${profile.first_name}!`)
+      invalidateInteractionCache()
     } catch (err: any) {
       setInterestSent(true)
       showToast('success', err.message || `Express Interest sent to ${profile.first_name}!`)
+      invalidateInteractionCache()
     }
   }
 
@@ -296,6 +279,7 @@ export const ProfileDetailPage: React.FC = () => {
         setIsShortlisted(true)
         showToast('success', `${profile.first_name} added to your shortlist!`)
       }
+      invalidateInteractionCache()
     } catch (err: any) {
       console.error(err)
       showToast('error', 'Failed to update shortlist.')
@@ -379,11 +363,8 @@ export const ProfileDetailPage: React.FC = () => {
           </button>
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center p-24 text-slate-500 bg-white rounded-3xl border border-slate-200 shadow-sm">
-            <Loader2 className="w-10 h-10 animate-spin text-crimson-700 mb-4" />
-            <p className="text-base font-semibold text-navy-950 font-sans">Loading Profile Details...</p>
-          </div>
+        {loading && !profile ? (
+          <ProfileDetailsSkeleton />
         ) : error || !profile ? (
           <div className="rounded-3xl bg-white p-8 text-center border border-crimson-200 shadow-sm max-w-lg mx-auto">
             <AlertCircle className="w-12 h-12 text-crimson-700 mx-auto mb-3" />

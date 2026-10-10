@@ -40,6 +40,7 @@ import {
 import { updateMyProfile } from '../lib/authApi'
 import { masterDataApi, type Community } from '../lib/masterDataApi'
 import { getDefaultAvatar } from '../lib/utils'
+import { ProfileDetailsSkeleton } from '../components/skeletons'
 
 // Decorative Botanical Leaf SVG Watermark matching 2-color brand theme (Navy Blue subtle tint)
 const LeafWatermark: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -261,11 +262,8 @@ export const MyProfilePage: React.FC = () => {
       )}
 
       <main className="flex-1 mx-auto max-w-6xl 2xl:max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center p-24 text-slate-500 bg-white rounded-3xl border border-slate-200 shadow-sm">
-            <Loader2 className="w-10 h-10 animate-spin text-crimson-700 mb-4" />
-            <p className="text-base font-semibold text-navy-950 font-sans">Loading Profile Details...</p>
-          </div>
+        {loading && !profile ? (
+          <ProfileDetailsSkeleton />
         ) : error ? (
           <div className="rounded-3xl bg-white p-8 text-center border border-crimson-200 shadow-sm max-w-lg mx-auto">
             <AlertCircle className="w-12 h-12 text-crimson-700 mx-auto mb-3" />

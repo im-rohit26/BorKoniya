@@ -13,7 +13,6 @@ import {
   ArrowUpDown,
   Filter,
   CheckCircle,
-  Loader2,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -22,12 +21,8 @@ import {
   removeFromShortlist,
   blockProfile,
   getShortlist,
-  getShortlistedIds,
-  getSentInterestIds,
-  getConnectedProfileIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
-import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import {
   getRecommendedMatches,
   getNewMatches,
@@ -38,7 +33,9 @@ import {
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
-import { masterDataApi, type Community, type SelectOption } from '../lib/masterDataApi'
+import { useMasterData, useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
+import { invalidateInteractionCache } from '../lib/queryClient'
+import { ProfileGridSkeleton } from '../components/skeletons'
 import { RotateCcw } from 'lucide-react'
 
 type MatchTabId = 'recommended' | 'new' | 'near_you' | 'visitors' | 'shortlist'
@@ -56,10 +53,10 @@ export const MatchesPage: React.FC = () => {
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('ALL')
   const [filterDiet, setFilterDiet] = useState('ALL')
 
-  const [communities, setCommunities] = useState<Community[]>([])
-  const [states, setStates] = useState<SelectOption[]>([])
-  const [maritalStatuses, setMaritalStatuses] = useState<SelectOption[]>([])
-  const [dietOptions, setDietOptions] = useState<SelectOption[]>([])
+  // Master Data & Interaction Status via central query cache
+  const { communities, states, maritalStatuses, dietOptions } = useMasterData()
+  const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
+  const { isPremium: isPremiumUser } = useUserSubscription()
 
   const [tabProfiles, setTabProfiles] = useState<Record<MatchTabId, ProfileCardData[]>>({
     recommended: [],
@@ -71,37 +68,8 @@ export const MatchesPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [reportModalData, setReportModalData] = useState<{ id: string; name: string } | null>(null)
-  const [isPremiumUser, setIsPremiumUser] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState('Direct Family Messaging')
-
-  // Load master data on mount
-  useEffect(() => {
-    Promise.all([
-      masterDataApi.getCommunities().catch(() => []),
-      masterDataApi.getStates().catch(() => []),
-      masterDataApi.getMaritalStatuses().catch(() => []),
-      masterDataApi.getDietOptions().catch(() => []),
-    ]).then(([comm, st, mar, diet]) => {
-      setCommunities(comm)
-      setStates(st)
-      setMaritalStatuses(mar)
-      setDietOptions(diet)
-    }).catch(console.error)
-  }, [])
-
-  // Load subscription status on mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      getSubscriptionStatus()
-        .then((status) => {
-          if (status.is_active) setIsPremiumUser(true)
-        })
-        .catch(() => {})
-    } else {
-      setIsPremiumUser(false)
-    }
-  }, [isAuthenticated])
 
   // Fetch real matches for active category only with filters applied
   useEffect(() => {
@@ -115,29 +83,6 @@ export const MatchesPage: React.FC = () => {
         if (filterState && filterState !== 'ALL') filters.state = filterState
         if (filterMaritalStatus && filterMaritalStatus !== 'ALL') filters.marital_status = filterMaritalStatus
         if (filterDiet && filterDiet !== 'ALL') filters.diet = filterDiet
-
-        let shortlistedIds: string[] = []
-        let sentInterestIds: string[] = []
-        let connectedIds: string[] = []
-        if (isAuthenticated) {
-          try {
-            [shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
-              getShortlistedIds().catch(() => []),
-              getSentInterestIds().catch(() => []),
-              getConnectedProfileIds().catch(() => []),
-            ])
-          } catch {
-            shortlistedIds = []
-            sentInterestIds = []
-            connectedIds = []
-          }
-        }
-
-        if (isCancelled) return
-
-        const shortlistedSet = new Set(shortlistedIds)
-        const sentInterestSet = new Set(sentInterestIds)
-        const connectedSet = new Set(connectedIds)
 
         const mapList = (list: any[]) =>
           list.map((p) =>
@@ -217,6 +162,7 @@ export const MatchesPage: React.FC = () => {
         }
       })
       showToast(`Express Interest sent to ${name}!`)
+      invalidateInteractionCache()
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
       throw err
@@ -270,6 +216,7 @@ export const MatchesPage: React.FC = () => {
         })
         showToast(`${name} added to shortlist!`)
       }
+      invalidateInteractionCache()
     } catch (err: any) {
       console.error(err)
       throw err
@@ -513,11 +460,8 @@ export const MatchesPage: React.FC = () => {
         )}
 
         {/* Profile Card List */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center p-16 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin text-crimson-700 mb-3" />
-            <p className="text-sm font-medium">Fetching verified community matches...</p>
-          </div>
+        {loading && displayProfiles.length === 0 ? (
+          <ProfileGridSkeleton count={6} layout="vertical" columnsClassName="grid grid-cols-1 md:grid-cols-2 gap-6" />
         ) : displayProfiles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {displayProfiles.map((profile) => (

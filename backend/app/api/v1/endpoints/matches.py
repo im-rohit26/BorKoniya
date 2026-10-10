@@ -188,7 +188,7 @@ def get_recommended_matches(
         age_max=age_max,
     )
 
-    total_count = query.count()
+    total_count = query.order_by(None).count()
     response.headers["X-Total-Count"] = str(total_count)
 
     profiles = (
@@ -251,7 +251,7 @@ def get_new_matches(
         age_max=age_max,
     )
 
-    total_count = query.count()
+    total_count = query.order_by(None).count()
     response.headers["X-Total-Count"] = str(total_count)
 
     profiles = (
@@ -324,7 +324,7 @@ def get_near_you_matches(
         age_max=age_max,
     )
 
-    total_count = query.count()
+    total_count = query.order_by(None).count()
     response.headers["X-Total-Count"] = str(total_count)
 
     profiles = (
@@ -372,7 +372,7 @@ def get_profile_visitors(
     elif gender:
         query = query.filter(Profile.gender == gender.upper())
 
-    total_count = query.count()
+    total_count = query.order_by(None).count()
     response.headers["X-Total-Count"] = str(total_count)
 
     profiles = (

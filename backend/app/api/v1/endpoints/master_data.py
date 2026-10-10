@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.entities import Community, SubCommunity
 
-router = APIRouter(tags=["Master Data"])
+def cache_control_master_data(response: Response):
+    response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
+
+router = APIRouter(tags=["Master Data"], dependencies=[Depends(cache_control_master_data)])
 
 @router.get("/communities")
 def get_communities(db: Session = Depends(get_db)):

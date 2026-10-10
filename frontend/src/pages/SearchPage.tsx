@@ -14,7 +14,6 @@ import {
   Bookmark,
   ArrowUpDown,
   CheckCircle,
-  Loader2,
 } from 'lucide-react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -23,16 +22,14 @@ import {
   removeFromShortlist,
   startOrGetConversation,
   blockProfile,
-  getShortlistedIds,
-  getSentInterestIds,
-  getConnectedProfileIds,
 } from '../lib/interactionApi'
-import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import { getSearchProfilesWithTotal, mapProfileResponseToCard } from '../lib/profileApi'
 import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
-import { masterDataApi, type Community, type SelectOption } from '../lib/masterDataApi'
+import { useMasterData, useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
+import { invalidateInteractionCache } from '../lib/queryClient'
+import { ProfileGridSkeleton } from '../components/skeletons'
 
 export const SearchPage: React.FC = () => {
   const [searchParams] = useSearchParams()
@@ -41,7 +38,6 @@ export const SearchPage: React.FC = () => {
   const [registerModalOpen, setRegisterModalOpen] = useState(false)
   const [advancedModalOpen, setAdvancedModalOpen] = useState(false)
   const [reportModalData, setReportModalData] = useState<{ id: string; name: string } | null>(null)
-  const [isPremiumUser, setIsPremiumUser] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState('Instant Family Messaging')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -79,24 +75,10 @@ export const SearchPage: React.FC = () => {
   // Saved Searches
   const [savedSearches, setSavedSearches] = useState<any[]>([])
 
-  const [communities, setCommunities] = useState<Community[]>([])
-  const [states, setStates] = useState<SelectOption[]>([])
-  const [maritalStatuses, setMaritalStatuses] = useState<SelectOption[]>([])
-  const [dietOptions, setDietOptions] = useState<SelectOption[]>([])
-
-  useEffect(() => {
-    Promise.all([
-      masterDataApi.getCommunities(),
-      masterDataApi.getStates(),
-      masterDataApi.getMaritalStatuses(),
-      masterDataApi.getDietOptions(),
-    ]).then(([comm, st, mar, diet]) => {
-      setCommunities(comm)
-      setStates(st)
-      setMaritalStatuses(mar)
-      setDietOptions(diet)
-    }).catch(console.error)
-  }, [])
+  // Master Data & Interaction Status via central query cache
+  const { communities, states, maritalStatuses, dietOptions } = useMasterData()
+  const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
+  const { isPremium: isPremiumUser } = useUserSubscription()
 
   const [profiles, setProfiles] = useState<ProfileCardData[]>([])
 
@@ -104,19 +86,6 @@ export const SearchPage: React.FC = () => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
-
-  // Check subscription status on mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      getSubscriptionStatus()
-        .then((status) => {
-          if (status.is_active) setIsPremiumUser(true)
-        })
-        .catch(() => {})
-    } else {
-      setIsPremiumUser(false)
-    }
-  }, [isAuthenticated])
 
   // Fetch profiles from API based on filters & page
   useEffect(() => {
@@ -135,26 +104,6 @@ export const SearchPage: React.FC = () => {
         if (diet && diet !== 'ALL') filters.diet = diet
 
         const result = await getSearchProfilesWithTotal(filters, pageSize, currentPage)
-
-        let shortlistedIds: string[] = []
-        let sentInterestIds: string[] = []
-        let connectedIds: string[] = []
-        if (isAuthenticated) {
-          try {
-            [shortlistedIds, sentInterestIds, connectedIds] = await Promise.all([
-              getShortlistedIds().catch(() => []),
-              getSentInterestIds().catch(() => []),
-              getConnectedProfileIds().catch(() => []),
-            ])
-          } catch {
-            shortlistedIds = []
-            sentInterestIds = []
-            connectedIds = []
-          }
-        }
-        const shortlistedSet = new Set(shortlistedIds)
-        const sentInterestSet = new Set(sentInterestIds)
-        const connectedSet = new Set(connectedIds)
 
         if (!isCancelled) {
           const mapped = result.profiles.map((p) =>
@@ -203,6 +152,7 @@ export const SearchPage: React.FC = () => {
         prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
       )
       showToast(`Express Interest sent to ${name}!`)
+      invalidateInteractionCache()
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
       throw err
@@ -228,6 +178,7 @@ export const SearchPage: React.FC = () => {
         )
         showToast(`${name} added to shortlist!`)
       }
+      invalidateInteractionCache()
     } catch (err: any) {
       console.error(err)
       throw err
@@ -558,11 +509,8 @@ export const SearchPage: React.FC = () => {
 
           {/* Results List */}
           <main className="lg:col-span-8 space-y-4">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center p-16 text-slate-500 bg-white rounded-2xl border border-slate-200">
-                <Loader2 className="w-8 h-8 animate-spin text-crimson-700 mb-3" />
-                <p className="text-sm font-medium">Searching verified profiles in Supabase...</p>
-              </div>
+            {loading && filteredProfiles.length === 0 ? (
+              <ProfileGridSkeleton count={4} layout="horizontal" />
             ) : filteredProfiles.length > 0 ? (
               <>
                 <div className="space-y-4">

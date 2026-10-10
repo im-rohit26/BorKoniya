@@ -25,6 +25,8 @@ import { MatchScoreBadge } from '../components/cards/MatchScoreBadge';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
+import { InterestListSkeleton } from '../components/skeletons';
+import { invalidateInteractionCache } from '../lib/queryClient';
 
 export const ShortlistPage: React.FC = () => {
   const navigate = useNavigate();
@@ -64,6 +66,7 @@ export const ShortlistPage: React.FC = () => {
       await removeFromShortlist(profileId);
       setShortlist((prev) => prev.filter((item) => item.target_profile_id !== profileId));
       showToast(`${name} removed from your shortlist.`);
+      invalidateInteractionCache();
     } catch (err: any) {
       alert(err.message || 'Failed to remove from shortlist');
     }
@@ -74,6 +77,7 @@ export const ShortlistPage: React.FC = () => {
       await sendInterest(profileId);
       setSentInterests((prev) => new Set([...prev, profileId]));
       showToast(`Express Interest sent to ${name}!`);
+      invalidateInteractionCache();
     } catch (err: any) {
       alert(err.message || 'Failed to send interest');
     }
@@ -136,11 +140,8 @@ export const ShortlistPage: React.FC = () => {
         </div>
 
         {/* List Content */}
-        {isLoading ? (
-          <div className="py-20 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-crimson-700 mx-auto" />
-            <p className="text-sm text-gray-500 font-medium">Loading your shortlisted profiles...</p>
-          </div>
+        {isLoading && shortlist.length === 0 ? (
+          <InterestListSkeleton count={3} />
         ) : shortlist.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-gray-200/80 shadow-sm space-y-4">
             <div className="w-16 h-16 rounded-full bg-crimson-50 text-crimson-700 flex items-center justify-center mx-auto">

@@ -32,6 +32,8 @@ import { ReportProfileModal } from '../components/safety/ReportProfileModal';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
+import { InterestListSkeleton } from '../components/skeletons';
+import { invalidateInteractionCache } from '../lib/queryClient';
 
 type TabType = 'RECEIVED' | 'SENT' | 'ACCEPTED' | 'DECLINED';
 
@@ -76,6 +78,7 @@ export const InterestsPage: React.FC = () => {
     try {
       await acceptInterest(interestId);
       showToast(`Interest from ${name} accepted! You can now start chatting.`);
+      invalidateInteractionCache();
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to accept interest');
@@ -87,6 +90,7 @@ export const InterestsPage: React.FC = () => {
     try {
       await declineInterest(interestId);
       showToast('Interest declined respectfully.');
+      invalidateInteractionCache();
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to decline interest');
@@ -98,6 +102,7 @@ export const InterestsPage: React.FC = () => {
     try {
       await cancelInterest(interestId);
       showToast('Sent interest cancelled.');
+      invalidateInteractionCache();
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to cancel interest');
@@ -321,11 +326,8 @@ export const InterestsPage: React.FC = () => {
         </div>
 
         {/* List Content */}
-        {isLoading ? (
-          <div className="py-20 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-crimson-700 mx-auto" />
-            <p className="text-sm text-gray-500 font-medium">Loading your matrimonial interests...</p>
-          </div>
+        {isLoading && displayedItems.length === 0 ? (
+          <InterestListSkeleton count={4} />
         ) : displayedItems.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-gray-200/80 shadow-sm space-y-4">
             <div className="w-16 h-16 rounded-full bg-crimson-50 text-crimson-700 flex items-center justify-center mx-auto">

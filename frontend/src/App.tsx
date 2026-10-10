@@ -1,5 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './lib/queryClient'
 import { AuthProvider } from './context/AuthContext'
 import { CallProvider } from './context/CallContext'
 import { CallNotification } from './components/calling/CallNotification'
@@ -8,6 +10,7 @@ import { LanguageSelectorModal } from './components/common/LanguageSelectorModal
 import { ScreenCaptureProtection } from './components/security/ScreenCaptureProtection'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { MobileBottomNav } from './components/common/MobileBottomNav'
+import { PageContentSkeleton } from './components/skeletons/PageContentSkeleton'
 
 // Route Code-Splitting: Lazy load each page on demand
 const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })))
@@ -25,12 +28,6 @@ const ShortlistPage = lazy(() => import('./pages/ShortlistPage').then((m) => ({ 
 const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
 
-const PageLoader = () => (
-  <div className="min-h-[50vh] flex items-center justify-center">
-    <div className="h-8 w-8 animate-spin rounded-full border-3 border-crimson-700 border-t-transparent" />
-  </div>
-)
-
 export default function App() {
   const [showInitialLangModal, setShowInitialLangModal] = useState(false)
 
@@ -43,25 +40,26 @@ export default function App() {
   }, [])
 
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-      <AuthProvider>
-        <CallProvider>
-        {/* Global 1-to-1 Voice & Video Call UI */}
-        <CallNotification />
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <BrowserRouter>
+        <AuthProvider>
+          <CallProvider>
+          {/* Global 1-to-1 Voice & Video Call UI */}
+          <CallNotification />
 
-        {/* Global Anti-Screenshot & Download Shield */}
-        <ScreenCaptureProtection />
+          {/* Global Anti-Screenshot & Download Shield */}
+          <ScreenCaptureProtection />
 
-        {/* First-visit Language Prompt */}
-        <LanguageSelectorModal
-          isOpen={showInitialLangModal}
-          onClose={() => setShowInitialLangModal(false)}
-          isInitial={true}
-        />
+          {/* First-visit Language Prompt */}
+          <LanguageSelectorModal
+            isOpen={showInitialLangModal}
+            onClose={() => setShowInitialLangModal(false)}
+            isInitial={true}
+          />
 
-        <Suspense fallback={<PageLoader />}>
-        <Routes>
+          <Suspense fallback={<PageContentSkeleton />}>
+          <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -198,5 +196,6 @@ export default function App() {
       </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
+    </QueryClientProvider>
   )
 }

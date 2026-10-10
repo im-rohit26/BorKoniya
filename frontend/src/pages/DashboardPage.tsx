@@ -10,20 +10,15 @@ import {
   MessageSquare,
   ArrowRight,
   CheckCircle,
-  Loader2,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   sendInterest,
   addToShortlist,
   removeFromShortlist,
-  getShortlistedIds,
-  getSentInterestIds,
-  getConnectedProfileIds,
   startOrGetConversation,
 } from '../lib/interactionApi'
 import { getDefaultAvatar } from '../lib/utils'
-import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import {
   getDashboardStats,
   mapProfileResponseToCard,
@@ -31,13 +26,17 @@ import {
 } from '../lib/profileApi'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
+import { useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
+import { invalidateInteractionCache } from '../lib/queryClient'
+import { DashboardSkeleton, ProfileGridSkeleton } from '../components/skeletons'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
-  const [isPremiumUser, setIsPremiumUser] = useState(false)
+  const { isPremium: isPremiumUser } = useUserSubscription()
+  const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [matches, setMatches] = useState<ProfileCardData[]>([])
   const [loadingMatches, setLoadingMatches] = useState(true)
@@ -54,26 +53,14 @@ export const DashboardPage: React.FC = () => {
 
     const fetchDashboard = async () => {
       try {
-        const [dash, sub, sIds, sentIds, connIds] = await Promise.all([
-          getDashboardStats().catch(() => null),
-          getSubscriptionStatus().catch(() => null),
-          getShortlistedIds().catch(() => []),
-          getSentInterestIds().catch(() => []),
-          getConnectedProfileIds().catch(() => []),
-        ])
-
+        const dash = await getDashboardStats().catch(() => null)
         if (isCancelled) return
-
-        if (sub?.is_active) setIsPremiumUser(true)
 
         if (dash) {
           setDashboardData(dash)
-          const sSet = new Set(sIds)
-          const sentSet = new Set(sentIds)
-          const connSet = new Set(connIds)
           const recProfiles = dash.recommended_profiles || (dash as any).top_matches || []
           const mapped = recProfiles.map((p) =>
-            mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id), connSet.has(p.id))
+            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id), connectedSet.has(p.id))
           )
           setMatches(mapped)
         }
@@ -90,7 +77,7 @@ export const DashboardPage: React.FC = () => {
     return () => {
       isCancelled = true
     }
-  }, [user?.user_id])
+  }, [user?.user_id, shortlistedSet, sentInterestSet, connectedSet])
 
   const handleInterest = async (id: string, name: string) => {
     try {
@@ -99,6 +86,7 @@ export const DashboardPage: React.FC = () => {
         prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
       )
       showToast(`Express Interest sent to ${name}!`)
+      invalidateInteractionCache()
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
     }
@@ -141,6 +129,7 @@ export const DashboardPage: React.FC = () => {
         )
         showToast(`${name} added to shortlist!`)
       }
+      invalidateInteractionCache()
     } catch (err: any) {
       console.error(err)
     }
@@ -194,10 +183,14 @@ export const DashboardPage: React.FC = () => {
       <Header onOpenLanguageModal={() => setLangModalOpen(true)} onOpenRegister={() => {}} />
 
       <div className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 w-full">
-        {/* Welcome Banner & Profile Completion Meter */}
-        <div className="rounded-3xl bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 p-6 sm:p-8 text-white shadow-md mb-8 border border-navy-800">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+        {loadingMatches && !dashboardData ? (
+          <DashboardSkeleton />
+        ) : (
+          <>
+            {/* Welcome Banner & Profile Completion Meter */}
+            <div className="rounded-3xl bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 p-6 sm:p-8 text-white shadow-md mb-8 border border-navy-800">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
               <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-crimson-400 bg-white/10 shadow-md flex-shrink-0">
                 <img
                   src={dashboardData?.user?.photo_url || user?.photo_url || getDefaultAvatar(dashboardData?.user?.gender || user?.gender)}
@@ -311,11 +304,8 @@ export const DashboardPage: React.FC = () => {
             </Link>
           </div>
 
-          {loadingMatches ? (
-            <div className="flex flex-col items-center justify-center p-12 text-slate-500 bg-white rounded-2xl border border-slate-200">
-              <Loader2 className="w-8 h-8 animate-spin text-crimson-700 mb-3" />
-              <p className="text-sm font-medium">Loading recommendations from Supabase...</p>
-            </div>
+          {loadingMatches && matches.length === 0 ? (
+            <ProfileGridSkeleton count={3} layout="vertical" columnsClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" />
           ) : matches.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center bg-white">
               <Sparkles className="mx-auto h-8 w-8 text-crimson-600 mb-2 opacity-80" />
@@ -347,6 +337,8 @@ export const DashboardPage: React.FC = () => {
           )}
 
         </div>
+          </>
+        )}
       </div>
 
       {toastMessage && (

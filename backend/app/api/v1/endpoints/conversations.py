@@ -4,7 +4,7 @@ import uuid
 import shutil
 from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from app.core.database import get_db
@@ -431,7 +431,12 @@ def get_messages(
             Message.is_deleted_for_receiver == False,
         )
     )
-    messages = query.filter(visibility_filter).order_by(Message.created_at.asc()).all()
+    messages = (
+        query.options(joinedload(Message.reply_to))
+        .filter(visibility_filter)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
 
     results = []
     sender_cache: dict = {}
@@ -443,7 +448,10 @@ def get_messages(
 
         reply_info = None
         if msg.reply_to_message_id and msg.reply_to:
-            rep_sender = db.query(Profile).filter(Profile.id == msg.reply_to.sender_profile_id).first()
+            rep_pid = msg.reply_to.sender_profile_id
+            if rep_pid not in sender_cache:
+                sender_cache[rep_pid] = db.query(Profile).filter(Profile.id == rep_pid).first()
+            rep_sender = sender_cache[rep_pid]
             rep_content = "This message was deleted" if msg.reply_to.deleted_for_everyone else msg.reply_to.content
             reply_info = ReplySnippetResponse(
                 id=msg.reply_to.id,
