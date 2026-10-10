@@ -442,6 +442,27 @@ def test_conversations_and_messaging(client, auth_headers):
             msg_data = send_msg.json()
             assert msg_data["content"] == "Hello! Looking forward to discussing with your family."
             assert msg_data["is_mine"] is True
+            msg_id = msg_data["id"]
+
+            # Test adding reaction
+            react_res = client.post(
+                f"/api/v1/conversations/{conv_id}/messages/{msg_id}/reactions",
+                json={"emoji": "❤️"},
+                headers=auth_headers,
+            )
+            assert react_res.status_code == 200
+            react_data = react_res.json()
+            assert "reactions" in react_data
+            assert "❤️" in react_data["reactions"].values()
+
+            # Test toggling reaction off
+            toggle_res = client.post(
+                f"/api/v1/conversations/{conv_id}/messages/{msg_id}/reactions",
+                json={"emoji": "❤️"},
+                headers=auth_headers,
+            )
+            assert toggle_res.status_code == 200
+            assert toggle_res.json()["reactions"] == {}
 
         get_msgs = client.get(f"/api/v1/conversations/{conv_id}/messages", headers=auth_headers)
         assert get_msgs.status_code == 200

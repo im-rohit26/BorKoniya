@@ -29,7 +29,9 @@ from app.schemas.interaction import (
     BatchDeleteMessagesRequest,
     ReplySnippetResponse,
     DeleteMessageRequest,
+    MessageReactionRequest,
 )
+from sqlalchemy.orm.attributes import flag_modified
 from app.models.entities import ProfilePhoto
 
 router = APIRouter(prefix="/conversations", tags=["In-App Messaging & Chat"])
@@ -481,6 +483,7 @@ def get_messages(
                 deleted_for_everyone=bool(msg.deleted_for_everyone),
                 deleted_at=msg.deleted_at,
                 can_delete_for_everyone=can_del_everyone,
+                reactions=msg.reactions or {},
             )
         )
 
@@ -603,6 +606,7 @@ def send_message(
         is_forwarded=new_msg.is_forwarded,
         message_type=new_msg.message_type,
         media_url=new_msg.media_url,
+        reactions={},
     )
 
 
@@ -1064,5 +1068,112 @@ async def upload_chat_attachment(
         "file_name": clean_filename,
         "file_size": final_size,
     }
+
+
+@router.post("/{conversation_id}/messages/{message_id}/reactions", response_model=MessageItemResponse)
+def react_to_message(
+    conversation_id: str,
+    message_id: str,
+    payload: MessageReactionRequest,
+    current_profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    # Verify membership
+    is_member = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.profile_id == current_profile.id,
+        )
+        .first()
+    )
+    if not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to react to messages in this conversation.",
+        )
+
+    msg = (
+        db.query(Message)
+        .filter(
+            Message.id == message_id,
+            Message.conversation_id == conversation_id,
+        )
+        .first()
+    )
+    if not msg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found.",
+        )
+
+    if msg.deleted_for_everyone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot react to a deleted message.",
+        )
+
+    current_reactions = dict(msg.reactions) if isinstance(msg.reactions, dict) else {}
+    clean_emoji = payload.emoji.strip() if payload.emoji else ""
+
+    # Toggle reaction: if the same emoji is passed again by current user, remove it
+    if current_reactions.get(current_profile.id) == clean_emoji:
+        current_reactions.pop(current_profile.id, None)
+    elif clean_emoji:
+        current_reactions[current_profile.id] = clean_emoji
+    else:
+        current_reactions.pop(current_profile.id, None)
+
+    msg.reactions = current_reactions
+    flag_modified(msg, "reactions")
+    db.commit()
+    db.refresh(msg)
+
+    sender_prof = db.query(Profile).filter(Profile.id == msg.sender_profile_id).first()
+    is_mine = (msg.sender_profile_id == current_profile.id)
+
+    reply_info = None
+    if msg.reply_to_message_id and msg.reply_to:
+        rep_sender = db.query(Profile).filter(Profile.id == msg.reply_to.sender_profile_id).first()
+        rep_content = "This message was deleted" if msg.reply_to.deleted_for_everyone else msg.reply_to.content
+        reply_info = ReplySnippetResponse(
+            id=msg.reply_to.id,
+            sender_name=rep_sender.first_name if rep_sender else "Member",
+            content=rep_content,
+            message_type=msg.reply_to.message_type or "text",
+            media_url=None if msg.reply_to.deleted_for_everyone else msg.reply_to.media_url,
+        )
+
+    now = datetime.now(timezone.utc)
+    msg_created = msg.created_at
+    if msg_created.tzinfo is None:
+        msg_created = msg_created.replace(tzinfo=timezone.utc)
+    age_in_hours = (now - msg_created).total_seconds() / 3600.0
+    can_del_everyone = is_mine and (not msg.deleted_for_everyone) and (age_in_hours <= 24.0)
+
+    displayed_content = "This message was deleted" if msg.deleted_for_everyone else msg.content
+
+    return MessageItemResponse(
+        id=msg.id,
+        conversation_id=msg.conversation_id,
+        sender_profile_id=msg.sender_profile_id,
+        sender_name=sender_prof.first_name if sender_prof else "Member",
+        sender_gender=sender_prof.gender if sender_prof else None,
+        content=displayed_content,
+        is_mine=is_mine,
+        is_read=msg.is_read,
+        created_at=msg.created_at,
+        reply_to_message_id=msg.reply_to_message_id,
+        reply_to=reply_info,
+        is_forwarded=bool(msg.is_forwarded),
+        forwarded_from_message_id=msg.forwarded_from_message_id,
+        message_type=msg.message_type or "text",
+        media_url=None if msg.deleted_for_everyone else msg.media_url,
+        deleted_for_everyone=bool(msg.deleted_for_everyone),
+        deleted_at=msg.deleted_at,
+        can_delete_for_everyone=can_del_everyone,
+        reactions=msg.reactions or {},
+    )
+
 
 

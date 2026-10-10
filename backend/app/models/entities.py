@@ -222,6 +222,7 @@ class Message(Base):
     is_deleted_for_receiver = Column(Boolean, default=False)
     deleted_for_everyone = Column(Boolean, default=False)
     deleted_at = Column(DateTime, nullable=True)
+    reactions = Column(JSON, default=dict, nullable=True)
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("Profile")

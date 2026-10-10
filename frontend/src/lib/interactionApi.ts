@@ -66,6 +66,7 @@ export interface MessageItem {
   deleted_for_everyone?: boolean;
   deleted_at?: string;
   can_delete_for_everyone?: boolean;
+  reactions?: Record<string, string> | null;
 }
 
 export interface InterestsSummary {
@@ -525,6 +526,29 @@ export async function uploadChatAttachment(
     let msg = err.detail;
     if (Array.isArray(msg)) msg = msg.map((e: any) => e.msg || e.message).join(', ');
     throw new Error(msg || 'Failed to upload attachment');
+  }
+  return res.json();
+}
+
+export async function reactToMessage(
+  conversationId: string,
+  messageId: string,
+  emoji: string
+): Promise<MessageItem> {
+  const res = await fetch(
+    `${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}/reactions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ emoji }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to react to message' }));
+    throw new Error(err.detail || 'Failed to react to message');
   }
   return res.json();
 }

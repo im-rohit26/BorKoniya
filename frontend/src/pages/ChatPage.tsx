@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Send,
@@ -58,6 +58,7 @@ import {
   getBlockedProfiles,
   uploadChatAttachment,
   startOrGetConversation,
+  reactToMessage,
 } from '../lib/interactionApi';
 import type { ConversationSummary, MessageItem } from '../lib/interactionApi';
 import { BACKEND_ROOT_URL } from '../lib/config';
@@ -110,10 +111,22 @@ export const ChatPage: React.FC = () => {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [activeConvId, setActiveConvId] = useState<string | null>(conversationId || null);
+  const activeConvIdRef = useRef<string | null>(conversationId || null);
+  useEffect(() => {
+    activeConvIdRef.current = activeConvId;
+  }, [activeConvId]);
+
+  const hasAutoSelectedDefaultRef = useRef(false);
 
   useEffect(() => {
-    if (conversationId && conversationId !== activeConvId) {
-      setActiveConvId(conversationId);
+    if (conversationId) {
+      hasAutoSelectedDefaultRef.current = true;
+      if (conversationId !== activeConvId) {
+        setActiveConvId(conversationId);
+      }
+    } else if (activeConvId && window.innerWidth < 768) {
+      // Mobile user navigated back to conversation list via history
+      setActiveConvId(null);
     }
   }, [conversationId]);
 
@@ -160,15 +173,8 @@ export const ChatPage: React.FC = () => {
   const [actionMenuMsg, setActionMenuMsg] = useState<{
     msg: MessageItem;
     position: { top: number; right?: number; left?: number; isMine: boolean };
+    isMobileSheet?: boolean;
   } | null>(null);
-  const [reactions, setReactions] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem('borkoniya_chat_reactions');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
 
   // Forward Modal State
   const [forwardModalOpen, setForwardModalOpen] = useState(false);
@@ -286,10 +292,6 @@ export const ChatPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (conversationId) setActiveConvId(conversationId);
-  }, [conversationId]);
-
-  useEffect(() => {
     getBlockedProfiles()
       .then((blocked: any[]) => {
         if (Array.isArray(blocked)) {
@@ -299,20 +301,34 @@ export const ChatPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const fetchConversations = async (silent = false) => {
+  const fetchConversations = useCallback(async (silent = false) => {
     if (!silent) setIsLoadingConvs(true);
     try {
       const convs = await getConversations();
       setConversations(convs);
-      if (!activeConvId && !queryProfileId && convs.length > 0 && window.innerWidth >= 768) {
-        setActiveConvId(convs[0].id);
-      }
     } catch (err) {
       console.error('Failed to load conversations:', err);
     } finally {
       if (!silent) setIsLoadingConvs(false);
     }
-  };
+  }, []);
+
+  // Dedicated Desktop Initial Default Selection (strictly once, never overridden by background polling)
+  useEffect(() => {
+    if (hasAutoSelectedDefaultRef.current) return;
+    if (queryProfileId) return;
+    if (conversationId) {
+      hasAutoSelectedDefaultRef.current = true;
+      return;
+    }
+    if (window.innerWidth >= 768 && conversations.length > 0 && !activeConvIdRef.current) {
+      hasAutoSelectedDefaultRef.current = true;
+      const defaultId = conversations[0].id;
+      setActiveConvId(defaultId);
+      const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+      navigate(`${basePath}/${defaultId}`, { replace: true });
+    }
+  }, [conversations, conversationId, queryProfileId, location.pathname, navigate]);
 
   // Resolve chat when opened with ?profileId=... or ?profile_id=...
   useEffect(() => {
@@ -333,6 +349,7 @@ export const ChatPage: React.FC = () => {
         );
         if (existing) {
           if (isMounted) {
+            hasAutoSelectedDefaultRef.current = true;
             setActiveConvId(existing.id);
             const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
             navigate(`${basePath}/${existing.id}`, { replace: true });
@@ -345,6 +362,7 @@ export const ChatPage: React.FC = () => {
         if (res?.conversation_id && isMounted) {
           const freshConvs = await getConversations();
           if (isMounted) {
+            hasAutoSelectedDefaultRef.current = true;
             setConversations(freshConvs);
             setActiveConvId(res.conversation_id);
             const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
@@ -389,8 +407,7 @@ export const ChatPage: React.FC = () => {
     }, 8000);
 
     return () => clearInterval(convPoll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchConversations]);
 
   // Presence channel to broadcast and track real active online users
   useEffect(() => {
@@ -494,6 +511,19 @@ export const ChatPage: React.FC = () => {
         .on('broadcast', { event: 'new_message' }, () => {
           fetchChatMessages(true);
           fetchConversations(true);
+        })
+        .on('broadcast', { event: 'message_reaction' }, (eventPayload: any) => {
+          if (eventPayload?.payload?.message_id && eventPayload?.payload?.reactions) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === eventPayload.payload.message_id
+                  ? { ...m, reactions: eventPayload.payload.reactions }
+                  : m
+              )
+            );
+          } else {
+            fetchChatMessages(true);
+          }
         })
         .subscribe((status: string) => {
           wsConnectedRef.current = status === 'SUBSCRIBED';
@@ -634,18 +664,105 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  // Reactions
-  const handleReactToMessage = (messageId: string, emoji: string) => {
-    setReactions((prev) => {
-      const updated = { ...prev, [messageId]: prev[messageId] === emoji ? '' : emoji };
-      try {
-        localStorage.setItem('borkoniya_chat_reactions', JSON.stringify(updated));
-      } catch {
-        /* ignore */
-      }
-      return updated;
-    });
+  // Persistent Reactions
+  const handleToggleHeartReaction = async (msg: MessageItem) => {
+    if (!activeConvId || isBlocked || !canChat || msg.deleted_for_everyone) return;
+    if (reactionLockRef.current.has(msg.id)) return;
+
+    reactionLockRef.current.add(msg.id);
+
+    const myProfileId = currentUser?.profile_id || '';
+    const currentReactions = { ...(msg.reactions || {}) };
+    const currentEmoji = currentReactions[myProfileId];
+    const targetEmoji = currentEmoji === '❤️' ? '' : '❤️';
+
+    // Optimistic UI update
+    const previousReactions = { ...currentReactions };
+    if (targetEmoji) {
+      currentReactions[myProfileId] = targetEmoji;
+    } else {
+      delete currentReactions[myProfileId];
+    }
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msg.id ? { ...m, reactions: currentReactions } : m))
+    );
+
+    try {
+      const updatedMsg = await reactToMessage(activeConvId, msg.id, targetEmoji);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, reactions: updatedMsg.reactions || {} } : m))
+      );
+
+      currentChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'message_reaction',
+        payload: {
+          conversation_id: activeConvId,
+          message_id: msg.id,
+          reactions: updatedMsg.reactions || {},
+        },
+      });
+    } catch (err: any) {
+      // Rollback on failure
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, reactions: previousReactions } : m))
+      );
+      console.warn('Failed to update reaction:', err);
+    } finally {
+      reactionLockRef.current.delete(msg.id);
+    }
+  };
+
+  const handleReactToMessage = async (messageId: string, emoji: string) => {
     setActionMenuMsg(null);
+    if (!activeConvId || isBlocked || !canChat) return;
+
+    const targetMsg = messages.find((m) => m.id === messageId);
+    if (!targetMsg || targetMsg.deleted_for_everyone) return;
+
+    if (reactionLockRef.current.has(messageId)) return;
+    reactionLockRef.current.add(messageId);
+
+    const myProfileId = currentUser?.profile_id || '';
+    const currentReactions = { ...(targetMsg.reactions || {}) };
+    const currentEmoji = currentReactions[myProfileId];
+    const newEmoji = currentEmoji === emoji ? '' : emoji;
+
+    const previousReactions = { ...currentReactions };
+    if (newEmoji) {
+      currentReactions[myProfileId] = newEmoji;
+    } else {
+      delete currentReactions[myProfileId];
+    }
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, reactions: currentReactions } : m))
+    );
+
+    try {
+      const updatedMsg = await reactToMessage(activeConvId, messageId, newEmoji);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, reactions: updatedMsg.reactions || {} } : m))
+      );
+
+      currentChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'message_reaction',
+        payload: {
+          conversation_id: activeConvId,
+          message_id: messageId,
+          reactions: updatedMsg.reactions || {},
+        },
+      });
+    } catch (err: any) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, reactions: previousReactions } : m))
+      );
+      console.warn('Failed to update reaction:', err);
+    } finally {
+      reactionLockRef.current.delete(messageId);
+    }
   };
 
   // Reply
@@ -807,9 +924,35 @@ export const ChatPage: React.FC = () => {
     );
   };
 
-  // Robust Viewport collision calculation for 3-dot message menu
-  const handleOpenActionMenu = (e: React.MouseEvent | React.TouchEvent, msg: MessageItem) => {
+  // Close message action on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActionMenuMsg(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Robust Viewport collision calculation for message menu
+  const handleOpenActionMenu = (
+    e: React.MouseEvent | React.TouchEvent,
+    msg: MessageItem,
+    isMobileTouch = false
+  ) => {
     e.stopPropagation();
+    const isMobile = isMobileTouch || window.innerWidth < 768;
+
+    if (isMobile) {
+      setActionMenuMsg({
+        msg,
+        position: { top: 0, isMine: msg.is_mine },
+        isMobileSheet: true,
+      });
+      return;
+    }
+
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
     const isMine = msg.is_mine;
@@ -854,21 +997,88 @@ export const ChatPage: React.FC = () => {
     setActionMenuMsg({
       msg,
       position: { top, left, right, isMine },
+      isMobileSheet: false,
     });
   };
 
-  // Mobile long press support
-  const touchTimerRef = useRef<any>(null);
+  // Mobile Touch Gestures (Long Press 400-500ms & Double Tap for ❤️)
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+  const lastTapRef = useRef<{ msgId: string; time: number } | null>(null);
+  const reactionLockRef = useRef<Set<string>>(new Set());
+
   const handleTouchStart = (e: React.TouchEvent, msg: MessageItem) => {
-    touchTimerRef.current = setTimeout(() => {
-      handleOpenActionMenu(e, msg);
-    }, 500);
-  };
-  const handleTouchEnd = () => {
-    if (touchTimerRef.current) {
-      clearTimeout(touchTimerRef.current);
-      touchTimerRef.current = null;
+    if (isSelectMode) return;
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    isLongPressTriggeredRef.current = false;
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
     }
+
+    // 450ms long press threshold
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      lastTapRef.current = null;
+      try {
+        navigator.vibrate?.(40);
+      } catch {
+        /* ignore */
+      }
+      handleOpenActionMenu(e, msg, true);
+    }, 450);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+
+    // Cancel long press immediately if user moves > 10px (normal scrolling)
+    if (dx > 10 || dy > 10) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      touchStartPosRef.current = null;
+      lastTapRef.current = null;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, msg: MessageItem) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    // If long press already triggered, prevent click/double-tap
+    if (isLongPressTriggeredRef.current) {
+      e.preventDefault();
+      setTimeout(() => {
+        isLongPressTriggeredRef.current = false;
+      }, 100);
+      touchStartPosRef.current = null;
+      return;
+    }
+
+    // Check for double tap if not in selection mode and not scrolling
+    if (touchStartPosRef.current && !isSelectMode) {
+      const now = Date.now();
+      const lastTap = lastTapRef.current;
+      if (lastTap && lastTap.msgId === msg.id && now - lastTap.time < 320) {
+        // Double tap!
+        e.preventDefault();
+        lastTapRef.current = null;
+        handleToggleHeartReaction(msg);
+      } else {
+        lastTapRef.current = { msgId: msg.id, time: now };
+      }
+    }
+
+    touchStartPosRef.current = null;
   };
 
   const filteredConversations = conversations.filter((c) => {
@@ -1331,8 +1541,10 @@ export const ChatPage: React.FC = () => {
                     <div
                       key={c.id}
                       onClick={() => {
+                        hasAutoSelectedDefaultRef.current = true;
                         setActiveConvId(c.id);
-                        navigate(`/messages/${c.id}`);
+                        const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+                        navigate(`${basePath}/${c.id}`);
                       }}
                       className={`px-4 py-3.5 flex items-center gap-3 cursor-pointer transition-colors relative group select-none border-l-4 ${
                         isActive ? 'bg-[#fde8ee] border-[#e0102f]' : 'border-transparent hover:bg-[#f6f9ff]'
@@ -1468,7 +1680,8 @@ export const ChatPage: React.FC = () => {
                     <button
                       onClick={() => {
                         setActiveConvId(null);
-                        navigate('/messages');
+                        const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+                        navigate(basePath);
                       }}
                       className="md:hidden p-1.5 text-[#0b2a5b] hover:text-[#e0102f] hover:bg-[#fde8ee] rounded-full flex-shrink-0"
                       title="Back to chats"
@@ -1672,7 +1885,7 @@ export const ChatPage: React.FC = () => {
               {/* Security notice */}
               <div className="relative z-10 flex justify-center px-3 pt-2 flex-shrink-0">
                 <span className="inline-block max-w-full px-3.5 py-1 bg-white/80 border border-[#f3c4ca] text-[#7a1020] text-[10px] sm:text-[11px] font-medium rounded-full shadow-sm text-center leading-snug">
-                  🔒 Messages are end-to-end encrypted & protected. Screenshots restricted.
+                  🔒 Messages are end-to-end encrypted & protected.
                 </span>
               </div>
 
@@ -1691,116 +1904,260 @@ export const ChatPage: React.FC = () => {
                 </div>
               )}
 
-              {/* ================= FLOATING ACTION POPUP ================= */}
+              {/* ================= FLOATING ACTION POPUP / MOBILE BOTTOM SHEET ================= */}
               {actionMenuMsg && (
-                <div
-                  ref={actionMenuRef}
-                  style={{
-                    position: 'fixed',
-                    top: actionMenuMsg.position.top,
-                    left: actionMenuMsg.position.left,
-                    right: actionMenuMsg.position.right,
-                    zIndex: 9999,
-                  }}
-                  className="w-56 max-w-[calc(100vw-24px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 animate-in fade-in zoom-in-95 duration-100 select-none"
-                >
-                  {/* Top Emoji Reaction Bar */}
-                  <div className="px-3 py-2 border-b border-[#eef2fa] flex items-center justify-between gap-1 bg-[#fdf3f6] rounded-t-2xl">
-                    {REACTION_EMOJIS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => handleReactToMessage(actionMenuMsg.msg.id, emoji)}
-                        className="text-lg p-1 hover:scale-125 transition-transform active:scale-95"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => handleReactToMessage(actionMenuMsg.msg.id, '❤️')}
-                      className="p-1 text-[#8a96b0] hover:text-[#e0102f]"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
+                actionMenuMsg.isMobileSheet ? (
+                  <>
+                    {/* Mobile Backdrop */}
+                    <div
+                      className="fixed inset-0 bg-[#0b2a5b]/45 z-[9998] backdrop-blur-2xs transition-opacity animate-in fade-in duration-150"
+                      onClick={() => setActionMenuMsg(null)}
+                    />
 
-                  {/* Context Menu Action Items */}
-                  <div className="py-1 text-sm text-[#0b2a5b]">
-                    <button
-                      onClick={() => handleInitiateReply(actionMenuMsg.msg)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors"
+                    {/* Mobile Touch-Friendly Bottom Sheet */}
+                    <div
+                      ref={actionMenuRef}
+                      className="fixed bottom-0 left-0 right-0 z-[9999] bg-white rounded-t-3xl shadow-2xl border-t border-[#e3e9f5] max-h-[85vh] flex flex-col p-4 animate-in slide-in-from-bottom duration-200 select-none pb-[max(1.25rem,env(safe-area-inset-bottom))]"
                     >
-                      <Reply className="w-4 h-4 text-[#0b4fd8]" />
-                      <span>Reply</span>
-                    </button>
+                      <div className="w-10 h-1 bg-[#d0d8e8] rounded-full mx-auto mb-3" />
 
-                    <button
-                      onClick={() => handleInitiateForwardSingle(actionMenuMsg.msg)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors"
-                    >
-                      <Forward className="w-4 h-4 text-[#0b4fd8]" />
-                      <span>Forward</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleCopyMessage(actionMenuMsg.msg)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors"
-                    >
-                      <Copy className="w-4 h-4 text-[#0b4fd8]" />
-                      <span>Copy</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setIsSelectMode(true);
-                        setSelectedMessageIds([actionMenuMsg.msg.id]);
-                        setActionMenuMsg(null);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors border-t border-[#eef2fa]"
-                    >
-                      <CheckSquare className="w-4 h-4 text-[#0b4fd8]" />
-                      <span>Select</span>
-                    </button>
-
-                    {/* Delete for me */}
-                    <button
-                      onClick={() => {
-                        const targetMsg = actionMenuMsg.msg;
-                        setActionMenuMsg(null);
-                        setDeleteConfirmState({ msg: targetMsg, deleteType: 'for_me' });
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-[#fff0f1] text-[#e0102f] flex items-center gap-3 transition-colors border-t border-[#eef2fa]"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Delete for me</span>
-                    </button>
-
-                    {/* Delete for everyone (Only for sender within 24 hours) */}
-                    {actionMenuMsg.msg.is_mine &&
-                      !actionMenuMsg.msg.deleted_for_everyone &&
-                      actionMenuMsg.msg.can_delete_for_everyone !== false && (
+                      {/* Selected Message Preview snippet */}
+                      <div className="px-3 py-2 bg-[#f4f7fd] rounded-2xl mb-3 flex items-center justify-between gap-2 border border-[#e3e9f5]">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[11px] font-bold text-[#e0102f]">
+                            {actionMenuMsg.msg.is_mine ? 'Your message' : actionMenuMsg.msg.sender_name}
+                          </span>
+                          <p className="text-xs text-[#0b2a5b] truncate">{actionMenuMsg.msg.content}</p>
+                        </div>
                         <button
+                          type="button"
+                          onClick={() => setActionMenuMsg(null)}
+                          className="p-1 rounded-full text-[#6b7a99] hover:bg-slate-200"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Top Emoji Reaction Bar */}
+                      <div className="px-2 py-2 border border-[#fbd8e1] bg-[#fdf3f6] rounded-2xl flex items-center justify-around gap-1 mb-3">
+                        {REACTION_EMOJIS.map((emoji) => {
+                          const myReaction = actionMenuMsg.msg.reactions?.[currentUser?.profile_id || ''];
+                          const isSelectedReaction = myReaction === emoji;
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleReactToMessage(actionMenuMsg.msg.id, emoji)}
+                              className={`text-2xl p-2 rounded-xl transition-all active:scale-90 ${
+                                isSelectedReaction ? 'bg-white shadow-sm ring-2 ring-[#e0102f] scale-110' : 'hover:scale-125'
+                              }`}
+                            >
+                              {emoji}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Touch-Friendly Action List */}
+                      <div className="space-y-1 text-sm font-semibold text-[#0b2a5b] overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleInitiateReply(actionMenuMsg.msg)}
+                          className="w-full text-left px-4 py-3 rounded-2xl hover:bg-[#f6f9ff] active:bg-[#edf2fc] flex items-center gap-3 transition-colors min-h-[44px]"
+                        >
+                          <Reply className="w-5 h-5 text-[#0b4fd8]" />
+                          <span>Reply</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleInitiateForwardSingle(actionMenuMsg.msg)}
+                          className="w-full text-left px-4 py-3 rounded-2xl hover:bg-[#f6f9ff] active:bg-[#edf2fc] flex items-center gap-3 transition-colors min-h-[44px]"
+                        >
+                          <Forward className="w-5 h-5 text-[#0b4fd8]" />
+                          <span>Forward</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(actionMenuMsg.msg)}
+                          className="w-full text-left px-4 py-3 rounded-2xl hover:bg-[#f6f9ff] active:bg-[#edf2fc] flex items-center gap-3 transition-colors min-h-[44px]"
+                        >
+                          <Copy className="w-5 h-5 text-[#0b4fd8]" />
+                          <span>Copy Text</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSelectMode(true);
+                            setSelectedMessageIds([actionMenuMsg.msg.id]);
+                            setActionMenuMsg(null);
+                          }}
+                          className="w-full text-left px-4 py-3 rounded-2xl hover:bg-[#f6f9ff] active:bg-[#edf2fc] flex items-center gap-3 transition-colors min-h-[44px]"
+                        >
+                          <CheckSquare className="w-5 h-5 text-[#0b4fd8]" />
+                          <span>Select Messages</span>
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => {
                             const targetMsg = actionMenuMsg.msg;
                             setActionMenuMsg(null);
-                            setDeleteConfirmState({ msg: targetMsg, deleteType: 'for_everyone' });
+                            setDeleteConfirmState({ msg: targetMsg, deleteType: 'for_me' });
                           }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-[#fff0f1] text-[#c70a27] font-medium flex items-center gap-3 transition-colors"
+                          className="w-full text-left px-4 py-3 rounded-2xl hover:bg-[#fff0f1] active:bg-[#fee2e2] text-[#e0102f] flex items-center gap-3 transition-colors min-h-[44px]"
                         >
-                          <Trash2 className="w-4 h-4 text-[#e0102f]" />
-                          <span>Delete for everyone</span>
+                          <Trash2 className="w-5 h-5" />
+                          <span>Delete for me</span>
                         </button>
-                      )}
 
-                    {/* Cancel button */}
-                    <button
-                      onClick={() => setActionMenuMsg(null)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] text-[#6b7a99] flex items-center gap-3 transition-colors border-t border-[#eef2fa] text-xs font-semibold"
-                    >
-                      <X className="w-4 h-4 text-[#8a96b0]" />
-                      <span>Cancel</span>
-                    </button>
+                        {actionMenuMsg.msg.is_mine &&
+                          !actionMenuMsg.msg.deleted_for_everyone &&
+                          actionMenuMsg.msg.can_delete_for_everyone !== false && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetMsg = actionMenuMsg.msg;
+                                setActionMenuMsg(null);
+                                setDeleteConfirmState({ msg: targetMsg, deleteType: 'for_everyone' });
+                              }}
+                              className="w-full text-left px-4 py-3 rounded-2xl hover:bg-[#fff0f1] active:bg-[#fee2e2] text-[#c70a27] flex items-center gap-3 transition-colors min-h-[44px]"
+                            >
+                              <Trash2 className="w-5 h-5 text-[#e0102f]" />
+                              <span>Delete for everyone</span>
+                            </button>
+                          )}
+
+                        <button
+                          type="button"
+                          onClick={() => setActionMenuMsg(null)}
+                          className="w-full text-center py-3 bg-[#f1f4fb] hover:bg-[#e4ebf8] rounded-2xl text-xs font-bold text-[#6b7a99] mt-2 transition-colors min-h-[44px]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Desktop Context Menu adjacent to Chevron */
+                  <div
+                    ref={actionMenuRef}
+                    style={{
+                      position: 'fixed',
+                      top: actionMenuMsg.position.top,
+                      left: actionMenuMsg.position.left,
+                      right: actionMenuMsg.position.right,
+                      zIndex: 9999,
+                    }}
+                    className="w-56 max-w-[calc(100vw-24px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 animate-in fade-in zoom-in-95 duration-100 select-none"
+                  >
+                    {/* Top Emoji Reaction Bar */}
+                    <div className="px-3 py-2 border-b border-[#eef2fa] flex items-center justify-between gap-1 bg-[#fdf3f6] rounded-t-2xl">
+                      {REACTION_EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleReactToMessage(actionMenuMsg.msg.id, emoji)}
+                          className="text-lg p-1 hover:scale-125 transition-transform active:scale-95 cursor-pointer"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => handleReactToMessage(actionMenuMsg.msg.id, '❤️')}
+                        className="p-1 text-[#8a96b0] hover:text-[#e0102f] cursor-pointer"
+                        title="React with Heart"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Context Menu Action Items */}
+                    <div className="py-1 text-sm text-[#0b2a5b]">
+                      <button
+                        type="button"
+                        onClick={() => handleInitiateReply(actionMenuMsg.msg)}
+                        className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Reply className="w-4 h-4 text-[#0b4fd8]" />
+                        <span>Reply</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleInitiateForwardSingle(actionMenuMsg.msg)}
+                        className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Forward className="w-4 h-4 text-[#0b4fd8]" />
+                        <span>Forward</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMessage(actionMenuMsg.msg)}
+                        className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Copy className="w-4 h-4 text-[#0b4fd8]" />
+                        <span>Copy</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSelectMode(true);
+                          setSelectedMessageIds([actionMenuMsg.msg.id]);
+                          setActionMenuMsg(null);
+                        }}
+                        className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] flex items-center gap-3 transition-colors border-t border-[#eef2fa] cursor-pointer"
+                      >
+                        <CheckSquare className="w-4 h-4 text-[#0b4fd8]" />
+                        <span>Select</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetMsg = actionMenuMsg.msg;
+                          setActionMenuMsg(null);
+                          setDeleteConfirmState({ msg: targetMsg, deleteType: 'for_me' });
+                        }}
+                        className="w-full text-left px-3.5 py-2 hover:bg-[#fff0f1] text-[#e0102f] flex items-center gap-3 transition-colors border-t border-[#eef2fa] cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete for me</span>
+                      </button>
+
+                      {actionMenuMsg.msg.is_mine &&
+                        !actionMenuMsg.msg.deleted_for_everyone &&
+                        actionMenuMsg.msg.can_delete_for_everyone !== false && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetMsg = actionMenuMsg.msg;
+                              setActionMenuMsg(null);
+                              setDeleteConfirmState({ msg: targetMsg, deleteType: 'for_everyone' });
+                            }}
+                            className="w-full text-left px-3.5 py-2 hover:bg-[#fff0f1] text-[#c70a27] font-medium flex items-center gap-3 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4 text-[#e0102f]" />
+                            <span>Delete for everyone</span>
+                          </button>
+                        )}
+
+                      <button
+                        type="button"
+                        onClick={() => setActionMenuMsg(null)}
+                        className="w-full text-left px-3.5 py-2 hover:bg-[#f6f9ff] text-[#6b7a99] flex items-center gap-3 transition-colors border-t border-[#eef2fa] text-xs font-semibold cursor-pointer"
+                      >
+                        <X className="w-4 h-4 text-[#8a96b0]" />
+                        <span>Cancel</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )
               )}
 
               {/* Messages Container */}
@@ -1828,7 +2185,6 @@ export const ChatPage: React.FC = () => {
                   messages.map((m, idx) => {
                     const timeString = formatMessageTime(m.created_at);
                     const isSelected = selectedMessageIds.includes(m.id);
-                    const userReaction = reactions[m.id];
                     const prev = idx > 0 ? messages[idx - 1] : null;
                     const curDate = parseDateTime(m.created_at);
                     const prevDate = prev ? parseDateTime(prev.created_at) : null;
@@ -1836,6 +2192,19 @@ export const ChatPage: React.FC = () => {
                       !prevDate || !curDate || prevDate.toDateString() !== curDate.toDateString();
                     const isFwdMine = !!m.is_forwarded && m.is_mine;
                     const onBlue = m.is_mine && !isFwdMine;
+
+                    const reactionCounts: Record<string, number> = {};
+                    if (m.reactions && typeof m.reactions === 'object') {
+                      Object.values(m.reactions).forEach((emoji) => {
+                        if (emoji) {
+                          reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+                        }
+                      });
+                    }
+                    const reactionEntries = Object.entries(reactionCounts);
+                    const totalReactionsCount = reactionEntries.reduce((acc, [, c]) => acc + c, 0);
+                    const myReaction = currentUser?.profile_id && m.reactions ? m.reactions[currentUser.profile_id] : null;
+                    const isMenuOpen = actionMenuMsg?.msg.id === m.id;
 
                     return (
                       <React.Fragment key={m.id}>
@@ -1853,11 +2222,18 @@ export const ChatPage: React.FC = () => {
                             if (isSelectMode) toggleSelectMessage(m.id);
                           }}
                           onTouchStart={(e) => handleTouchStart(e, m)}
-                          onTouchEnd={handleTouchEnd}
-                          onTouchMove={handleTouchEnd}
+                          onTouchEnd={(e) => handleTouchEnd(e, m)}
+                          onTouchMove={handleTouchMove}
+                          onContextMenu={(e) => {
+                            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                              e.preventDefault();
+                            }
+                          }}
                           className={`flex w-full items-end gap-1.5 sm:gap-2 group transition-colors rounded-2xl px-1 py-0.5 ${
                             isSelected ? 'bg-[#fde8ee]/80 ring-2 ring-[#e0102f]/40' : ''
-                          } ${m.is_mine ? 'justify-end' : 'justify-start'}`}
+                          } ${m.is_mine ? 'justify-end' : 'justify-start'} ${
+                            reactionEntries.length > 0 ? 'mb-2.5' : ''
+                          }`}
                         >
                           {/* Select checkbox if select mode */}
                           {isSelectMode && (
@@ -1888,7 +2264,9 @@ export const ChatPage: React.FC = () => {
                           )}
 
                           <div
-                            className={`relative min-w-0 max-w-[80%] sm:max-w-[70%] lg:max-w-[60%] 2xl:max-w-[50%] rounded-3xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-sm select-text transition-all ${
+                            className={`relative min-w-0 max-w-[80%] sm:max-w-[70%] lg:max-w-[60%] 2xl:max-w-[50%] rounded-3xl px-3.5 sm:px-4 py-2 sm:py-2.5 ${
+                              !m.deleted_for_everyone ? 'pr-7 sm:pr-8' : ''
+                            } text-sm select-text transition-all ${
                               m.deleted_for_everyone
                                 ? 'bg-[#f4f6fa] border border-[#d9e2ec] text-[#8292a8] italic rounded-3xl shadow-none'
                                 : isFwdMine
@@ -1898,6 +2276,27 @@ export const ChatPage: React.FC = () => {
                                 : 'bg-white text-[#0b2a5b] rounded-bl-lg shadow-md shadow-[#0b2a5b]/5'
                             }`}
                           >
+                            {/* Desktop Chevron Down button - appears on hover or when menu is open */}
+                            {!isSelectMode && !m.deleted_for_everyone && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleOpenActionMenu(e, m, false)}
+                                className={`hidden md:flex absolute top-1.5 right-1.5 w-6 h-6 items-center justify-center rounded-full transition-all duration-150 z-10 cursor-pointer ${
+                                  isMenuOpen
+                                    ? onBlue
+                                      ? 'opacity-100 bg-white/25 text-white'
+                                      : 'opacity-100 bg-[#eef3fb] text-[#0b2a5b]'
+                                    : onBlue
+                                    ? 'opacity-0 group-hover:opacity-100 hover:bg-white/20 text-white/80 hover:text-white'
+                                    : 'opacity-0 group-hover:opacity-100 hover:bg-[#eef3fb] text-[#8a96b0] hover:text-[#0b2a5b]'
+                                }`}
+                                title="Message options"
+                                aria-label="Message options"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5 stroke-[2.2]" />
+                              </button>
+                            )}
+
                             {/* Forwarded Header Indicator */}
                             {m.is_forwarded && !m.deleted_for_everyone && (
                               <div className="flex items-center gap-1 text-[11px] font-medium italic mb-1 text-[#e0102f]">
@@ -2056,22 +2455,8 @@ export const ChatPage: React.FC = () => {
                               </>
                             )}
 
-                            {/* Actions (3-dot) + Time & Read Receipts — inline, so it never overlaps the text */}
+                            {/* Time & Read Receipts — clean inline display */}
                             <div className="flex items-center justify-end gap-1 mt-1 select-none">
-                              {!isSelectMode && !m.deleted_for_everyone && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleOpenActionMenu(e, m)}
-                                  className={`p-0.5 mr-0.5 rounded-full transition-opacity opacity-70 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 ${
-                                    onBlue
-                                      ? 'text-white/80 hover:text-white'
-                                      : 'text-[#8a96b0] hover:text-[#e0102f]'
-                                  }`}
-                                  title="Message actions"
-                                >
-                                  <MoreVertical className="w-3.5 h-3.5" />
-                                </button>
-                              )}
                               <span
                                 className={`text-[10px] ${
                                   m.deleted_for_everyone
@@ -2096,11 +2481,30 @@ export const ChatPage: React.FC = () => {
                                 ))}
                             </div>
 
-                            {/* Reaction Badge */}
-                            {userReaction && !m.deleted_for_everyone && (
-                              <div className="absolute -bottom-3 left-3 bg-white rounded-full w-6 h-6 shadow-md border border-[#e3e9f5] text-xs flex items-center justify-center">
-                                <span>{userReaction}</span>
-                              </div>
+                            {/* Persistent Reaction Badge */}
+                            {reactionEntries.length > 0 && !m.deleted_for_everyone && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleHeartReaction(m);
+                                }}
+                                className={`absolute -bottom-2.5 ${
+                                  m.is_mine ? 'right-3' : 'left-3'
+                                } inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-white border border-[#e3e9f5] shadow-sm text-xs font-medium cursor-pointer hover:scale-105 active:scale-95 transition-transform z-10 ${
+                                  myReaction ? 'ring-1 ring-[#e0102f]/40 bg-[#fff5f7]' : ''
+                                }`}
+                                title={myReaction ? `You reacted ${myReaction}. Click to toggle.` : 'Click to toggle reaction'}
+                              >
+                                {reactionEntries.map(([emoji, count]) => (
+                                  <span key={emoji} className="inline-flex items-center gap-0.5 text-xs">
+                                    <span>{emoji}</span>
+                                    {totalReactionsCount > 1 && (
+                                      <span className="text-[10px] font-bold text-[#6b7a99]">{count}</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </button>
                             )}
                           </div>
 

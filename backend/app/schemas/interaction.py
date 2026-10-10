@@ -96,6 +96,11 @@ class MessageItemResponse(BaseModel):
     deleted_for_everyone: bool = False
     deleted_at: Optional[datetime] = None
     can_delete_for_everyone: bool = False
+    reactions: Optional[dict] = None
+
+
+class MessageReactionRequest(BaseModel):
+    emoji: str
 
 
 class ForwardMessagesRequest(BaseModel):

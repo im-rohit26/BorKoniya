@@ -263,6 +263,7 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMPTZ,
+    reactions JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
