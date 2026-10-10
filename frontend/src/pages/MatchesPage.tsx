@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
-import { ProfileCard, type ProfileCardData } from '../components/cards/ProfileCard'
+import { ProfileCard } from '../components/cards/ProfileCard'
 import {
   Sparkles,
   Users,
@@ -34,15 +34,16 @@ import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
 import { useMasterData, useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
-import { invalidateInteractionCache } from '../lib/queryClient'
+import { queryKeys, queryClient, invalidateInteractionCache } from '../lib/queryClient'
 import { ProfileGridSkeleton } from '../components/skeletons'
 import { RotateCcw } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 
 type MatchTabId = 'recommended' | 'new' | 'near_you' | 'visitors' | 'shortlist'
 
 export const MatchesPage: React.FC = () => {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<MatchTabId>('recommended')
   const [sortBy, setSortBy] = useState<'score' | 'age_asc' | 'age_desc'>('score')
@@ -58,85 +59,58 @@ export const MatchesPage: React.FC = () => {
   const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
   const { isPremium: isPremiumUser } = useUserSubscription()
 
-  const [tabProfiles, setTabProfiles] = useState<Record<MatchTabId, ProfileCardData[]>>({
-    recommended: [],
-    new: [],
-    near_you: [],
-    visitors: [],
-    shortlist: [],
-  })
-  const [loading, setLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [reportModalData, setReportModalData] = useState<{ id: string; name: string } | null>(null)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState('Direct Family Messaging')
 
-  // Fetch real matches for active category only with filters applied
-  useEffect(() => {
-    let isCancelled = false
-    setLoading(true)
+  const filters = useMemo(() => {
+    const f: Record<string, any> = {}
+    if (filterCommunity && filterCommunity !== 'ALL') f.community = filterCommunity
+    if (filterState && filterState !== 'ALL') f.state = filterState
+    if (filterMaritalStatus && filterMaritalStatus !== 'ALL') f.marital_status = filterMaritalStatus
+    if (filterDiet && filterDiet !== 'ALL') f.diet = filterDiet
+    return f
+  }, [filterCommunity, filterState, filterMaritalStatus, filterDiet])
 
-    const fetchActiveCategory = async () => {
-      try {
-        const filters: Record<string, any> = {}
-        if (filterCommunity && filterCommunity !== 'ALL') filters.community = filterCommunity
-        if (filterState && filterState !== 'ALL') filters.state = filterState
-        if (filterMaritalStatus && filterMaritalStatus !== 'ALL') filters.marital_status = filterMaritalStatus
-        if (filterDiet && filterDiet !== 'ALL') filters.diet = filterDiet
-
-        const mapList = (list: any[]) =>
-          list.map((p) =>
-            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id), connectedSet.has(p.id))
-          )
-
-        if (activeTab === 'shortlist') {
-          const shortlistItems = isAuthenticated ? await getShortlist().catch(() => []) : []
-          const mappedShortlist = shortlistItems
-            .filter((item) => item?.profile)
-            .map((item) =>
-              mapProfileResponseToCard(
-                item.profile,
-                true,
-                sentInterestSet.has(item.profile.id),
-                connectedSet.has(item.profile.id)
-              )
-            )
-          if (!isCancelled) {
-            setTabProfiles((prev) => ({ ...prev, shortlist: mappedShortlist }))
-          }
-        } else {
-          let rawList: any[] = []
-          if (activeTab === 'recommended') {
-            rawList = await getRecommendedMatches(20, filters, 1).catch(() => [])
-          } else if (activeTab === 'new') {
-            rawList = await getNewMatches(20, filters, 1).catch(() => [])
-          } else if (activeTab === 'near_you') {
-            rawList = await getNearYouMatches(20, filters, 1).catch(() => [])
-          } else if (activeTab === 'visitors') {
-            rawList = await getProfileVisitors(20, filters, 1).catch(() => [])
-          }
-
-          if (!isCancelled) {
-            setTabProfiles((prev) => ({
-              ...prev,
-              [activeTab]: mapList(rawList),
-            }))
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch matches:', err)
-      } finally {
-        if (!isCancelled) {
-          setLoading(false)
-        }
+  const { data: rawCategoryProfiles = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.matches.tab(activeTab, filters, 1, user?.user_id),
+    queryFn: async () => {
+      if (activeTab === 'shortlist') {
+        const shortlistItems = isAuthenticated ? await getShortlist().catch(() => []) : []
+        return shortlistItems.filter((item: any) => item?.profile).map((item: any) => item.profile)
+      } else if (activeTab === 'recommended') {
+        return getRecommendedMatches(20, filters, 1).catch(() => [])
+      } else if (activeTab === 'new') {
+        return getNewMatches(20, filters, 1).catch(() => [])
+      } else if (activeTab === 'near_you') {
+        return getNearYouMatches(20, filters, 1).catch(() => [])
+      } else if (activeTab === 'visitors') {
+        return getProfileVisitors(20, filters, 1).catch(() => [])
       }
-    }
+      return []
+    },
+    staleTime: 2 * 60 * 1000,
+  })
 
-    fetchActiveCategory()
-    return () => {
-      isCancelled = true
+  // Select and sort profiles for active tab directly from query cache
+  const displayProfiles = useMemo(() => {
+    const list = (rawCategoryProfiles || []).map((p: any) =>
+      mapProfileResponseToCard(
+        p,
+        activeTab === 'shortlist' || shortlistedSet.has(p.id),
+        sentInterestSet.has(p.id),
+        connectedSet.has(p.id)
+      )
+    )
+    if (sortBy === 'age_asc') {
+      return [...list].sort((a, b) => a.age - b.age)
+    } else if (sortBy === 'age_desc') {
+      return [...list].sort((a, b) => b.age - a.age)
+    } else {
+      return [...list].sort((a, b) => b.matchScore - a.matchScore)
     }
-  }, [activeTab, filterCommunity, filterState, filterMaritalStatus, filterDiet, isAuthenticated])
+  }, [rawCategoryProfiles, activeTab, shortlistedSet, sentInterestSet, connectedSet, sortBy])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -150,19 +124,9 @@ export const MatchesPage: React.FC = () => {
     }
     try {
       await sendInterest(id)
-      setTabProfiles((prev) => {
-        const updateList = (list: ProfileCardData[]) =>
-          list.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
-        return {
-          recommended: updateList(prev.recommended),
-          new: updateList(prev.new),
-          near_you: updateList(prev.near_you),
-          visitors: updateList(prev.visitors),
-          shortlist: updateList(prev.shortlist),
-        }
-      })
-      showToast(`Express Interest sent to ${name}!`)
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
+      showToast(`Express Interest sent to ${name}!`)
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
       throw err
@@ -177,46 +141,13 @@ export const MatchesPage: React.FC = () => {
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
-        setTabProfiles((prev) => {
-          const updateList = (list: ProfileCardData[]) =>
-            list.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
-          return {
-            recommended: updateList(prev.recommended),
-            new: updateList(prev.new),
-            near_you: updateList(prev.near_you),
-            visitors: updateList(prev.visitors),
-            shortlist: prev.shortlist.filter((p) => p.id !== id),
-          }
-        })
         showToast(`${name} removed from shortlist.`)
       } else {
         await addToShortlist(id)
-        setTabProfiles((prev) => {
-          const allCards = [
-            ...prev.recommended,
-            ...prev.new,
-            ...prev.near_you,
-            ...prev.visitors,
-          ]
-          const targetCard = allCards.find((p) => p.id === id)
-          const updateList = (list: ProfileCardData[]) =>
-            list.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
-          const nextShortlist =
-            targetCard && !prev.shortlist.some((p) => p.id === id)
-              ? [{ ...targetCard, isShortlisted: true }, ...prev.shortlist]
-              : updateList(prev.shortlist)
-
-          return {
-            recommended: updateList(prev.recommended),
-            new: updateList(prev.new),
-            near_you: updateList(prev.near_you),
-            visitors: updateList(prev.visitors),
-            shortlist: nextShortlist,
-          }
-        })
         showToast(`${name} added to shortlist!`)
       }
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
       console.error(err)
       throw err
@@ -227,16 +158,8 @@ export const MatchesPage: React.FC = () => {
     if (!window.confirm(`Block ${name}? They will be removed from your matches.`)) return
     try {
       await blockProfile(id)
-      setTabProfiles((prev) => {
-        const filterList = (list: ProfileCardData[]) => list.filter((p) => p.id !== id)
-        return {
-          recommended: filterList(prev.recommended),
-          new: filterList(prev.new),
-          near_you: filterList(prev.near_you),
-          visitors: filterList(prev.visitors),
-          shortlist: filterList(prev.shortlist),
-        }
-      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.matches.all })
+      invalidateInteractionCache()
       showToast(`${name} has been blocked.`)
     } catch (err: any) {
       alert(err.message || 'Failed to block member')
@@ -266,18 +189,6 @@ export const MatchesPage: React.FC = () => {
     setFilterState('ALL')
     setFilterMaritalStatus('ALL')
     setFilterDiet('ALL')
-  }
-
-  // Select profiles for active tab
-  let displayProfiles = [...(tabProfiles[activeTab] || [])]
-
-  // Sort profiles
-  if (sortBy === 'age_asc') {
-    displayProfiles.sort((a, b) => a.age - b.age)
-  } else if (sortBy === 'age_desc') {
-    displayProfiles.sort((a, b) => b.age - a.age)
-  } else {
-    displayProfiles.sort((a, b) => b.matchScore - a.matchScore)
   }
 
   return (
@@ -402,11 +313,11 @@ export const MatchesPage: React.FC = () => {
         {/* Category Navigation Tabs */}
         <div className="flex items-center space-x-2 overflow-x-auto pb-3 mb-8 no-scrollbar">
           {[
-            { id: 'recommended', label: 'Recommended for You', icon: Sparkles, count: tabProfiles.recommended.length },
-            { id: 'new', label: 'New Matches', icon: Users, count: tabProfiles.new.length },
-            { id: 'near_you', label: 'Near You (WB & Odisha)', icon: MapPin, count: tabProfiles.near_you.length },
-            { id: 'visitors', label: 'Who Viewed Me', icon: Eye, count: tabProfiles.visitors.length },
-            { id: 'shortlist', label: 'Shortlisted', icon: Star, count: tabProfiles.shortlist.length },
+            { id: 'recommended', label: 'Recommended for You', icon: Sparkles },
+            { id: 'new', label: 'New Matches', icon: Users },
+            { id: 'near_you', label: 'Near You (WB & Odisha)', icon: MapPin },
+            { id: 'visitors', label: 'Who Viewed Me', icon: Eye },
+            { id: 'shortlist', label: 'Shortlisted', icon: Star },
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -422,13 +333,11 @@ export const MatchesPage: React.FC = () => {
               >
                 <Icon className={`h-4 w-4 ${isActive ? 'text-crimson-300' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                    isActive ? 'bg-crimson-700 text-white' : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {tab.count}
-                </span>
+                {isActive && (
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-crimson-700 text-white">
+                    {displayProfiles.length}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -443,7 +352,7 @@ export const MatchesPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-bold">
-                  {tabProfiles.visitors.length} {tabProfiles.visitors.length === 1 ? 'Member' : 'Members'} Viewed Your Profile This Week
+                  {displayProfiles.length} {displayProfiles.length === 1 ? 'Member' : 'Members'} Viewed Your Profile This Week
                 </h3>
                 <p className="text-xs text-slate-200 mt-0.5">
                   Upgrade to BorKonya Premium to unlock who visited you and connect with them instantly.

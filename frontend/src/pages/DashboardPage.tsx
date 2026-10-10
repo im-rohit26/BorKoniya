@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
-import { ProfileCard, type ProfileCardData } from '../components/cards/ProfileCard'
+import { ProfileCard } from '../components/cards/ProfileCard'
 import {
   Sparkles,
   Heart,
@@ -27,8 +27,9 @@ import {
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
 import { useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
-import { invalidateInteractionCache } from '../lib/queryClient'
+import { queryKeys, invalidateInteractionCache } from '../lib/queryClient'
 import { DashboardSkeleton, ProfileGridSkeleton } from '../components/skeletons'
+import { useQuery } from '@tanstack/react-query'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
@@ -38,55 +39,34 @@ export const DashboardPage: React.FC = () => {
   const { isPremium: isPremiumUser } = useUserSubscription()
   const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
   const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [matches, setMatches] = useState<ProfileCardData[]>([])
-  const [loadingMatches, setLoadingMatches] = useState(true)
-  const [dashboardData, setDashboardData] = useState<DashboardStatsResponse | null>(null)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  useEffect(() => {
-    let isCancelled = false
-    setLoadingMatches(true)
+  // Central query caching for dashboard stats (60s stale time)
+  const { data: dashboardData = null, isLoading: loadingMatches } = useQuery<DashboardStatsResponse | null>({
+    queryKey: queryKeys.dashboard.stats(user?.user_id),
+    queryFn: () => getDashboardStats().catch(() => null),
+    staleTime: 60 * 1000,
+  })
 
-    const fetchDashboard = async () => {
-      try {
-        const dash = await getDashboardStats().catch(() => null)
-        if (isCancelled) return
-
-        if (dash) {
-          setDashboardData(dash)
-          const recProfiles = dash.recommended_profiles || (dash as any).top_matches || []
-          const mapped = recProfiles.map((p) =>
-            mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id), connectedSet.has(p.id))
-          )
-          setMatches(mapped)
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard:', err)
-      } finally {
-        if (!isCancelled) {
-          setLoadingMatches(false)
-        }
-      }
-    }
-
-    fetchDashboard()
-    return () => {
-      isCancelled = true
-    }
-  }, [user?.user_id, shortlistedSet, sentInterestSet, connectedSet])
+  // Purely reactive matches computed from query data & cached interaction sets
+  const matches = useMemo(() => {
+    if (!dashboardData) return []
+    const recProfiles = dashboardData.recommended_profiles || (dashboardData as any).top_matches || []
+    return recProfiles.map((p) =>
+      mapProfileResponseToCard(p, shortlistedSet.has(p.id), sentInterestSet.has(p.id), connectedSet.has(p.id))
+    )
+  }, [dashboardData, shortlistedSet, sentInterestSet, connectedSet])
 
   const handleInterest = async (id: string, name: string) => {
     try {
       await sendInterest(id)
-      setMatches((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
-      )
-      showToast(`Express Interest sent to ${name}!`)
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
+      showToast(`Express Interest sent to ${name}!`)
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
     }
@@ -96,40 +76,13 @@ export const DashboardPage: React.FC = () => {
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
-        setMatches((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
-        )
-        setDashboardData((prev) =>
-          prev
-            ? {
-                ...prev,
-                metrics: {
-                  ...prev.metrics,
-                  shortlist_count: Math.max(0, prev.metrics.shortlist_count - 1),
-                },
-              }
-            : null
-        )
         showToast(`${name} removed from shortlist.`)
       } else {
         await addToShortlist(id)
-        setMatches((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
-        )
-        setDashboardData((prev) =>
-          prev
-            ? {
-                ...prev,
-                metrics: {
-                  ...prev.metrics,
-                  shortlist_count: prev.metrics.shortlist_count + 1,
-                },
-              }
-            : null
-        )
         showToast(`${name} added to shortlist!`)
       }
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
       console.error(err)
     }

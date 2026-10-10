@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Header } from '../components/common/Header'
 import { Hero } from '../components/home/Hero'
 import { SearchPreview } from '../components/home/SearchPreview'
@@ -18,12 +18,12 @@ import {
   getRecommendedMatches,
   mapProfileResponseToCard,
   getMyProfile,
-  type ProfileResponse,
 } from '../lib/profileApi'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import { useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
-import { invalidateInteractionCache } from '../lib/queryClient'
+import { queryKeys, invalidateInteractionCache } from '../lib/queryClient'
 import { ProfileCardSkeleton } from '../components/skeletons'
 
 export const LandingPage: React.FC = () => {
@@ -31,9 +31,6 @@ export const LandingPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
   const [registerModalOpen, setRegisterModalOpen] = useState(false)
-  const [myProfile, setMyProfile] = useState<ProfileResponse | null>(null)
-  const [rawProfiles, setRawProfiles] = useState<ProfileResponse[]>([])
-  const [loading, setLoading] = useState(true)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -41,46 +38,25 @@ export const LandingPage: React.FC = () => {
   const { isPremium: isPremiumUser } = useUserSubscription()
   const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
 
+  // Central cached myProfile (persists across route navigations)
+  const { data: myProfile = null } = useQuery({
+    queryKey: queryKeys.profiles.me(user?.user_id),
+    queryFn: () => getMyProfile().catch(() => null),
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Central cached curated matches (instant 0ms render when navigating back from other pages)
+  const { data: rawProfiles = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.matches.recommended(6, user?.user_id),
+    queryFn: () => getRecommendedMatches(6),
+    staleTime: 2 * 60 * 1000,
+  })
+
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      getMyProfile()
-        .then((p) => setMyProfile(p))
-        .catch(() => setMyProfile(null))
-    } else {
-      setMyProfile(null)
-    }
-  }, [isAuthenticated, user?.user_id])
-
-  useEffect(() => {
-    let isCancelled = false
-    setLoading(true)
-
-    const fetchProfiles = async () => {
-      try {
-        const raw = await getRecommendedMatches(6)
-        if (!isCancelled) {
-          setRawProfiles(raw || [])
-        }
-      } catch (err) {
-        console.error('Failed to load landing profiles:', err)
-      } finally {
-        if (!isCancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchProfiles()
-
-    return () => {
-      isCancelled = true
-    }
-  }, [isAuthenticated, user?.user_id])
 
   const profiles: ProfileCardData[] = useMemo(() => {
     return rawProfiles.map((p) =>

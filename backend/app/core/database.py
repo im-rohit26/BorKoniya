@@ -15,9 +15,10 @@ if db_url.startswith("sqlite"):
 else:
     engine_kwargs.update({
         "pool_pre_ping": True,
-        "pool_size": 10,
-        "max_overflow": 20,
-        "pool_recycle": 300,
+        "pool_size": 4,
+        "max_overflow": 2,
+        "pool_recycle": 180,
+        "pool_timeout": 30,
     })
 
 # Engine configuration

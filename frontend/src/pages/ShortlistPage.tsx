@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bookmark,
@@ -16,7 +16,6 @@ import {
   getShortlist,
   removeFromShortlist,
   sendInterest,
-  getSentInterestIds,
 } from '../lib/interactionApi';
 import type { ShortlistItem } from '../lib/interactionApi';
 import { ProtectedPhoto } from '../components/security/ProtectedPhoto';
@@ -26,35 +25,25 @@ import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 import { InterestListSkeleton } from '../components/skeletons';
-import { invalidateInteractionCache } from '../lib/queryClient';
+import { queryKeys, invalidateInteractionCache } from '../lib/queryClient';
+import { useAuth } from '../context/AuthContext';
+import { useInteractionStatus } from '../hooks/useSharedData';
+import { useQuery } from '@tanstack/react-query';
 
 export const ShortlistPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [langModalOpen, setLangModalOpen] = useState(false);
-  const [shortlist, setShortlist] = useState<ShortlistItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [sentInterests, setSentInterests] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [items, sentIds] = await Promise.all([
-        getShortlist(),
-        getSentInterestIds().catch(() => []),
-      ]);
-      setShortlist(items);
-      setSentInterests(new Set(sentIds));
-    } catch (err) {
-      console.error('Failed to load shortlist:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { sentInterestSet } = useInteractionStatus();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Central query caching for shortlist (45s stale time)
+  const { data: shortlist = [], isLoading, refetch } = useQuery<ShortlistItem[]>({
+    queryKey: queryKeys.interactions.shortlist(user?.user_id),
+    queryFn: () => getShortlist().catch(() => []),
+    staleTime: 45 * 1000,
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -64,9 +53,9 @@ export const ShortlistPage: React.FC = () => {
   const handleRemove = async (profileId: string, name: string) => {
     try {
       await removeFromShortlist(profileId);
-      setShortlist((prev) => prev.filter((item) => item.target_profile_id !== profileId));
       showToast(`${name} removed from your shortlist.`);
       invalidateInteractionCache();
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
     } catch (err: any) {
       alert(err.message || 'Failed to remove from shortlist');
     }
@@ -75,9 +64,9 @@ export const ShortlistPage: React.FC = () => {
   const handleSendInterest = async (profileId: string, name: string) => {
     try {
       await sendInterest(profileId);
-      setSentInterests((prev) => new Set([...prev, profileId]));
       showToast(`Express Interest sent to ${name}!`);
       invalidateInteractionCache();
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
     } catch (err: any) {
       alert(err.message || 'Failed to send interest');
     }
@@ -129,7 +118,7 @@ export const ShortlistPage: React.FC = () => {
                 {shortlist.length} Saved {shortlist.length === 1 ? 'Profile' : 'Profiles'}
               </span>
               <button
-                onClick={loadData}
+                onClick={() => refetch()}
                 className="p-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl transition-all"
                 title="Refresh shortlist"
               >
@@ -164,7 +153,7 @@ export const ShortlistPage: React.FC = () => {
             {shortlist.map((item) => {
               const p = item.profile;
               const formattedName = `${p.first_name} ${p.last_name || ''}`;
-              const hasSentInterest = sentInterests.has(p.id);
+              const hasSentInterest = sentInterestSet.has(p.id);
 
               return (
                 <div

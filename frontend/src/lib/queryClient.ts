@@ -51,6 +51,9 @@ export const queryKeys = {
     stats: (userId?: string) => ['dashboard', 'stats', userId || 'anon'] as const,
   },
   matches: {
+    all: ['matches'] as const,
+    recommended: (limit: number, userId?: string) =>
+      ['matches', 'recommended', limit, userId || 'anon'] as const,
     tab: (tab: string, filters: Record<string, any>, page: number, userId?: string) =>
       ['matches', tab, filters, page, userId || 'anon'] as const,
   },

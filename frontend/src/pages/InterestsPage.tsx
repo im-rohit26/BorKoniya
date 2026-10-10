@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -25,7 +25,6 @@ import {
   blockProfile,
   startOrGetConversation,
 } from '../lib/interactionApi';
-import type { InterestItem } from '../lib/interactionApi';
 import { ProtectedPhoto } from '../components/security/ProtectedPhoto';
 import { ScreenCaptureProtection } from '../components/security/ScreenCaptureProtection';
 import { ReportProfileModal } from '../components/safety/ReportProfileModal';
@@ -33,41 +32,37 @@ import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 import { InterestListSkeleton } from '../components/skeletons';
+import { useAuth } from '../context/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 import { invalidateInteractionCache } from '../lib/queryClient';
 
 type TabType = 'RECEIVED' | 'SENT' | 'ACCEPTED' | 'DECLINED';
 
 export const InterestsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [langModalOpen, setLangModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('RECEIVED');
-  const [receivedList, setReceivedList] = useState<InterestItem[]>([]);
-  const [sentList, setSentList] = useState<InterestItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Safety Modal
   const [reportModalData, setReportModalData] = useState<{ id: string; name: string } | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
+  // Central query caching for interests lists (45s stale time)
+  const { data: interestsData, isLoading, refetch } = useQuery({
+    queryKey: ['interactions', 'lists', user?.user_id],
+    queryFn: async () => {
       const [received, sent] = await Promise.all([
         getReceivedInterests(),
         getSentInterests(),
       ]);
-      setReceivedList(received);
-      setSentList(sent);
-    } catch (err) {
-      console.error('Failed to load interests data:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return { received, sent };
+    },
+    staleTime: 45 * 1000,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const receivedList = interestsData?.received || [];
+  const sentList = interestsData?.sent || [];
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -79,7 +74,8 @@ export const InterestsPage: React.FC = () => {
       await acceptInterest(interestId);
       showToast(`Interest from ${name} accepted! You can now start chatting.`);
       invalidateInteractionCache();
-      await loadData();
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+      await refetch();
     } catch (err: any) {
       alert(err.message || 'Failed to accept interest');
     }
@@ -91,7 +87,8 @@ export const InterestsPage: React.FC = () => {
       await declineInterest(interestId);
       showToast('Interest declined respectfully.');
       invalidateInteractionCache();
-      await loadData();
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+      await refetch();
     } catch (err: any) {
       alert(err.message || 'Failed to decline interest');
     }
@@ -103,7 +100,8 @@ export const InterestsPage: React.FC = () => {
       await cancelInterest(interestId);
       showToast('Sent interest cancelled.');
       invalidateInteractionCache();
-      await loadData();
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+      await refetch();
     } catch (err: any) {
       alert(err.message || 'Failed to cancel interest');
     }
@@ -114,7 +112,9 @@ export const InterestsPage: React.FC = () => {
     try {
       await blockProfile(profileId);
       showToast(`${name} has been blocked.`);
-      await loadData();
+      invalidateInteractionCache();
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'));
+      await refetch();
     } catch (err: any) {
       alert(err.message || 'Failed to block profile');
     }
@@ -228,7 +228,7 @@ export const InterestsPage: React.FC = () => {
             </div>
 
             <button
-              onClick={loadData}
+              onClick={() => refetch()}
               className="inline-flex items-center gap-2 self-start md:self-auto px-4 py-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl text-sm font-medium transition-all"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />

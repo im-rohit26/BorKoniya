@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
@@ -28,7 +28,8 @@ import { ReportProfileModal } from '../components/safety/ReportProfileModal'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
 import { useMasterData, useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
-import { invalidateInteractionCache } from '../lib/queryClient'
+import { queryKeys, invalidateInteractionCache } from '../lib/queryClient'
+import { useQuery } from '@tanstack/react-query'
 import { ProfileGridSkeleton } from '../components/skeletons'
 
 export const SearchPage: React.FC = () => {
@@ -41,10 +42,8 @@ export const SearchPage: React.FC = () => {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState('Instant Family Messaging')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 12
-  const [totalCount, setTotalCount] = useState(0)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const { user, isAuthenticated } = useAuth()
@@ -80,61 +79,49 @@ export const SearchPage: React.FC = () => {
   const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
   const { isPremium: isPremiumUser } = useUserSubscription()
 
-  const [profiles, setProfiles] = useState<ProfileCardData[]>([])
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set())
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Fetch profiles from API based on filters & page
-  useEffect(() => {
-    let isCancelled = false
-    setLoading(true)
+  // Memoized query filter payload
+  const queryFilters = useMemo(() => {
+    const filters: Record<string, any> = {}
+    if (lookingFor && lookingFor !== 'ALL') filters.gender = lookingFor
+    if (community && community !== 'ALL') filters.community = community
+    if (state && state !== 'ALL' && state !== 'All India') filters.state = state
+    if (maritalStatus && maritalStatus !== 'ALL') filters.marital_status = maritalStatus
+    if (education && education !== 'ALL') filters.highest_qualification = education
+    if (profession && profession !== 'ALL') filters.occupation = profession
+    if (diet && diet !== 'ALL') filters.diet = diet
+    return filters
+  }, [lookingFor, community, state, maritalStatus, education, profession, diet])
 
-    const fetchProfiles = async () => {
-      try {
-        const filters: Record<string, any> = {}
-        if (lookingFor && lookingFor !== 'ALL') filters.gender = lookingFor
-        if (community && community !== 'ALL') filters.community = community
-        if (state && state !== 'ALL' && state !== 'All India') filters.state = state
-        if (maritalStatus && maritalStatus !== 'ALL') filters.marital_status = maritalStatus
-        if (education && education !== 'ALL') filters.highest_qualification = education
-        if (profession && profession !== 'ALL') filters.occupation = profession
-        if (diet && diet !== 'ALL') filters.diet = diet
+  // Central query caching for search results (60s stale time)
+  const { data: searchResult, isLoading } = useQuery({
+    queryKey: queryKeys.search.results(queryFilters, currentPage, user?.user_id),
+    queryFn: () => getSearchProfilesWithTotal(queryFilters, pageSize, currentPage),
+    staleTime: 60 * 1000,
+  })
 
-        const result = await getSearchProfilesWithTotal(filters, pageSize, currentPage)
+  const rawProfiles = searchResult?.profiles || []
+  const totalCount = searchResult?.total || 0
 
-        if (!isCancelled) {
-          const mapped = result.profiles.map((p) =>
-            mapProfileResponseToCard(
-              p,
-              shortlistedSet.has(p.id),
-              sentInterestSet.has(p.id),
-              connectedSet.has(p.id)
-            )
-          )
-          setProfiles(mapped)
-          setTotalCount(result.total)
-        }
-      } catch (err) {
-        console.error('Failed to load search results:', err)
-        if (!isCancelled) {
-          setProfiles([])
-          setTotalCount(0)
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchProfiles()
-    return () => {
-      isCancelled = true
-    }
-  }, [lookingFor, community, state, maritalStatus, education, profession, diet, currentPage])
+  // Derive mapped profile cards reactively
+  const profiles: ProfileCardData[] = useMemo(() => {
+    return rawProfiles
+      .filter((p) => !blockedIds.has(p.id))
+      .map((p) =>
+        mapProfileResponseToCard(
+          p,
+          shortlistedSet.has(p.id),
+          sentInterestSet.has(p.id),
+          connectedSet.has(p.id)
+        )
+      )
+  }, [rawProfiles, blockedIds, shortlistedSet, sentInterestSet, connectedSet])
 
   // Reset page to 1 when criteria change
   useEffect(() => {
@@ -148,11 +135,9 @@ export const SearchPage: React.FC = () => {
     }
     try {
       await sendInterest(id)
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
-      )
       showToast(`Express Interest sent to ${name}!`)
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
       throw err
@@ -167,18 +152,13 @@ export const SearchPage: React.FC = () => {
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
-        setProfiles((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
-        )
         showToast(`${name} removed from shortlist.`)
       } else {
         await addToShortlist(id)
-        setProfiles((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
-        )
         showToast(`${name} added to shortlist!`)
       }
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
       console.error(err)
       throw err
@@ -264,24 +244,29 @@ export const SearchPage: React.FC = () => {
     if (!window.confirm(`Are you sure you want to block ${name}?`)) return
     try {
       await blockProfile(id)
-      setProfiles((prev) => prev.filter((p) => p.id !== id))
+      setBlockedIds((prev) => new Set([...prev, id]))
       showToast(`${name} has been blocked.`)
+      invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
       alert(err.message || 'Failed to block member')
     }
   }
 
-  let filteredProfiles = [...profiles]
-  if (verifiedOnly) {
-    filteredProfiles = filteredProfiles.filter((p) => p.isMobileVerified)
-  }
-  if (sortBy === 'age_asc') {
-    filteredProfiles.sort((a, b) => a.age - b.age)
-  } else if (sortBy === 'age_desc') {
-    filteredProfiles.sort((a, b) => b.age - a.age)
-  } else {
-    filteredProfiles.sort((a, b) => b.matchScore - a.matchScore)
-  }
+  const filteredProfiles = useMemo(() => {
+    let list = [...profiles]
+    if (verifiedOnly) {
+      list = list.filter((p) => p.isMobileVerified)
+    }
+    if (sortBy === 'age_asc') {
+      list.sort((a, b) => a.age - b.age)
+    } else if (sortBy === 'age_desc') {
+      list.sort((a, b) => b.age - a.age)
+    } else {
+      list.sort((a, b) => b.matchScore - a.matchScore)
+    }
+    return list
+  }, [profiles, verifiedOnly, sortBy])
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfbf9]">
@@ -509,7 +494,7 @@ export const SearchPage: React.FC = () => {
 
           {/* Results List */}
           <main className="lg:col-span-8 space-y-4">
-            {loading && filteredProfiles.length === 0 ? (
+            {isLoading && filteredProfiles.length === 0 ? (
               <ProfileGridSkeleton count={4} layout="horizontal" />
             ) : filteredProfiles.length > 0 ? (
               <>

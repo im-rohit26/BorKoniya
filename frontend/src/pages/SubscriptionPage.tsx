@@ -26,12 +26,23 @@ import type {
   SubscriptionPlan,
   CouponResult,
   CheckoutResult,
-  SubscriptionStatus,
 } from '../lib/subscriptionApi';
+import { useAuth } from '../context/AuthContext';
+import { queryKeys, queryClient } from '../lib/queryClient';
+import { useQuery } from '@tanstack/react-query';
+
+const FALLBACK_PLAN: SubscriptionPlan = {
+  id: 'monthly_premium',
+  name: '1 Month Premium',
+  price_inr: 200,
+  duration_days: 30,
+  features: {},
+  is_popular: false,
+};
 
 export const SubscriptionPage: React.FC = () => {
+  const { user } = useAuth();
   const [langModalOpen, setLangModalOpen] = useState(false);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('monthly_premium');
   const [couponCode, setCouponCode] = useState('BOR50');
   const [couponResult, setCouponResult] = useState<CouponResult | null>(null);
@@ -45,48 +56,32 @@ export const SubscriptionPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
 
-  // Active status
-  const [userStatus, setUserStatus] = useState<SubscriptionStatus | null>(null);
+  // Central query caching for subscription plans (60 min stale time)
+  const { data: plans = [], isLoading: isLoadingPlans } = useQuery({
+    queryKey: ['subscription', 'plans'],
+    queryFn: getSubscriptionPlans,
+    staleTime: 60 * 60 * 1000,
+  });
 
-  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+  // Central query caching for user subscription status (5 min stale time)
+  const { data: userStatus = null, refetch: refetchStatus } = useQuery({
+    queryKey: queryKeys.subscription.status(user?.user_id),
+    queryFn: getSubscriptionStatus,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // 1. Load plans and existing subscription status
+  // Automatically select the most popular plan if default is not available
   useEffect(() => {
-    getSubscriptionPlans()
-      .then((data) => {
-        setPlans(data);
-        if (data.length > 0) {
-          const pop = data.find((p) => p.is_popular);
-          setSelectedPlanId(pop ? pop.id : data[0].id);
-        }
-      })
-      .catch((err) => console.error('Failed to load plans:', err))
-      .finally(() => setIsLoadingPlans(false));
+    if (plans.length > 0) {
+      const exists = plans.some((p) => p.id === selectedPlanId);
+      if (!exists) {
+        const pop = plans.find((p) => p.is_popular);
+        setSelectedPlanId(pop ? pop.id : plans[0].id);
+      }
+    }
+  }, [plans, selectedPlanId]);
 
-    getSubscriptionStatus()
-      .then((status) => {
-        setUserStatus(status);
-      })
-      .catch(() => {});
-  }, []);
-
-  if (isLoadingPlans) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fbfbf9]">
-        <div className="text-slate-500 font-medium">Loading subscription plans...</div>
-      </div>
-    );
-  }
-
-  const selectedPlan = plans.find((p) => p.id === selectedPlanId);
-
-  if (!selectedPlan) {
-    return (
-      <div className="error-state min-h-screen flex items-center justify-center bg-[#fbfbf9]">
-        <p className="text-lg text-slate-600 font-semibold">Plan not found. Please go back and select a plan.</p>
-      </div>
-    );
-  }
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || FALLBACK_PLAN;
 
   // 2. Handle Coupon Validation
   const handleApplyCoupon = async (e: React.FormEvent) => {
@@ -112,7 +107,7 @@ export const SubscriptionPage: React.FC = () => {
   };
 
   // Calculate pricing
-  const basePrice = selectedPlan.price_inr;
+  const basePrice = selectedPlan ? selectedPlan.price_inr : 200;
   const discount = couponResult && couponResult.is_valid ? couponResult.discount_amount_inr : 0;
   const netPayable = Math.max(0, basePrice - discount);
 
@@ -127,9 +122,9 @@ export const SubscriptionPage: React.FC = () => {
       setCheckoutResult(result);
       setCheckoutModalOpen(false);
 
-      // Refresh subscription status
-      const updatedStatus = await getSubscriptionStatus();
-      setUserStatus(updatedStatus);
+      // Refresh subscription status across the app
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await refetchStatus();
     } catch (err: any) {
       alert(err.message || 'Payment processing failed. Please try again.');
     } finally {
@@ -223,105 +218,131 @@ export const SubscriptionPage: React.FC = () => {
         )}
 
         {/* Plan Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {plans.map((plan) => {
-            const isSelected = plan.id === selectedPlanId;
-            const isPopular = plan.is_popular || plan.id === 'quarterly_gold';
-
-            return (
+        {isLoadingPlans && plans.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {[1, 2, 3].map((i) => (
               <div
-                key={plan.id}
-                onClick={() => {
-                  setSelectedPlanId(plan.id);
-                  if (couponResult) {
-                    applyCoupon(couponResult.coupon_code, plan.id).then(setCouponResult);
-                  }
-                }}
-                className={`relative rounded-3xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                  isSelected
-                    ? 'bg-white border-2 border-crimson-700 shadow-xl scale-[1.02]'
-                    : 'bg-white border border-slate-200 hover:border-slate-300 shadow-sm'
-                }`}
+                key={i}
+                className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 animate-pulse space-y-6 flex flex-col justify-between h-[420px]"
               >
-                {isPopular && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-crimson-700 px-4 py-1 text-[11px] font-extrabold text-white shadow-md uppercase tracking-wider">
-                    Most Popular
-                  </div>
-                )}
-
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold font-serif text-navy-950">{plan.name}</h3>
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        isSelected ? 'border-crimson-700 bg-crimson-700 text-white' : 'border-slate-300'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="h-6 w-32 bg-slate-200 rounded-lg" />
+                    <div className="w-5 h-5 rounded-full bg-slate-200" />
                   </div>
-
-                  <div className="mb-6 pb-6 border-b border-slate-100">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl sm:text-4xl font-black text-navy-950">
-                        ₹{plan.price_inr}
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">
-                        / {plan.duration_days} days
-                      </span>
-                    </div>
-                    <p className="text-xs text-emerald-600 font-semibold mt-1">
-                      Use code BOR50 for 50% discount
-                    </p>
-                  </div>
-
-                  {/* Feature Checkmarks */}
-                  <div className="space-y-3 text-xs text-slate-700 mb-8">
-                    <div className="flex items-center gap-2.5 font-medium">
-                      <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>Unlimited in-app messaging with matches</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 font-medium">
-                      <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>View verified family phone & email</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 font-medium">
-                      <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>See who viewed your profile</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 font-medium">
-                      <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>Priority placement in community searches</span>
-                    </div>
-                    {plan.duration_days >= 90 && (
-                      <div className="flex items-center gap-2.5 font-medium text-crimson-900">
-                        <Star className="w-4 h-4 text-crimson-700 fill-crimson-700 flex-shrink-0" />
-                        <span>Featured profile badge & save 17%</span>
-                      </div>
-                    )}
-                    {plan.duration_days >= 365 && (
-                      <div className="flex items-center gap-2.5 font-medium text-navy-900">
-                        <Zap className="w-4 h-4 text-navy-700 fill-navy-700 flex-shrink-0" />
-                        <span>Dedicated community matchmaker assistance</span>
-                      </div>
-                    )}
+                  <div className="h-10 w-28 bg-slate-200 rounded-lg mb-6" />
+                  <div className="space-y-3 pt-6 border-t border-slate-100">
+                    <div className="h-4 w-full bg-slate-100 rounded" />
+                    <div className="h-4 w-4/5 bg-slate-100 rounded" />
+                    <div className="h-4 w-3/4 bg-slate-100 rounded" />
+                    <div className="h-4 w-5/6 bg-slate-100 rounded" />
                   </div>
                 </div>
+                <div className="h-12 w-full bg-slate-200 rounded-2xl" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {plans.map((plan) => {
+              const isSelected = plan.id === selectedPlanId;
+              const isPopular = plan.is_popular || plan.id === 'quarterly_gold';
 
-                <button
-                  type="button"
-                  className={`w-full py-3 rounded-2xl text-xs font-bold transition-all ${
+              return (
+                <div
+                  key={plan.id}
+                  onClick={() => {
+                    setSelectedPlanId(plan.id);
+                    if (couponResult) {
+                      applyCoupon(couponResult.coupon_code, plan.id).then(setCouponResult);
+                    }
+                  }}
+                  className={`relative rounded-3xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between ${
                     isSelected
-                      ? 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-md'
-                      : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                      ? 'bg-white border-2 border-crimson-700 shadow-xl scale-[1.02]'
+                      : 'bg-white border border-slate-200 hover:border-slate-300 shadow-sm'
                   }`}
                 >
-                  {isSelected ? 'Selected Plan' : 'Select Plan'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                  {isPopular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-crimson-700 px-4 py-1 text-[11px] font-extrabold text-white shadow-md uppercase tracking-wider">
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold font-serif text-navy-950">{plan.name}</h3>
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          isSelected ? 'border-crimson-700 bg-crimson-700 text-white' : 'border-slate-300'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </div>
+
+                    <div className="mb-6 pb-6 border-b border-slate-100">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl sm:text-4xl font-black text-navy-950">
+                          ₹{plan.price_inr}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">
+                          / {plan.duration_days} days
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-600 font-semibold mt-1">
+                        Use code BOR50 for 50% discount
+                      </p>
+                    </div>
+
+                    {/* Feature Checkmarks */}
+                    <div className="space-y-3 text-xs text-slate-700 mb-8">
+                      <div className="flex items-center gap-2.5 font-medium">
+                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <span>Unlimited in-app messaging with matches</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 font-medium">
+                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <span>View verified family phone & email</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 font-medium">
+                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <span>See who viewed your profile</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 font-medium">
+                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <span>Priority placement in community searches</span>
+                      </div>
+                      {plan.duration_days >= 90 && (
+                        <div className="flex items-center gap-2.5 font-medium text-crimson-900">
+                          <Star className="w-4 h-4 text-crimson-700 fill-crimson-700 flex-shrink-0" />
+                          <span>Featured profile badge & save 17%</span>
+                        </div>
+                      )}
+                      {plan.duration_days >= 365 && (
+                        <div className="flex items-center gap-2.5 font-medium text-navy-900">
+                          <Zap className="w-4 h-4 text-navy-700 fill-navy-700 flex-shrink-0" />
+                          <span>Dedicated community matchmaker assistance</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={`w-full py-3 rounded-2xl text-xs font-bold transition-all ${
+                      isSelected
+                        ? 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-md'
+                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                    }`}
+                  >
+                    {isSelected ? 'Selected Plan' : 'Select Plan'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Checkout & Coupon Section */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
@@ -367,8 +388,8 @@ export const SubscriptionPage: React.FC = () => {
           {/* Right Column: Price Summary & Pay CTA */}
           <div className="lg:col-span-5 bg-slate-50 rounded-2xl p-6 border border-slate-200/80 space-y-4">
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold uppercase tracking-wider pb-2 border-b border-slate-200">
-              <span>{selectedPlan.name}</span>
-              <span>{selectedPlan.duration_days} Days</span>
+              <span>{selectedPlan?.name || '1 Month Premium'}</span>
+              <span>{selectedPlan?.duration_days || 30} Days</span>
             </div>
 
             <div className="space-y-2 text-xs">
@@ -486,8 +507,8 @@ export const SubscriptionPage: React.FC = () => {
             <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-5">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-navy-950">{selectedPlan.name}</h4>
-                  <p className="text-xs text-slate-500">{selectedPlan.duration_days} Days Access</p>
+                  <h4 className="text-sm font-bold text-navy-950">{selectedPlan?.name || '1 Month Premium'}</h4>
+                  <p className="text-xs text-slate-500">{selectedPlan?.duration_days || 30} Days Access</p>
                 </div>
                 <div className="text-right">
                   <span className="text-xl font-black text-crimson-700">₹{netPayable.toFixed(2)}</span>

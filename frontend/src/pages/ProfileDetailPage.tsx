@@ -54,7 +54,8 @@ import {
 } from '../lib/interactionApi'
 import { getDefaultAvatar } from '../lib/utils'
 import { useInteractionStatus, useUserSubscription, useMasterData } from '../hooks/useSharedData'
-import { invalidateInteractionCache } from '../lib/queryClient'
+import { queryKeys, queryClient, invalidateInteractionCache } from '../lib/queryClient'
+import { useQuery } from '@tanstack/react-query'
 import { ProfileDetailsSkeleton } from '../components/skeletons'
 
 // Decorative Botanical Leaf SVG Watermark matching 2-color brand theme (Navy Blue subtle tint)
@@ -100,16 +101,44 @@ export const ProfileDetailPage: React.FC = () => {
   const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
   const { communities } = useMasterData()
 
-  const [profile, setProfile] = useState<ProfileResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Central query caching for profile detail (2 min stale time)
+  const {
+    data: profileData,
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey: queryKeys.profiles.detail(id || ''),
+    queryFn: () => getProfileById(id!),
+    enabled: Boolean(id),
+    staleTime: 2 * 60 * 1000,
+  })
+
+  // Local override state for editing/updating
+  const [profileOverride, setProfileOverride] = useState<ProfileResponse | null>(null)
+  const profile = profileOverride || profileData || null
+  const error = queryError ? (queryError as any).message || 'Profile could not be loaded.' : null
+
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
-  // Visitor interaction state
-  const [interestSent, setInterestSent] = useState(false)
-  const [isShortlisted, setIsShortlisted] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
+  // Visitor interaction local override (for instant UI feedback before invalidation refetches)
+  const [localInterestSent, setLocalInterestSent] = useState<boolean | null>(null)
+  const [localShortlisted, setLocalShortlisted] = useState<boolean | null>(null)
+
+  const isShortlisted = profile
+    ? (localShortlisted !== null ? localShortlisted : shortlistedSet.has(profile.id))
+    : false
+  const interestSent = profile
+    ? (localInterestSent !== null ? localInterestSent : sentInterestSet.has(profile.id))
+    : false
+  const isConnected = profile ? connectedSet.has(profile.id) : false
+
+  // Reset local overrides when profile id changes
+  useEffect(() => {
+    setProfileOverride(null)
+    setLocalInterestSent(null)
+    setLocalShortlisted(null)
+  }, [id])
 
   // Editing state for Owner view
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -129,28 +158,6 @@ export const ProfileDetailPage: React.FC = () => {
         (user.email && profile.revealed_email === user.email))) ||
       id === '8d18f513-5f7d-492a-80bd-6f55ebffdab3'
   )
-
-  useEffect(() => {
-    const loadProfileData = async () => {
-      if (!id) return
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await getProfileById(id)
-        setProfile(data)
-        setIsShortlisted(shortlistedSet.has(data.id))
-        setInterestSent(sentInterestSet.has(data.id))
-        setIsConnected(connectedSet.has(data.id))
-      } catch (err: any) {
-        console.error('Failed to load profile details:', err)
-        setError(err.message || 'Profile could not be loaded.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadProfileData()
-  }, [id, shortlistedSet, sentInterestSet, connectedSet])
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
@@ -182,7 +189,12 @@ export const ProfileDetailPage: React.FC = () => {
     setIsUploadingPhoto(true)
     try {
       const uploaded = await uploadProfilePhoto(file, true, profile?.id)
-      setProfile((prev) => (prev ? { ...prev, photo_url: uploaded.storage_path } : null))
+      setProfileOverride((prev) => (prev || profile ? { ...(prev || profile)!, photo_url: uploaded.storage_path } : null))
+      if (id) {
+        queryClient.setQueryData(queryKeys.profiles.detail(id), (old: any) =>
+          old ? { ...old, photo_url: uploaded.storage_path } : old
+        )
+      }
       await refreshUser()
       showToast('success', 'Profile photo updated successfully!')
     } catch (err: any) {
@@ -240,7 +252,12 @@ export const ProfileDetailPage: React.FC = () => {
       if (payload.height_cm) payload.height_cm = parseInt(String(payload.height_cm), 10) || 165
 
       const updated = await updateMyProfile(payload, profile?.id)
-      setProfile((prev) => ({ ...(prev || {}), ...updated } as ProfileResponse))
+      setProfileOverride((prev) => ({ ...(prev || profile || {}), ...updated } as ProfileResponse))
+      if (id) {
+        queryClient.setQueryData(queryKeys.profiles.detail(id), (old: any) =>
+          old ? { ...old, ...updated } : old
+        )
+      }
       await refreshUser()
       showToast('success', 'Profile information updated successfully!')
       closeModal()
@@ -256,14 +273,16 @@ export const ProfileDetailPage: React.FC = () => {
   const handleInterest = async () => {
     if (!profile || interestSent) return
     try {
+      setLocalInterestSent(true)
       await sendInterest(profile.id)
-      setInterestSent(true)
       showToast('success', `Express Interest sent to ${profile.first_name}!`)
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
-      setInterestSent(true)
+      setLocalInterestSent(true)
       showToast('success', err.message || `Express Interest sent to ${profile.first_name}!`)
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     }
   }
 
@@ -271,16 +290,18 @@ export const ProfileDetailPage: React.FC = () => {
     if (!profile) return
     try {
       if (isShortlisted) {
+        setLocalShortlisted(false)
         await removeFromShortlist(profile.id)
-        setIsShortlisted(false)
         showToast('success', `${profile.first_name} removed from your shortlist.`)
       } else {
+        setLocalShortlisted(true)
         await addToShortlist(profile.id)
-        setIsShortlisted(true)
         showToast('success', `${profile.first_name} added to your shortlist!`)
       }
       invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
+      setLocalShortlisted(null)
       console.error(err)
       showToast('error', 'Failed to update shortlist.')
     }
@@ -363,7 +384,7 @@ export const ProfileDetailPage: React.FC = () => {
           </button>
         </div>
 
-        {loading && !profile ? (
+        {isLoading && !profile ? (
           <ProfileDetailsSkeleton />
         ) : error || !profile ? (
           <div className="rounded-3xl bg-white p-8 text-center border border-crimson-200 shadow-sm max-w-lg mx-auto">

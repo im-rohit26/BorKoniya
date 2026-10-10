@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
@@ -38,8 +38,10 @@ import {
   type ProfileResponse,
 } from '../lib/profileApi'
 import { updateMyProfile } from '../lib/authApi'
-import { masterDataApi, type Community } from '../lib/masterDataApi'
 import { getDefaultAvatar } from '../lib/utils'
+import { useMasterData } from '../hooks/useSharedData'
+import { queryKeys, queryClient } from '../lib/queryClient'
+import { useQuery } from '@tanstack/react-query'
 import { ProfileDetailsSkeleton } from '../components/skeletons'
 
 // Decorative Botanical Leaf SVG Watermark matching 2-color brand theme (Navy Blue subtle tint)
@@ -76,9 +78,27 @@ const LeafWatermark: React.FC<{ className?: string }> = ({ className = '' }) => 
 export const MyProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth()
   const [langModalOpen, setLangModalOpen] = useState(false)
-  const [profile, setProfile] = useState<ProfileResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+
+  // Central query caching for user profile (60s stale time)
+  const {
+    data: profileData,
+    isLoading,
+    error: queryError,
+    refetch: refetchProfile,
+  } = useQuery({
+    queryKey: queryKeys.profiles.me(user?.user_id),
+    queryFn: getMyProfile,
+    staleTime: 60 * 1000,
+  })
+
+  // Master Data via central query cache
+  const { communities } = useMasterData()
+
+  // Local override state for editing/updating
+  const [profileOverride, setProfileOverride] = useState<ProfileResponse | null>(null)
+  const profile = profileOverride || profileData || null
+  const error = queryError ? (queryError as any).message || 'Failed to load your profile.' : null
+
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -89,35 +109,8 @@ export const MyProfilePage: React.FC = () => {
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Master Data Options for Dropdowns
-  const [communities, setCommunities] = useState<Community[]>([])
-
   // Modal Form State
   const [editForm, setEditForm] = useState<Record<string, any>>({})
-
-  // Fetch current user's profile
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await getMyProfile()
-        setProfile(data)
-      } catch (err: any) {
-        console.error('Failed to load profile:', err)
-        setError(err.message || 'Failed to load your profile.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchProfile()
-  }, [])
-
-  // Load master data for modals
-  useEffect(() => {
-    masterDataApi.getCommunities().then(setCommunities).catch(() => {})
-  }, [])
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
@@ -150,7 +143,10 @@ export const MyProfilePage: React.FC = () => {
     setIsUploadingPhoto(true)
     try {
       const uploaded = await uploadProfilePhoto(file, true, profile?.id)
-      setProfile((prev) => (prev ? { ...prev, photo_url: uploaded.storage_path } : null))
+      setProfileOverride((prev) => (prev || profile ? { ...(prev || profile)!, photo_url: uploaded.storage_path } : null))
+      queryClient.setQueryData(queryKeys.profiles.me(user?.user_id), (old: any) =>
+        old ? { ...old, photo_url: uploaded.storage_path } : old
+      )
       await refreshUser()
       showToast('success', 'Profile photo updated successfully!')
     } catch (err: any) {
@@ -208,7 +204,10 @@ export const MyProfilePage: React.FC = () => {
       if (payload.height_cm) payload.height_cm = parseInt(String(payload.height_cm), 10) || 165
 
       const updated = await updateMyProfile(payload, profile?.id)
-      setProfile((prev) => ({ ...(prev || {}), ...updated } as ProfileResponse))
+      setProfileOverride((prev) => ({ ...(prev || profile || {}), ...updated } as ProfileResponse))
+      queryClient.setQueryData(queryKeys.profiles.me(user?.user_id), (old: any) =>
+        old ? { ...old, ...updated } : old
+      )
       await refreshUser()
       showToast('success', 'Profile information updated successfully!')
       closeModal()
@@ -262,7 +261,7 @@ export const MyProfilePage: React.FC = () => {
       )}
 
       <main className="flex-1 mx-auto max-w-6xl 2xl:max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
-        {loading && !profile ? (
+        {isLoading && !profile ? (
           <ProfileDetailsSkeleton />
         ) : error ? (
           <div className="rounded-3xl bg-white p-8 text-center border border-crimson-200 shadow-sm max-w-lg mx-auto">
@@ -270,7 +269,7 @@ export const MyProfilePage: React.FC = () => {
             <h3 className="text-lg font-bold text-navy-950 font-sans">Failed to load profile</h3>
             <p className="text-sm text-slate-600 mt-1">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => refetchProfile()}
               className="mt-5 px-6 py-2.5 bg-crimson-700 hover:bg-crimson-800 text-white font-semibold rounded-xl text-xs shadow-md transition-colors"
             >
               Retry

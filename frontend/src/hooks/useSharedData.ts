@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { masterDataApi, type Community, type SelectOption } from '../lib/masterDataApi'
 import {
@@ -8,6 +9,11 @@ import {
 import { getSubscriptionStatus, type SubscriptionStatus } from '../lib/subscriptionApi'
 import { queryKeys } from '../lib/queryClient'
 import { useAuth } from '../context/AuthContext'
+
+const EMPTY_STR_ARRAY: string[] = []
+const EMPTY_STR_SET: Set<string> = new Set()
+const EMPTY_COMMUNITIES: Community[] = []
+const EMPTY_OPTIONS: SelectOption[] = []
 
 export interface MasterDataBundle {
   communities: Community[]
@@ -43,10 +49,10 @@ export function useMasterData(): MasterDataBundle {
   })
 
   return {
-    communities: query.data?.communities || [],
-    states: query.data?.states || [],
-    maritalStatuses: query.data?.maritalStatuses || [],
-    dietOptions: query.data?.dietOptions || [],
+    communities: query.data?.communities || EMPTY_COMMUNITIES,
+    states: query.data?.states || EMPTY_OPTIONS,
+    maritalStatuses: query.data?.maritalStatuses || EMPTY_OPTIONS,
+    dietOptions: query.data?.dietOptions || EMPTY_OPTIONS,
     isLoading: query.isLoading,
   }
 }
@@ -95,17 +101,30 @@ export function useInteractionStatus(): InteractionStatusBundle {
     staleTime: 45 * 1000, // 45 seconds
   })
 
-  const shortlistedIds = query.data?.shortlistedIds || []
-  const sentInterestIds = query.data?.sentInterestIds || []
-  const connectedIds = query.data?.connectedIds || []
+  const shortlistedIds = query.data?.shortlistedIds || EMPTY_STR_ARRAY
+  const sentInterestIds = query.data?.sentInterestIds || EMPTY_STR_ARRAY
+  const connectedIds = query.data?.connectedIds || EMPTY_STR_ARRAY
+
+  const shortlistedSet = useMemo(
+    () => (query.data?.shortlistedIds ? new Set(query.data.shortlistedIds) : EMPTY_STR_SET),
+    [query.data]
+  )
+  const sentInterestSet = useMemo(
+    () => (query.data?.sentInterestIds ? new Set(query.data.sentInterestIds) : EMPTY_STR_SET),
+    [query.data]
+  )
+  const connectedSet = useMemo(
+    () => (query.data?.connectedIds ? new Set(query.data.connectedIds) : EMPTY_STR_SET),
+    [query.data]
+  )
 
   return {
     shortlistedIds,
     sentInterestIds,
     connectedIds,
-    shortlistedSet: new Set(shortlistedIds),
-    sentInterestSet: new Set(sentInterestIds),
-    connectedSet: new Set(connectedIds),
+    shortlistedSet,
+    sentInterestSet,
+    connectedSet,
     isLoading: query.isLoading,
     refetch: query.refetch,
   }

@@ -146,6 +146,8 @@ export const ChatPage: React.FC = () => {
   }, [activeConvId]);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
+  const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
+  const isNearBottomRef = useRef(true);
   const [isLoadingConvs, setIsLoadingConvs] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -832,10 +834,6 @@ export const ChatPage: React.FC = () => {
 
   // Conversation Clear / Delete Modal State
   const [convActionConfirm, setConvActionConfirm] = useState<'delete_chat' | 'clear_chat' | null>(null);
-
-  // New message indicator & unread scroll state
-  const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
-  const isNearBottomRef = useRef(true);
 
   // Check scroll position to determine whether to auto-scroll or show indicator
   const handleScrollChat = () => {
