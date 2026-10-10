@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Header } from '../components/common/Header'
 import { Hero } from '../components/home/Hero'
 import { SearchPreview } from '../components/home/SearchPreview'
@@ -7,17 +7,13 @@ import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
 import { RegisterModal } from '../components/auth/RegisterModal'
 import { ProfileCard, type ProfileCardData } from '../components/cards/ProfileCard'
-import { Sparkles, ShieldCheck, Users, ArrowRight, Award, CheckCircle, Loader2 } from 'lucide-react'
+import { Sparkles, ShieldCheck, Users, ArrowRight, Award, CheckCircle } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   sendInterest,
   addToShortlist,
   removeFromShortlist,
-  getShortlistedIds,
-  getSentInterestIds,
-  getConnectedProfileIds,
 } from '../lib/interactionApi'
-import { getSubscriptionStatus } from '../lib/subscriptionApi'
 import {
   getRecommendedMatches,
   mapProfileResponseToCard,
@@ -26,6 +22,9 @@ import {
 } from '../lib/profileApi'
 import { UpgradeToPrimeModal } from '../components/common/UpgradeToPrimeModal'
 import { useAuth } from '../context/AuthContext'
+import { useInteractionStatus, useUserSubscription } from '../hooks/useSharedData'
+import { invalidateInteractionCache } from '../lib/queryClient'
+import { ProfileCardSkeleton } from '../components/skeletons'
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate()
@@ -33,11 +32,14 @@ export const LandingPage: React.FC = () => {
   const [langModalOpen, setLangModalOpen] = useState(false)
   const [registerModalOpen, setRegisterModalOpen] = useState(false)
   const [myProfile, setMyProfile] = useState<ProfileResponse | null>(null)
-  const [profiles, setProfiles] = useState<ProfileCardData[]>([])
+  const [rawProfiles, setRawProfiles] = useState<ProfileResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
-  const [isPremiumUser, setIsPremiumUser] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // Central cached user subscription and interaction sets
+  const { isPremium: isPremiumUser } = useUserSubscription()
+  const { shortlistedSet, sentInterestSet, connectedSet } = useInteractionStatus()
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -55,52 +57,41 @@ export const LandingPage: React.FC = () => {
   }, [isAuthenticated, user?.user_id])
 
   useEffect(() => {
-    if (isAuthenticated) {
-      getSubscriptionStatus()
-        .then((status) => {
-          if (status.is_active) setIsPremiumUser(true)
-        })
-        .catch(() => {})
-    } else {
-      setIsPremiumUser(false)
-    }
+    let isCancelled = false
+    setLoading(true)
 
     const fetchProfiles = async () => {
-      setLoading(true)
       try {
         const raw = await getRecommendedMatches(6)
-        let sIds: string[] = []
-        let sentIds: string[] = []
-        let connIds: string[] = []
-        if (isAuthenticated) {
-          try {
-            [sIds, sentIds, connIds] = await Promise.all([
-              getShortlistedIds().catch(() => []),
-              getSentInterestIds().catch(() => []),
-              getConnectedProfileIds().catch(() => []),
-            ])
-          } catch {
-            sIds = []
-            sentIds = []
-            connIds = []
-          }
+        if (!isCancelled) {
+          setRawProfiles(raw || [])
         }
-        const sSet = new Set(sIds)
-        const sentSet = new Set(sentIds)
-        const connSet = new Set(connIds)
-        const mapped = raw.slice(0, 6).map((p) =>
-          mapProfileResponseToCard(p, sSet.has(p.id), sentSet.has(p.id), connSet.has(p.id))
-        )
-        setProfiles(mapped)
       } catch (err) {
         console.error('Failed to load landing profiles:', err)
       } finally {
-        setLoading(false)
+        if (!isCancelled) {
+          setLoading(false)
+        }
       }
     }
 
     fetchProfiles()
+
+    return () => {
+      isCancelled = true
+    }
   }, [isAuthenticated, user?.user_id])
+
+  const profiles: ProfileCardData[] = useMemo(() => {
+    return rawProfiles.map((p) =>
+      mapProfileResponseToCard(
+        p,
+        shortlistedSet.has(p.id),
+        sentInterestSet.has(p.id),
+        connectedSet.has(p.id)
+      )
+    )
+  }, [rawProfiles, shortlistedSet, sentInterestSet, connectedSet])
 
   const handleInterest = async (id: string, name: string) => {
     if (!isAuthenticated) {
@@ -109,9 +100,8 @@ export const LandingPage: React.FC = () => {
     }
     try {
       await sendInterest(id)
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, isInterestSent: true } : p))
-      )
+      invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
       showToast(`Express Interest sent to ${name}!`)
     } catch (err: any) {
       showToast(err.message || 'Interest sent successfully!')
@@ -127,17 +117,13 @@ export const LandingPage: React.FC = () => {
     try {
       if (isCurrentlyShortlisted) {
         await removeFromShortlist(id)
-        setProfiles((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: false } : p))
-        )
         showToast(`${name} removed from shortlist.`)
       } else {
         await addToShortlist(id)
-        setProfiles((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isShortlisted: true } : p))
-        )
         showToast(`${name} added to shortlist!`)
       }
+      invalidateInteractionCache()
+      window.dispatchEvent(new CustomEvent('borkonya:interests-updated'))
     } catch (err: any) {
       console.error(err)
       throw err
@@ -211,9 +197,10 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center p-12 text-slate-500 bg-white rounded-2xl border border-slate-200">
-            <Loader2 className="w-8 h-8 animate-spin text-crimson-700 mb-3" />
-            <p className="text-sm font-medium">Fetching verified community profiles from Supabase...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <ProfileCardSkeleton key={`landing-skeleton-${idx}`} layout="vertical" />
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
