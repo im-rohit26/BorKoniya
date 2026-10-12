@@ -60,6 +60,14 @@ class ConversationSummaryResponse(BaseModel):
     unread_count: int = 0
     can_chat: bool = True
     created_at: datetime
+    is_archived: bool = False
+    is_muted: bool = False
+    muted_until: Optional[datetime] = None
+    is_pinned: bool = False
+    is_unread: bool = False
+    is_favourite: bool = False
+    is_closed: bool = False
+    list_id: Optional[str] = None
 
 
 class MessageSendRequest(BaseModel):
@@ -145,3 +153,18 @@ class ReportProfileResponse(BaseModel):
     status: str
     created_at: datetime
     message: str
+
+
+class UpdateConversationSettingsRequest(BaseModel):
+    is_archived: Optional[bool] = None
+    is_muted: Optional[bool] = None
+    muted_until: Optional[datetime] = None
+    is_pinned: Optional[bool] = None
+    is_unread: Optional[bool] = None
+    is_favourite: Optional[bool] = None
+    is_closed: Optional[bool] = None
+    list_id: Optional[str] = None
+
+
+class ClearConversationRequest(BaseModel):
+    keep_starred: Optional[bool] = False

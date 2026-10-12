@@ -182,6 +182,15 @@ class Conversation(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+    is_archived = Column(Boolean, default=False)
+    is_muted = Column(Boolean, default=False)
+    muted_until = Column(DateTime, nullable=True)
+    is_pinned = Column(Boolean, default=False)
+    is_unread = Column(Boolean, default=False)
+    is_favourite = Column(Boolean, default=False)
+    is_closed = Column(Boolean, default=False)
+    list_id = Column(String(50), nullable=True)
+
     members = relationship("ConversationMember", back_populates="conversation", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
 
@@ -194,6 +203,16 @@ class ConversationMember(Base):
     joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_hidden = Column(Boolean, default=False)
     cleared_at = Column(DateTime, nullable=True)
+
+    # User-specific chat settings
+    is_archived = Column(Boolean, default=False)
+    is_muted = Column(Boolean, default=False)
+    muted_until = Column(DateTime, nullable=True)
+    is_pinned = Column(Boolean, default=False)
+    is_unread = Column(Boolean, default=False)
+    is_favourite = Column(Boolean, default=False)
+    is_closed = Column(Boolean, default=False)
+    list_id = Column(String(50), nullable=True)
 
     conversation = relationship("Conversation", back_populates="members")
     profile = relationship("Profile")

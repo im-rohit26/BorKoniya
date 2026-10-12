@@ -30,6 +30,8 @@ from app.schemas.interaction import (
     ReplySnippetResponse,
     DeleteMessageRequest,
     MessageReactionRequest,
+    UpdateConversationSettingsRequest,
+    ClearConversationRequest,
 )
 from sqlalchemy.orm.attributes import flag_modified
 from app.models.entities import ProfilePhoto
@@ -292,12 +294,25 @@ def get_conversations(
             if p.profile_id not in photo_map:
                 photo_map[p.profile_id] = p.storage_path
 
+    member_map = {m.conversation_id: m for m in my_member_records}
+
     results = []
     for conv, other_profile, last_msg_content, last_msg_time, unread in rows:
         can_chat = is_premium or (other_profile.id in mutual_ids)
         last_name_display = other_profile.last_name if can_chat else f"{other_profile.last_name[0]}."
 
         other_photo_url = photo_map.get(other_profile.id)
+        mem = member_map.get(conv.id)
+
+        is_muted = False
+        if mem and mem.is_muted:
+            if mem.muted_until and mem.muted_until < datetime.now(timezone.utc):
+                is_muted = False
+            else:
+                is_muted = True
+
+        is_unread = bool(mem.is_unread) if mem else False
+        unread_final = max(unread, 1) if is_unread else unread
 
         results.append(
             ConversationSummaryResponse(
@@ -316,11 +331,28 @@ def get_conversations(
                 ),
                 last_message=last_msg_content,
                 last_message_time=last_msg_time if last_msg_time else conv.updated_at,
-                unread_count=unread,
+                unread_count=unread_final,
                 can_chat=can_chat,
                 created_at=conv.created_at,
+                is_archived=bool(mem.is_archived) if mem else False,
+                is_muted=is_muted,
+                muted_until=mem.muted_until if mem else None,
+                is_pinned=bool(mem.is_pinned) if mem else False,
+                is_unread=is_unread,
+                is_favourite=bool(mem.is_favourite) if mem else False,
+                is_closed=bool(mem.is_closed) if mem else False,
+                list_id=mem.list_id if mem else None,
             )
         )
+
+    # Sort pinned chats to the top, then by latest message/update time
+    results.sort(
+        key=lambda c: (
+            1 if c.is_pinned else 0,
+            c.last_message_time or c.created_at
+        ),
+        reverse=True
+    )
 
     return results
 
@@ -963,15 +995,17 @@ def delete_conversation_for_me(
     return {"status": "SUCCESS", "message": "Conversation removed from your chat list."}
 
 
-@router.post("/{conversation_id}/clear")
-def clear_conversation(
+@router.patch("/{conversation_id}/settings")
+def update_conversation_settings(
     conversation_id: str,
+    payload: UpdateConversationSettingsRequest,
     current_profile: Profile = Depends(get_current_profile),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Clears all messages in the conversation for the current user ("Clear chat")
-    without affecting the other user.
+    Updates user-specific settings for this conversation
+    (is_archived, is_muted, muted_until, is_pinned, is_unread, is_favourite, is_closed, list_id).
     """
     member = (
         db.query(ConversationMember)
@@ -987,7 +1021,86 @@ def clear_conversation(
             detail="Conversation not found or you are not a member.",
         )
 
-    member.cleared_at = datetime.now(timezone.utc)
+    if payload.is_archived is not None:
+        member.is_archived = payload.is_archived
+    if payload.is_muted is not None:
+        member.is_muted = payload.is_muted
+    if payload.muted_until is not None:
+        member.muted_until = payload.muted_until
+    if payload.is_pinned is not None:
+        member.is_pinned = payload.is_pinned
+    if payload.is_unread is not None:
+        member.is_unread = payload.is_unread
+    if payload.is_favourite is not None:
+        member.is_favourite = payload.is_favourite
+    if payload.is_closed is not None:
+        member.is_closed = payload.is_closed
+    if payload.list_id is not None:
+        member.list_id = payload.list_id if payload.list_id != "" else None
+
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "conversation_id": conversation_id,
+        "is_archived": member.is_archived,
+        "is_muted": member.is_muted,
+        "muted_until": member.muted_until,
+        "is_pinned": member.is_pinned,
+        "is_unread": member.is_unread,
+        "is_favourite": member.is_favourite,
+        "is_closed": member.is_closed,
+        "list_id": member.list_id,
+    }
+
+
+@router.post("/{conversation_id}/clear")
+def clear_conversation(
+    conversation_id: str,
+    payload: Optional[ClearConversationRequest] = None,
+    current_profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """
+    Clears all messages in the conversation for the current user ("Clear chat")
+    without affecting the other user.
+    If keep_starred is True, messages with starred reactions are preserved.
+    """
+    member = (
+        db.query(ConversationMember)
+        .filter(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.profile_id == current_profile.id,
+        )
+        .first()
+    )
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found or you are not a member.",
+        )
+
+    keep_starred = bool(payload and payload.keep_starred)
+    messages = db.query(Message).filter(Message.conversation_id == conversation_id).all()
+    now = datetime.now(timezone.utc)
+
+    for msg in messages:
+        reactions = msg.reactions or {}
+        is_starred = (
+            reactions.get(current_profile.id) in ("⭐", "star")
+            or any(v in ("⭐", "star") for v in reactions.values())
+        )
+        if keep_starred and is_starred:
+            continue
+
+        if msg.sender_profile_id == current_profile.id:
+            msg.is_deleted_for_sender = True
+        else:
+            msg.is_deleted_for_receiver = True
+
+    if not keep_starred:
+        member.cleared_at = now
+
     db.commit()
     return {"status": "SUCCESS", "message": "Chat cleared successfully."}
 

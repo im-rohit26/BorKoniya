@@ -42,6 +42,14 @@ import {
   FileText,
   Download,
   Loader2,
+  Archive,
+  VolumeX,
+  Volume2,
+  Pin,
+  PinOff,
+  Mail,
+  XCircle,
+  ListPlus,
 } from 'lucide-react';
 import {
   getConversations,
@@ -52,6 +60,7 @@ import {
   batchDeleteMessages,
   deleteConversationForMe,
   clearConversation,
+  updateConversationSettings,
   blockProfile,
   unblockProfile,
   markConversationRead,
@@ -88,9 +97,9 @@ import { ConversationListSkeleton, ChatMessageSkeleton } from '../components/ske
 // Horizontal scroller without visible scrollbar
 const NO_SCROLLBAR = '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
-// White round icon button used in chat header (smaller on mobile so everything fits)
+// White round icon button used in chat header (comfortable touch target >= 40px/44px on mobile)
 const ROUND_BTN =
-  'w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white text-[#0b2a5b] shadow-md shadow-[#0b2a5b]/10 hover:text-[#e0102f] transition-colors flex items-center justify-center gap-1.5 text-xs font-semibold flex-shrink-0';
+  'min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] rounded-full bg-white text-[#0b2a5b] shadow-md shadow-[#0b2a5b]/10 hover:text-[#e0102f] active:scale-95 transition-all flex items-center justify-center gap-1.5 text-xs font-semibold flex-shrink-0 touch-manipulation cursor-pointer';
 
 const BLUE_BUBBLE = 'bg-gradient-to-br from-[#0a56e0] to-[#0a3fc0] text-white shadow-md shadow-[#0b4fd8]/25';
 
@@ -154,7 +163,20 @@ export const ChatPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'favourites'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'favourites' | 'archived'>('all');
+  const [menuConv, setMenuConv] = useState<ConversationSummary | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'mute' | 'list' | null>(null);
+  const chatItemMenuRef = useRef<HTMLDivElement>(null);
+
+  const [actionModal, setActionModal] = useState<{
+    type: 'delete' | 'clear' | 'block';
+    convId: string;
+    targetProfileId: string;
+    targetName: string;
+  } | null>(null);
+  const [keepStarredMessages, setKeepStarredMessages] = useState(false);
+
   const [favouriteConvIds, setFavouriteConvIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('borkoniya_fav_convs');
@@ -411,6 +433,20 @@ export const ChatPage: React.FC = () => {
 
     return () => clearInterval(convPoll);
   }, [fetchConversations]);
+
+  // Close chat item dropdown menu on outside click or scroll
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (chatItemMenuRef.current && !chatItemMenuRef.current.contains(e.target as Node)) {
+        setMenuConv(null);
+        setActiveSubmenu(null);
+      }
+    };
+    if (menuConv) {
+      window.addEventListener('mousedown', handleOutsideClick);
+      return () => window.removeEventListener('mousedown', handleOutsideClick);
+    }
+  }, [menuConv]);
 
   // Presence channel to broadcast and track real active online users
   useEffect(() => {
@@ -872,7 +908,210 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  // Delete Conversation for me
+  // Dropdown Action Handlers
+  const handleToggleArchive = async (conv: ConversationSummary) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    const newArchived = !conv.is_archived;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, is_archived: newArchived } : c))
+    );
+    try {
+      await updateConversationSettings(conv.id, { is_archived: newArchived });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleMute = async (conv: ConversationSummary, durationHours: number | null) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    let mutedUntil: string | null = null;
+    let isMuted = true;
+    if (durationHours === 0) {
+      isMuted = false;
+      mutedUntil = null;
+    } else if (durationHours !== null) {
+      mutedUntil = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+    }
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conv.id ? { ...c, is_muted: isMuted, muted_until: mutedUntil } : c
+      )
+    );
+    try {
+      await updateConversationSettings(conv.id, { is_muted: isMuted, muted_until: mutedUntil });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleTogglePin = async (conv: ConversationSummary) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    const newPinned = !conv.is_pinned;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, is_pinned: newPinned } : c))
+    );
+    try {
+      await updateConversationSettings(conv.id, { is_pinned: newPinned });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleToggleMarkUnread = async (conv: ConversationSummary) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    const newUnread = !(conv.unread_count > 0 || conv.is_unread);
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conv.id
+          ? { ...c, is_unread: newUnread, unread_count: newUnread ? (c.unread_count || 1) : 0 }
+          : c
+      )
+    );
+    try {
+      await updateConversationSettings(conv.id, { is_unread: newUnread });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleToggleFavouriteChat = async (conv: ConversationSummary) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    const newFav = !conv.is_favourite;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, is_favourite: newFav } : c))
+    );
+    setFavouriteConvIds((prev) =>
+      newFav
+        ? prev.includes(conv.id)
+          ? prev
+          : [...prev, conv.id]
+        : prev.filter((id) => id !== conv.id)
+    );
+    try {
+      await updateConversationSettings(conv.id, { is_favourite: newFav });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleToggleClose = async (conv: ConversationSummary) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    const newClosed = !conv.is_closed;
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, is_closed: newClosed } : c))
+    );
+    try {
+      await updateConversationSettings(conv.id, { is_closed: newClosed });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleSetList = async (conv: ConversationSummary, listName: string | null) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, list_id: listName } : c))
+    );
+    try {
+      await updateConversationSettings(conv.id, { list_id: listName || '' });
+    } catch (err: any) {
+      console.error(err);
+      fetchConversations(true);
+    }
+  };
+
+  const handleOpenActionModal = (
+    type: 'delete' | 'clear' | 'block',
+    conv: ConversationSummary
+  ) => {
+    setMenuConv(null);
+    setActiveSubmenu(null);
+    const targetName = `${conv.other_profile.first_name} ${conv.other_profile.last_name || ''}`.trim();
+    setKeepStarredMessages(false);
+    setActionModal({
+      type,
+      convId: conv.id,
+      targetProfileId: conv.other_profile.profile_id,
+      targetName,
+    });
+  };
+
+  const handleExecuteDeleteChat = async () => {
+    if (!actionModal) return;
+    const targetId = actionModal.convId;
+    setActionModal(null);
+    setConversations((prev) => prev.filter((c) => c.id !== targetId));
+    if (activeConvId === targetId) {
+      setActiveConvId(null);
+    }
+    try {
+      await deleteConversationForMe(targetId);
+      await fetchConversations(true);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete conversation');
+      fetchConversations(true);
+    }
+  };
+
+  const handleExecuteClearChat = async () => {
+    if (!actionModal) return;
+    const targetId = actionModal.convId;
+    const keepStarred = keepStarredMessages;
+    setActionModal(null);
+    try {
+      await clearConversation(targetId, keepStarred);
+      if (activeConvId === targetId) {
+        if (keepStarred) {
+          setMessages((prev) =>
+            prev.filter((m) => {
+              const reactions = m.reactions || {};
+              return (
+                reactions[currentUser?.profile_id || ''] === '⭐' ||
+                Object.values(reactions).includes('⭐')
+              );
+            })
+          );
+        } else {
+          setMessages([]);
+        }
+      }
+      await fetchConversations(true);
+    } catch (err: any) {
+      alert(err.message || 'Failed to clear chat');
+    }
+  };
+
+  const handleExecuteBlockProfile = async () => {
+    if (!actionModal) return;
+    const targetPid = actionModal.targetProfileId;
+    const targetId = actionModal.convId;
+    setActionModal(null);
+    try {
+      await blockProfile(targetPid);
+      setConversations((prev) => prev.filter((c) => c.id !== targetId));
+      if (activeConvId === targetId) {
+        setActiveConvId(null);
+      }
+      await fetchConversations(true);
+    } catch (err: any) {
+      alert(err.message || 'Failed to block member');
+    }
+  };
+
+  // Delete Conversation for me (Legacy fallback)
   const handleExecuteDeleteConversation = async () => {
     if (!activeConvId) return;
     try {
@@ -885,11 +1124,11 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  // Clear Conversation messages for me
+  // Clear Conversation messages for me (Legacy fallback)
   const handleExecuteClearConversation = async () => {
     if (!activeConvId) return;
     try {
-      await clearConversation(activeConvId);
+      await clearConversation(activeConvId, false);
       setConvActionConfirm(null);
       setMessages([]);
       await fetchConversations();
@@ -1080,15 +1319,37 @@ export const ChatPage: React.FC = () => {
     touchStartPosRef.current = null;
   };
 
-  const filteredConversations = conversations.filter((c) => {
-    const nameMatch = `${c.other_profile.first_name} ${c.other_profile.last_name || ''}`
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    if (!nameMatch) return false;
-    if (activeFilter === 'unread') return c.unread_count > 0;
-    if (activeFilter === 'favourites') return favouriteConvIds.includes(c.id);
-    return true;
-  });
+  const filteredConversations = conversations
+    .filter((c) => {
+      const nameMatch = `${c.other_profile.first_name} ${c.other_profile.last_name || ''}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+      if (!nameMatch) return false;
+
+      // Archived filter behavior
+      if (activeFilter === 'archived') {
+        return !!c.is_archived;
+      }
+
+      // Hide archived chats in standard views unless searching
+      if (c.is_archived && !searchQuery) {
+        return false;
+      }
+
+      if (activeFilter === 'unread') return (c.unread_count > 0 || !!c.is_unread);
+      if (activeFilter === 'favourites') return !!c.is_favourite || favouriteConvIds.includes(c.id);
+      return true;
+    })
+    .sort((a, b) => {
+      // Pinned chats stay on top
+      const aPinned = a.is_pinned ? 1 : 0;
+      const bPinned = b.is_pinned ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+
+      const aTime = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+      const bTime = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+      return bTime - aTime;
+    });
 
   const forwardAvailableConversations = conversations.filter((c) => {
     const name = `${c.other_profile.first_name} ${c.other_profile.last_name || ''}`.toLowerCase();
@@ -1216,6 +1477,117 @@ export const ChatPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ================= CONVERSATION ITEM ACTION CONFIRMATION MODALS (DELETE / CLEAR / BLOCK) ================= */}
+      {actionModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#0b2a5b]/45 p-4 backdrop-blur-xs">
+          {actionModal.type === 'clear' ? (
+            /* Clear chat modal matching WhatsApp Web dialog */
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-[#e3e9f5] overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6">
+              <h3 className="font-bold text-[#0b2a5b] text-lg mb-2">
+                Clear this chat?
+              </h3>
+              <p className="text-xs text-[#6b7a99] leading-relaxed mb-5">
+                This chat will be empty but will remain in your chat list.
+              </p>
+
+              {/* Keep starred messages card with checkbox / toggle */}
+              <label className="flex items-center justify-between p-3.5 mb-6 rounded-2xl bg-[#f6f9ff] border border-[#e3e9f5] cursor-pointer hover:bg-[#edf2fc] transition-colors select-none">
+                <span className="text-xs font-semibold text-[#0b2a5b]">
+                  Keep starred messages
+                </span>
+                <input
+                  type="checkbox"
+                  checked={keepStarredMessages}
+                  onChange={(e) => setKeepStarredMessages(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-[#0a56e0] focus:ring-[#0a56e0]"
+                />
+              </label>
+
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  className="py-2.5 px-4 text-xs font-semibold text-[#0a56e0] hover:bg-[#f1f4fb] rounded-full transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteClearChat}
+                  className="py-2.5 px-5 text-xs font-bold text-white bg-[#e0102f] hover:bg-[#c70a27] rounded-full transition-colors shadow-md shadow-[#e0102f]/25"
+                >
+                  Clear chat
+                </button>
+              </div>
+            </div>
+          ) : actionModal.type === 'delete' ? (
+            /* Delete chat modal with required Hindi message */
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-[#e3e9f5] overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-[#fde8ee] flex items-center justify-center mx-auto mb-4 text-[#e0102f]">
+                <Trash2 className="w-7 h-7" />
+              </div>
+
+              <h3 className="font-bold text-[#0b2a5b] text-base sm:text-lg mb-2">
+                Kya aap sach me ye chat delete karna chahte ho?
+              </h3>
+
+              <p className="text-xs text-[#6b7a99] leading-relaxed mb-6">
+                Ye chat aapke Messages page se remove ho jayegi. Dusre user ke paas chat intact rahegi.
+              </p>
+
+              <div className="flex items-center gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  className="flex-1 py-2.5 px-4 text-xs font-semibold text-[#0b2a5b] bg-[#f1f4fb] hover:bg-[#e4ebf8] rounded-full transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteDeleteChat}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold text-white bg-[#e0102f] hover:bg-[#c70a27] rounded-full transition-colors shadow-md shadow-[#e0102f]/25"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Block user confirmation modal */
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-[#e3e9f5] overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-[#fde8ee] flex items-center justify-center mx-auto mb-4 text-[#e0102f]">
+                <Ban className="w-7 h-7" />
+              </div>
+
+              <h3 className="font-bold text-[#0b2a5b] text-lg mb-2">
+                Block {actionModal.targetName}?
+              </h3>
+
+              <p className="text-xs text-[#6b7a99] leading-relaxed mb-6">
+                Blocked contacts will no longer be able to message or view details of your profile.
+              </p>
+
+              <div className="flex items-center gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  className="flex-1 py-2.5 px-4 text-xs font-semibold text-[#0b2a5b] bg-[#f1f4fb] hover:bg-[#e4ebf8] rounded-full transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteBlockProfile}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold text-white bg-[#e0102f] hover:bg-[#c70a27] rounded-full transition-colors shadow-md shadow-[#e0102f]/25"
+                >
+                  Block
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1383,7 +1755,7 @@ export const ChatPage: React.FC = () => {
           <aside
             className={`${
               showChatOnMobile ? 'hidden md:flex' : 'flex'
-            } w-full md:w-[320px] lg:w-[370px] xl:w-[410px] 2xl:w-[460px] md:flex-shrink-0 min-w-0 min-h-0 border-r border-[#e3e9f5] flex-col bg-white/90`}
+            } w-full md:w-[380px] lg:w-[410px] xl:w-[440px] 2xl:w-[480px] md:flex-shrink-0 min-w-0 min-h-0 border-r border-[#e3e9f5] flex-col bg-white/90`}
           >
             {/* Brand + New Match */}
             <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-3 flex-shrink-0">
@@ -1396,10 +1768,10 @@ export const ChatPage: React.FC = () => {
               </div>
               <button
                 onClick={() => navigate('/matches')}
-                className="px-4 py-2.5 rounded-2xl bg-gradient-to-br from-[#0a56e0] to-[#0a3fc0] text-white text-sm font-semibold flex items-center gap-2 shadow-lg shadow-[#0b4fd8]/30 flex-shrink-0"
+                className="min-h-[44px] px-3.5 sm:px-4 py-2.5 rounded-2xl bg-gradient-to-br from-[#0a56e0] to-[#0a3fc0] text-white text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-lg shadow-[#0b4fd8]/30 flex-shrink-0 active:scale-95 transition-all cursor-pointer"
               >
-                <UserPlus className="w-4 h-4" />
-                <span>New Match</span>
+                <UserPlus className="w-4 h-4 flex-shrink-0" />
+                <span className="whitespace-nowrap">New Match</span>
               </button>
             </div>
 
@@ -1464,23 +1836,24 @@ export const ChatPage: React.FC = () => {
               )}
             </div>
 
-            {/* Filter pills */}
-            <div className={`px-3 py-2 flex items-center gap-2 overflow-x-auto text-xs flex-shrink-0 ${NO_SCROLLBAR}`}>
-              {(['all', 'unread', 'favourites'] as const).map((f) => {
-                const Icon = f === 'all' ? MessageSquare : f === 'unread' ? Bell : Star;
+            {/* Filter pills - Wrap to next row on mobile/narrow screens */}
+            <div className="px-3 py-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs flex-shrink-0">
+              {(['all', 'unread', 'favourites', 'archived'] as const).map((f) => {
+                const Icon = f === 'all' ? MessageSquare : f === 'unread' ? Bell : f === 'favourites' ? Star : Archive;
                 const active = activeFilter === f;
+                const archivedCount = conversations.filter((c) => c.is_archived).length;
                 return (
                   <button
                     key={f}
                     onClick={() => setActiveFilter(f)}
-                    className={`px-4 py-2 rounded-full font-semibold transition-all flex items-center gap-1.5 flex-shrink-0 ${
+                    className={`min-h-[34px] px-3 py-1.5 rounded-full font-semibold transition-all flex items-center gap-1.5 flex-shrink-0 active:scale-95 cursor-pointer ${
                       active
                         ? 'bg-[#e0102f] text-white shadow-md shadow-[#e0102f]/30'
-                        : 'bg-white text-[#0b2a5b] border border-[#e3e9f5] shadow-sm hover:bg-[#f4f7fd]'
+                        : 'bg-white text-[#0b2a5b] border border-[#e3e9f5] shadow-2xs hover:bg-[#f4f7fd]'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{f === 'all' ? 'All' : f === 'unread' ? 'Unread' : 'Favourites'}</span>
+                    <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="whitespace-nowrap">{f === 'all' ? 'All' : f === 'unread' ? 'Unread' : f === 'favourites' ? 'Favourites' : 'Archived'}</span>
                     {f === 'unread' && totalUnreadCount > 0 && (
                       <span
                         className={`min-w-4 h-4 px-1 text-[10px] rounded-full flex items-center justify-center font-bold ${
@@ -1490,15 +1863,25 @@ export const ChatPage: React.FC = () => {
                         {totalUnreadCount}
                       </span>
                     )}
+                    {f === 'archived' && archivedCount > 0 && (
+                      <span
+                        className={`min-w-4 h-4 px-1 text-[10px] rounded-full flex items-center justify-center font-bold ${
+                          active ? 'bg-white text-[#e0102f]' : 'bg-[#6b7a99] text-white'
+                        }`}
+                      >
+                        {archivedCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
               <button
                 onClick={() => navigate('/interests')}
-                className="px-4 py-2 rounded-full font-semibold flex items-center gap-1.5 flex-shrink-0 bg-white text-[#0b2a5b] border border-[#e3e9f5] shadow-sm hover:bg-[#f4f7fd]"
+                className="min-h-[34px] px-3 py-1.5 rounded-full font-semibold flex items-center gap-1.5 flex-shrink-0 bg-white text-[#0b2a5b] border border-[#e3e9f5] shadow-2xs hover:bg-[#f4f7fd] active:scale-95 transition-all cursor-pointer"
+                title="Accepted Interest Requests"
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Requests</span>
+                <UserPlus className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="whitespace-nowrap">Requests</span>
               </button>
             </div>
 
@@ -1562,11 +1945,31 @@ export const ChatPage: React.FC = () => {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-sm font-bold text-[#0b2a5b] truncate min-w-0">{name}</h4>
-                          <span className="text-[11px] flex-shrink-0 text-[#8a96b0]">
-                            {formatTimeSnippet(c.last_message_time || c.created_at)}
-                          </span>
+                        <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            {c.is_pinned && (
+                              <Pin className="w-3.5 h-3.5 text-[#0a56e0] flex-shrink-0 fill-[#0a56e0]/20" />
+                            )}
+                            <h4 className="text-sm font-bold text-[#0b2a5b] truncate min-w-0">{name}</h4>
+                            {c.is_closed && (
+                              <span className="text-[10px] px-1.5 py-0.2 font-medium bg-gray-100 text-[#6b7a99] rounded border border-gray-200 flex-shrink-0">
+                                Closed
+                              </span>
+                            )}
+                            {c.list_id && (
+                              <span className="text-[10px] px-1.5 py-0.2 font-medium bg-[#eef3fb] text-[#0a56e0] rounded border border-[#d6e2f8] flex-shrink-0 truncate max-w-[80px]">
+                                {c.list_id}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {c.is_muted && (
+                              <VolumeX className="w-3.5 h-3.5 text-[#8a96b0]" />
+                            )}
+                            <span className="text-[11px] text-[#8a96b0]">
+                              {formatTimeSnippet(c.last_message_time || c.created_at)}
+                            </span>
+                          </div>
                         </div>
 
                         <p className="text-xs mt-0.5 flex items-center gap-1">
@@ -1583,28 +1986,62 @@ export const ChatPage: React.FC = () => {
                         <div className="flex items-center justify-between gap-2 mt-0.5">
                           <p
                             className={`text-xs truncate min-w-0 flex-1 ${
-                              c.unread_count > 0 ? 'text-[#0b2a5b] font-semibold' : 'text-[#6b7a99]'
+                              (c.unread_count > 0 || c.is_unread) ? 'text-[#0b2a5b] font-semibold' : 'text-[#6b7a99]'
                             }`}
                           >
                             {c.last_message ||
                               `${c.other_profile.community || 'Matrimonial Match'} • ${c.other_profile.current_city || 'BorKoniya'}`}
                           </p>
 
-                          {c.unread_count > 0 ? (
-                            <span className="min-w-[22px] h-[22px] px-1.5 bg-[#e0102f] text-white rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0">
-                              {c.unread_count}
-                            </span>
-                          ) : (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {c.unread_count > 0 ? (
+                              <span className="min-w-[20px] h-[20px] px-1.5 bg-[#e0102f] text-white rounded-full flex items-center justify-center text-[10px] font-bold">
+                                {c.unread_count}
+                              </span>
+                            ) : c.is_unread ? (
+                              <span className="w-2.5 h-2.5 bg-[#16a34a] rounded-full" title="Marked as unread" />
+                            ) : (
+                              (c.is_favourite || isFav) && (
+                                <span className="text-xs text-[#f5b301]" title="Favourite">★</span>
+                              )
+                            )}
+
+                            {/* Chevron dropdown button */}
                             <button
-                              onClick={(e) => toggleFavourite(c.id, e)}
-                              className={`p-1 text-lg leading-none flex-shrink-0 transition-colors hover:text-[#f5b301] ${
-                                isFav ? 'text-[#f5b301]' : 'text-[#d6dcea] md:opacity-0 md:group-hover:opacity-100'
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const menuWidth = 220;
+                                const menuHeight = 360;
+                                let top = rect.bottom + 4;
+                                let left = rect.left - 180;
+
+                                if (left < 10) left = 10;
+                                if (left + menuWidth > window.innerWidth - 10) {
+                                  left = window.innerWidth - menuWidth - 10;
+                                }
+                                if (top + menuHeight > window.innerHeight - 10) {
+                                  top = Math.max(10, rect.top - menuHeight);
+                                }
+
+                                if (menuConv?.id === c.id) {
+                                  setMenuConv(null);
+                                  setActiveSubmenu(null);
+                                } else {
+                                  setMenuConv(c);
+                                  setMenuPosition({ top, left });
+                                  setActiveSubmenu(null);
+                                }
+                              }}
+                              className={`p-1 rounded-full text-[#8a96b0] hover:text-[#0b2a5b] hover:bg-[#e4ebf8] transition-all opacity-0 group-hover:opacity-100 ${
+                                menuConv?.id === c.id ? '!opacity-100 bg-[#e4ebf8] text-[#0b2a5b]' : ''
                               }`}
-                              title={isFav ? 'Remove favourite' : 'Star chat'}
+                              title="Chat options"
                             >
-                              ★
+                              <ChevronDown className="w-4 h-4" />
                             </button>
-                          )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1679,7 +2116,7 @@ export const ChatPage: React.FC = () => {
                         const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
                         navigate(basePath);
                       }}
-                      className="md:hidden p-1.5 text-[#0b2a5b] hover:text-[#e0102f] hover:bg-[#fde8ee] rounded-full flex-shrink-0"
+                      className="md:hidden min-w-[40px] min-h-[40px] flex items-center justify-center text-[#0b2a5b] hover:text-[#e0102f] hover:bg-[#fde8ee] rounded-full flex-shrink-0 active:scale-95 transition-all cursor-pointer"
                       title="Back to chats"
                     >
                       <ArrowLeft className="w-5 h-5" />
@@ -2734,7 +3171,7 @@ export const ChatPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className={`p-1.5 sm:p-2 rounded-full transition-colors ${
+                    className={`min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-full transition-colors active:scale-95 cursor-pointer ${
                       showEmojiPicker ? 'bg-white text-[#e0102f]' : 'text-[#0b4fd8] hover:bg-white'
                     }`}
                     title="Insert emoji"
@@ -2743,7 +3180,7 @@ export const ChatPage: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="flex-1 min-w-0 bg-white rounded-full px-3.5 py-2 sm:px-5 sm:py-2.5 flex items-center gap-2 border-2 border-[#f3a6b6] focus-within:border-[#e0102f] transition-colors shadow-2xs">
+                <div className="flex-1 min-w-0 bg-white rounded-full px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-2 border-2 border-[#f3a6b6] focus-within:border-[#e0102f] transition-colors shadow-2xs">
                   <input
                     ref={inputRef}
                     type="text"
@@ -2765,7 +3202,7 @@ export const ChatPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={!inputText.trim() || isSending || isBlocked || !canChat}
-                  className={`w-11 h-11 sm:w-13 sm:h-13 rounded-full transition-all flex items-center justify-center flex-shrink-0 ${
+                  className={`min-w-[42px] min-h-[42px] w-11 h-11 sm:w-12 sm:h-12 rounded-full transition-all flex items-center justify-center flex-shrink-0 cursor-pointer ${
                     inputText.trim() && !isBlocked && canChat
                       ? 'bg-gradient-to-br from-[#f0213f] to-[#c70a27] text-white shadow-md shadow-[#e0102f]/40 hover:scale-105 active:scale-95'
                       : 'bg-[#e4e8f3] text-[#a3adc4] cursor-not-allowed'
@@ -2797,6 +3234,230 @@ export const ChatPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ================= CHAT ITEM DROPDOWN MENU ================= */}
+      {menuConv && menuPosition && (
+        <div
+          ref={chatItemMenuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-56 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 text-xs text-[#0b2a5b] animate-in fade-in zoom-in-95 duration-100 select-none"
+        >
+          {/* 1. Archive chat */}
+          <button
+            type="button"
+            onClick={() => handleToggleArchive(menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            <Archive className="w-4 h-4 text-[#6b7a99]" />
+            <span className="font-medium">
+              {menuConv.is_archived ? 'Unarchive chat' : 'Archive chat'}
+            </span>
+          </button>
+
+          {/* 2. Mute notifications (with Submenu: 8 hours, 1 week, Always) */}
+          <div
+            className="relative"
+            onMouseEnter={() => setActiveSubmenu('mute')}
+            onMouseLeave={() => setActiveSubmenu(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute')}
+              className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                {menuConv.is_muted ? (
+                  <Volume2 className="w-4 h-4 text-[#6b7a99]" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-[#6b7a99]" />
+                )}
+                <span className="font-medium">
+                  {menuConv.is_muted ? 'Unmute notifications' : 'Mute notifications'}
+                </span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
+            </button>
+
+            {activeSubmenu === 'mute' && (
+              <div
+                className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95"
+              >
+                {menuConv.is_muted && (
+                  <button
+                    type="button"
+                    onClick={() => handleMute(menuConv, 0)}
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#0a56e0] font-semibold"
+                  >
+                    Unmute
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleMute(menuConv, 8)}
+                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left"
+                >
+                  8 hours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMute(menuConv, 24 * 7)}
+                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left"
+                >
+                  1 week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMute(menuConv, null)}
+                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left"
+                >
+                  Always
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Pin chat */}
+          <button
+            type="button"
+            onClick={() => handleTogglePin(menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            {menuConv.is_pinned ? (
+              <PinOff className="w-4 h-4 text-[#6b7a99]" />
+            ) : (
+              <Pin className="w-4 h-4 text-[#6b7a99]" />
+            )}
+            <span className="font-medium">
+              {menuConv.is_pinned ? 'Unpin chat' : 'Pin chat'}
+            </span>
+          </button>
+
+          {/* 4. Mark as unread */}
+          <button
+            type="button"
+            onClick={() => handleToggleMarkUnread(menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            <Mail className="w-4 h-4 text-[#6b7a99]" />
+            <span className="font-medium">
+              {menuConv.unread_count > 0 || menuConv.is_unread ? 'Mark as read' : 'Mark as unread'}
+            </span>
+          </button>
+
+          {/* 5. Add to favourites */}
+          <button
+            type="button"
+            onClick={() => handleToggleFavouriteChat(menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            <Star
+              className={`w-4 h-4 ${
+                menuConv.is_favourite ? 'text-[#f5b301] fill-[#f5b301]' : 'text-[#6b7a99]'
+              }`}
+            />
+            <span className="font-medium">
+              {menuConv.is_favourite ? 'Remove from favourites' : 'Add to favourites'}
+            </span>
+          </button>
+
+          {/* 6. Close chat */}
+          <button
+            type="button"
+            onClick={() => handleToggleClose(menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            <XCircle className="w-4 h-4 text-[#6b7a99]" />
+            <span className="font-medium">
+              {menuConv.is_closed ? 'Reopen chat' : 'Close chat'}
+            </span>
+          </button>
+
+          {/* 7. Add to list (with Submenu: Family, VIP, Work, Remove) */}
+          <div
+            className="relative"
+            onMouseEnter={() => setActiveSubmenu('list')}
+            onMouseLeave={() => setActiveSubmenu(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveSubmenu(activeSubmenu === 'list' ? null : 'list')}
+              className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <ListPlus className="w-4 h-4 text-[#6b7a99]" />
+                <span className="font-medium">Add to list</span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
+            </button>
+
+            {activeSubmenu === 'list' && (
+              <div
+                className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95"
+              >
+                {['Family', 'Close Friends', 'Prospective Match', 'VIP'].map((listName) => (
+                  <button
+                    key={listName}
+                    type="button"
+                    onClick={() => handleSetList(menuConv, listName)}
+                    className={`w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left ${
+                      menuConv.list_id === listName ? 'text-[#0a56e0] font-semibold' : ''
+                    }`}
+                  >
+                    <span>{listName}</span>
+                    {menuConv.list_id === listName && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+                {menuConv.list_id && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetList(menuConv, null)}
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#e0102f] border-t border-[#f0f3fa] mt-1 pt-1.5"
+                  >
+                    Remove from list
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 8. Block */}
+          <button
+            type="button"
+            onClick={() => handleOpenActionModal('block', menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            <Ban className="w-4 h-4 text-[#6b7a99]" />
+            <span className="font-medium">Block</span>
+          </button>
+
+          {/* 9. Clear chat */}
+          <button
+            type="button"
+            onClick={() => handleOpenActionModal('clear', menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+          >
+            <Eraser className="w-4 h-4 text-[#6b7a99]" />
+            <span className="font-medium">Clear chat</span>
+          </button>
+
+          <div className="h-px bg-[#f0f3fa] my-1" />
+
+          {/* 10. Delete chat (red color, last option) */}
+          <button
+            type="button"
+            onClick={() => handleOpenActionModal('delete', menuConv)}
+            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#fde8ee] text-left text-[#e0102f] transition-colors"
+          >
+            <Trash2 className="w-4 h-4 text-[#e0102f]" />
+            <span className="font-semibold">Delete chat</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

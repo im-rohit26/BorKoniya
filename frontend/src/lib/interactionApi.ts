@@ -38,6 +38,14 @@ export interface ConversationSummary {
   unread_count: number;
   can_chat: boolean;
   created_at: string;
+  is_archived?: boolean;
+  is_muted?: boolean;
+  muted_until?: string | null;
+  is_pinned?: boolean;
+  is_unread?: boolean;
+  is_favourite?: boolean;
+  is_closed?: boolean;
+  list_id?: string | null;
 }
 
 export interface ReplySnippet {
@@ -408,14 +416,57 @@ export async function deleteConversationForMe(conversationId: string) {
   return data;
 }
 
-export async function clearConversation(conversationId: string) {
+export interface UpdateConversationSettingsPayload {
+  is_archived?: boolean;
+  is_muted?: boolean;
+  muted_until?: string | null;
+  is_pinned?: boolean;
+  is_unread?: boolean;
+  is_favourite?: boolean;
+  is_closed?: boolean;
+  list_id?: string | null;
+}
+
+export async function updateConversationSettings(
+  conversationId: string,
+  settings: UpdateConversationSettingsPayload
+): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/settings`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update conversation settings' }));
+    throw new Error(err.detail || 'Failed to update conversation settings');
+  }
+  const data = await res.json();
+  invalidateConversationCache();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:conversations-updated'));
+  }
+  return data;
+}
+
+export async function clearConversation(conversationId: string, keepStarred: boolean = false) {
   const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/clear`, {
     method: 'POST',
-    headers: { ...getAuthHeaders() },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ keep_starred: keepStarred }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to clear conversation' }));
     throw new Error(err.detail || 'Failed to clear conversation');
+  }
+  invalidateConversationCache();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:conversations-updated'));
   }
   return res.json();
 }
