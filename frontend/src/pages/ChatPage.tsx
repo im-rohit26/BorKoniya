@@ -222,6 +222,31 @@ export const ChatPage: React.FC = () => {
   const quickRef = useRef<HTMLDivElement>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  // Handle mobile virtual keyboard appearance via window.visualViewport
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+        if (activeConvId) {
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }, 80);
+        }
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, [activeConvId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1416,7 +1441,10 @@ export const ChatPage: React.FC = () => {
   const showChatOnMobile = !!activeConvId;
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full max-w-full flex flex-col bg-[#eef3fb] overflow-hidden">
+    <div
+      style={viewportHeight ? { height: `${viewportHeight}px`, maxHeight: `${viewportHeight}px` } : undefined}
+      className="h-[100dvh] max-h-[100dvh] w-full max-w-full flex flex-col bg-[#eef3fb] overflow-hidden"
+    >
       <div className={`flex-shrink-0 ${showChatOnMobile ? 'hidden md:block' : ''}`}>
         <Header onOpenLanguageModal={() => setLangModalOpen(true)} onOpenRegister={() => {}} />
       </div>
@@ -2011,9 +2039,18 @@ export const ChatPage: React.FC = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                const isMobile = window.innerWidth < 768;
+                                if (isMobile) {
+                                  // Mobile: open bottom sheet or centered popup
+                                  setMenuConv(c);
+                                  setMenuPosition({ top: 0, left: 0 });
+                                  setActiveSubmenu(null);
+                                  return;
+                                }
+
                                 const rect = e.currentTarget.getBoundingClientRect();
-                                const menuWidth = 220;
-                                const menuHeight = 360;
+                                const menuWidth = 230;
+                                const menuHeight = 380;
                                 let top = rect.bottom + 4;
                                 let left = rect.left - 180;
 
@@ -2034,7 +2071,7 @@ export const ChatPage: React.FC = () => {
                                   setActiveSubmenu(null);
                                 }
                               }}
-                              className={`p-1 rounded-full text-[#8a96b0] hover:text-[#0b2a5b] hover:bg-[#e4ebf8] transition-all opacity-0 group-hover:opacity-100 ${
+                              className={`min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full text-[#8a96b0] hover:text-[#0b2a5b] hover:bg-[#e4ebf8] transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 active:scale-95 cursor-pointer touch-manipulation ${
                                 menuConv?.id === c.id ? '!opacity-100 bg-[#e4ebf8] text-[#0b2a5b]' : ''
                               }`}
                               title="Chat options"
@@ -3186,6 +3223,11 @@ export const ChatPage: React.FC = () => {
                     type="text"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                      }, 200);
+                    }}
                     disabled={isBlocked || !canChat}
                     placeholder={
                       isBlocked
@@ -3235,228 +3277,369 @@ export const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ================= CHAT ITEM DROPDOWN MENU ================= */}
-      {menuConv && menuPosition && (
-        <div
-          ref={chatItemMenuRef}
-          style={{
-            position: 'fixed',
-            top: `${menuPosition.top}px`,
-            left: `${menuPosition.left}px`,
-            zIndex: 9999,
-          }}
-          className="w-56 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 text-xs text-[#0b2a5b] animate-in fade-in zoom-in-95 duration-100 select-none"
-        >
-          {/* 1. Archive chat */}
-          <button
-            type="button"
-            onClick={() => handleToggleArchive(menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            <Archive className="w-4 h-4 text-[#6b7a99]" />
-            <span className="font-medium">
-              {menuConv.is_archived ? 'Unarchive chat' : 'Archive chat'}
-            </span>
-          </button>
-
-          {/* 2. Mute notifications (with Submenu: 8 hours, 1 week, Always) */}
-          <div
-            className="relative"
-            onMouseEnter={() => setActiveSubmenu('mute')}
-            onMouseLeave={() => setActiveSubmenu(null)}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute')}
-              className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                {menuConv.is_muted ? (
-                  <Volume2 className="w-4 h-4 text-[#6b7a99]" />
-                ) : (
-                  <VolumeX className="w-4 h-4 text-[#6b7a99]" />
-                )}
-                <span className="font-medium">
-                  {menuConv.is_muted ? 'Unmute notifications' : 'Mute notifications'}
-                </span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
-            </button>
-
-            {activeSubmenu === 'mute' && (
-              <div
-                className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95"
-              >
-                {menuConv.is_muted && (
-                  <button
-                    type="button"
-                    onClick={() => handleMute(menuConv, 0)}
-                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#0a56e0] font-semibold"
-                  >
-                    Unmute
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleMute(menuConv, 8)}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left"
-                >
-                  8 hours
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMute(menuConv, 24 * 7)}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left"
-                >
-                  1 week
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMute(menuConv, null)}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left"
-                >
-                  Always
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 3. Pin chat */}
-          <button
-            type="button"
-            onClick={() => handleTogglePin(menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            {menuConv.is_pinned ? (
-              <PinOff className="w-4 h-4 text-[#6b7a99]" />
-            ) : (
-              <Pin className="w-4 h-4 text-[#6b7a99]" />
-            )}
-            <span className="font-medium">
-              {menuConv.is_pinned ? 'Unpin chat' : 'Pin chat'}
-            </span>
-          </button>
-
-          {/* 4. Mark as unread */}
-          <button
-            type="button"
-            onClick={() => handleToggleMarkUnread(menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            <Mail className="w-4 h-4 text-[#6b7a99]" />
-            <span className="font-medium">
-              {menuConv.unread_count > 0 || menuConv.is_unread ? 'Mark as read' : 'Mark as unread'}
-            </span>
-          </button>
-
-          {/* 5. Add to favourites */}
-          <button
-            type="button"
-            onClick={() => handleToggleFavouriteChat(menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            <Star
-              className={`w-4 h-4 ${
-                menuConv.is_favourite ? 'text-[#f5b301] fill-[#f5b301]' : 'text-[#6b7a99]'
-              }`}
+      {/* ================= CHAT ITEM DROPDOWN MENU / MOBILE BOTTOM SHEET ================= */}
+      {menuConv && (
+        <>
+          {/* Mobile Backdrop & Bottom Sheet (< 768px) */}
+          <div className="md:hidden">
+            <div
+              className="fixed inset-0 bg-[#0b2a5b]/45 z-[9998] backdrop-blur-2xs transition-opacity animate-in fade-in duration-150"
+              onClick={() => {
+                setMenuConv(null);
+                setActiveSubmenu(null);
+              }}
             />
-            <span className="font-medium">
-              {menuConv.is_favourite ? 'Remove from favourites' : 'Add to favourites'}
-            </span>
-          </button>
-
-          {/* 6. Close chat */}
-          <button
-            type="button"
-            onClick={() => handleToggleClose(menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            <XCircle className="w-4 h-4 text-[#6b7a99]" />
-            <span className="font-medium">
-              {menuConv.is_closed ? 'Reopen chat' : 'Close chat'}
-            </span>
-          </button>
-
-          {/* 7. Add to list (with Submenu: Family, VIP, Work, Remove) */}
-          <div
-            className="relative"
-            onMouseEnter={() => setActiveSubmenu('list')}
-            onMouseLeave={() => setActiveSubmenu(null)}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveSubmenu(activeSubmenu === 'list' ? null : 'list')}
-              className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+            <div
+              ref={chatItemMenuRef}
+              className="fixed bottom-0 left-0 right-0 z-[9999] bg-white rounded-t-3xl shadow-2xl border-t border-[#e3e9f5] p-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
             >
-              <div className="flex items-center gap-3">
-                <ListPlus className="w-4 h-4 text-[#6b7a99]" />
-                <span className="font-medium">Add to list</span>
+              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
+              <div className="flex items-center justify-between px-2 pb-3 mb-2 border-b border-[#f0f3fa]">
+                <span className="font-bold text-sm text-[#0b2a5b] truncate">
+                  {menuConv.other_profile.first_name} {menuConv.other_profile.last_name || ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuConv(null);
+                    setActiveSubmenu(null);
+                  }}
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
-            </button>
 
-            {activeSubmenu === 'list' && (
-              <div
-                className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95"
-              >
-                {['Family', 'Close Friends', 'Prospective Match', 'VIP'].map((listName) => (
-                  <button
-                    key={listName}
-                    type="button"
-                    onClick={() => handleSetList(menuConv, listName)}
-                    className={`w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left ${
-                      menuConv.list_id === listName ? 'text-[#0a56e0] font-semibold' : ''
-                    }`}
-                  >
-                    <span>{listName}</span>
-                    {menuConv.list_id === listName && <Check className="w-3.5 h-3.5" />}
-                  </button>
-                ))}
-                {menuConv.list_id && (
+              <div className="space-y-1 text-sm text-[#0b2a5b]">
+                <button
+                  type="button"
+                  onClick={() => handleToggleArchive(menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  <Archive className="w-5 h-5 text-[#6b7a99]" />
+                  <span className="font-medium">{menuConv.is_archived ? 'Unarchive chat' : 'Archive chat'}</span>
+                </button>
+
+                {/* Mobile Mute Submenu */}
+                <div>
                   <button
                     type="button"
-                    onClick={() => handleSetList(menuConv, null)}
-                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#e0102f] border-t border-[#f0f3fa] mt-1 pt-1.5"
+                    onClick={() => setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute')}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
                   >
-                    Remove from list
+                    <div className="flex items-center gap-3">
+                      {menuConv.is_muted ? <Volume2 className="w-5 h-5 text-[#6b7a99]" /> : <VolumeX className="w-5 h-5 text-[#6b7a99]" />}
+                      <span className="font-medium">{menuConv.is_muted ? 'Unmute notifications' : 'Mute notifications'}</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${activeSubmenu === 'mute' ? 'rotate-180' : ''}`} />
                   </button>
-                )}
+                  {activeSubmenu === 'mute' && (
+                    <div className="ml-8 pl-3 border-l-2 border-[#eef2fa] space-y-1 py-1">
+                      {menuConv.is_muted && (
+                        <button
+                          type="button"
+                          onClick={() => handleMute(menuConv, 0)}
+                          className="w-full text-left py-2 px-2 text-sm text-[#0a56e0] font-semibold"
+                        >
+                          Unmute
+                        </button>
+                      )}
+                      <button type="button" onClick={() => handleMute(menuConv, 8)} className="w-full text-left py-2 px-2 text-sm text-[#0b2a5b]">
+                        8 hours
+                      </button>
+                      <button type="button" onClick={() => handleMute(menuConv, 24 * 7)} className="w-full text-left py-2 px-2 text-sm text-[#0b2a5b]">
+                        1 week
+                      </button>
+                      <button type="button" onClick={() => handleMute(menuConv, null)} className="w-full text-left py-2 px-2 text-sm text-[#0b2a5b]">
+                        Always
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleTogglePin(menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  {menuConv.is_pinned ? <PinOff className="w-5 h-5 text-[#6b7a99]" /> : <Pin className="w-5 h-5 text-[#6b7a99]" />}
+                  <span className="font-medium">{menuConv.is_pinned ? 'Unpin chat' : 'Pin chat'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleMarkUnread(menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  <Mail className="w-5 h-5 text-[#6b7a99]" />
+                  <span className="font-medium">{menuConv.unread_count > 0 || menuConv.is_unread ? 'Mark as read' : 'Mark as unread'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleFavouriteChat(menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  <Star className={`w-5 h-5 ${menuConv.is_favourite ? 'text-[#f5b301] fill-[#f5b301]' : 'text-[#6b7a99]'}`} />
+                  <span className="font-medium">{menuConv.is_favourite ? 'Remove from favourites' : 'Add to favourites'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleClose(menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  <XCircle className="w-5 h-5 text-[#6b7a99]" />
+                  <span className="font-medium">{menuConv.is_closed ? 'Reopen chat' : 'Close chat'}</span>
+                </button>
+
+                {/* Mobile Add to list Submenu */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubmenu(activeSubmenu === 'list' ? null : 'list')}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <ListPlus className="w-5 h-5 text-[#6b7a99]" />
+                      <span className="font-medium">Add to list</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${activeSubmenu === 'list' ? 'rotate-180' : ''}`} />
+                  </button>
+                  {activeSubmenu === 'list' && (
+                    <div className="ml-8 pl-3 border-l-2 border-[#eef2fa] space-y-1 py-1">
+                      {['Family', 'Close Friends', 'Prospective Match', 'VIP'].map((listName) => (
+                        <button
+                          key={listName}
+                          type="button"
+                          onClick={() => handleSetList(menuConv, listName)}
+                          className={`w-full flex items-center justify-between py-2 px-2 text-sm ${menuConv.list_id === listName ? 'text-[#0a56e0] font-semibold' : 'text-[#0b2a5b]'}`}
+                        >
+                          <span>{listName}</span>
+                          {menuConv.list_id === listName && <Check className="w-4 h-4" />}
+                        </button>
+                      ))}
+                      {menuConv.list_id && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetList(menuConv, null)}
+                          className="w-full text-left py-2 px-2 text-sm text-[#e0102f]"
+                        >
+                          Remove from list
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenActionModal('block', menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  <Ban className="w-5 h-5 text-[#6b7a99]" />
+                  <span className="font-medium">Block</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenActionModal('clear', menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
+                >
+                  <Eraser className="w-5 h-5 text-[#6b7a99]" />
+                  <span className="font-medium">Clear chat</span>
+                </button>
+
+                <div className="h-px bg-[#f0f3fa] my-2" />
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenActionModal('delete', menuConv)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#fde8ee] active:bg-[#fee2e2] text-[#e0102f] text-left transition-colors font-bold min-h-[44px]"
+                >
+                  <Trash2 className="w-5 h-5 text-[#e0102f]" />
+                  <span>Delete chat</span>
+                </button>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* 8. Block */}
-          <button
-            type="button"
-            onClick={() => handleOpenActionModal('block', menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            <Ban className="w-4 h-4 text-[#6b7a99]" />
-            <span className="font-medium">Block</span>
-          </button>
+          {/* Desktop / Tablet Floating Dropdown (>= 768px) */}
+          {menuPosition && (
+            <div
+              ref={chatItemMenuRef}
+              style={{
+                position: 'fixed',
+                top: `${menuPosition.top}px`,
+                left: `${menuPosition.left}px`,
+                zIndex: 9999,
+              }}
+              className="hidden md:block w-56 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 text-xs text-[#0b2a5b] animate-in fade-in zoom-in-95 duration-100 select-none"
+            >
+              {/* 1. Archive chat */}
+              <button
+                type="button"
+                onClick={() => handleToggleArchive(menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                <Archive className="w-4 h-4 text-[#6b7a99]" />
+                <span className="font-medium">{menuConv.is_archived ? 'Unarchive chat' : 'Archive chat'}</span>
+              </button>
 
-          {/* 9. Clear chat */}
-          <button
-            type="button"
-            onClick={() => handleOpenActionModal('clear', menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
-          >
-            <Eraser className="w-4 h-4 text-[#6b7a99]" />
-            <span className="font-medium">Clear chat</span>
-          </button>
+              {/* 2. Mute notifications */}
+              <div
+                className="relative"
+                onMouseEnter={() => setActiveSubmenu('mute')}
+                onMouseLeave={() => setActiveSubmenu(null)}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute')}
+                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {menuConv.is_muted ? <Volume2 className="w-4 h-4 text-[#6b7a99]" /> : <VolumeX className="w-4 h-4 text-[#6b7a99]" />}
+                    <span className="font-medium">{menuConv.is_muted ? 'Unmute notifications' : 'Mute notifications'}</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
+                </button>
+                {activeSubmenu === 'mute' && (
+                  <div className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95">
+                    {menuConv.is_muted && (
+                      <button type="button" onClick={() => handleMute(menuConv, 0)} className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#0a56e0] font-semibold">
+                        Unmute
+                      </button>
+                    )}
+                    <button type="button" onClick={() => handleMute(menuConv, 8)} className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left">
+                      8 hours
+                    </button>
+                    <button type="button" onClick={() => handleMute(menuConv, 24 * 7)} className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left">
+                      1 week
+                    </button>
+                    <button type="button" onClick={() => handleMute(menuConv, null)} className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left">
+                      Always
+                    </button>
+                  </div>
+                )}
+              </div>
 
-          <div className="h-px bg-[#f0f3fa] my-1" />
+              {/* 3. Pin chat */}
+              <button
+                type="button"
+                onClick={() => handleTogglePin(menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                {menuConv.is_pinned ? <PinOff className="w-4 h-4 text-[#6b7a99]" /> : <Pin className="w-4 h-4 text-[#6b7a99]" />}
+                <span className="font-medium">{menuConv.is_pinned ? 'Unpin chat' : 'Pin chat'}</span>
+              </button>
 
-          {/* 10. Delete chat (red color, last option) */}
-          <button
-            type="button"
-            onClick={() => handleOpenActionModal('delete', menuConv)}
-            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#fde8ee] text-left text-[#e0102f] transition-colors"
-          >
-            <Trash2 className="w-4 h-4 text-[#e0102f]" />
-            <span className="font-semibold">Delete chat</span>
-          </button>
-        </div>
+              {/* 4. Mark as unread */}
+              <button
+                type="button"
+                onClick={() => handleToggleMarkUnread(menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                <Mail className="w-4 h-4 text-[#6b7a99]" />
+                <span className="font-medium">{menuConv.unread_count > 0 || menuConv.is_unread ? 'Mark as read' : 'Mark as unread'}</span>
+              </button>
+
+              {/* 5. Add to favourites */}
+              <button
+                type="button"
+                onClick={() => handleToggleFavouriteChat(menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                <Star className={`w-4 h-4 ${menuConv.is_favourite ? 'text-[#f5b301] fill-[#f5b301]' : 'text-[#6b7a99]'}`} />
+                <span className="font-medium">{menuConv.is_favourite ? 'Remove from favourites' : 'Add to favourites'}</span>
+              </button>
+
+              {/* 6. Close chat */}
+              <button
+                type="button"
+                onClick={() => handleToggleClose(menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                <XCircle className="w-4 h-4 text-[#6b7a99]" />
+                <span className="font-medium">{menuConv.is_closed ? 'Reopen chat' : 'Close chat'}</span>
+              </button>
+
+              {/* 7. Add to list */}
+              <div
+                className="relative"
+                onMouseEnter={() => setActiveSubmenu('list')}
+                onMouseLeave={() => setActiveSubmenu(null)}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveSubmenu(activeSubmenu === 'list' ? null : 'list')}
+                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <ListPlus className="w-4 h-4 text-[#6b7a99]" />
+                    <span className="font-medium">Add to list</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
+                </button>
+                {activeSubmenu === 'list' && (
+                  <div className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95">
+                    {['Family', 'Close Friends', 'Prospective Match', 'VIP'].map((listName) => (
+                      <button
+                        key={listName}
+                        type="button"
+                        onClick={() => handleSetList(menuConv, listName)}
+                        className={`w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left ${menuConv.list_id === listName ? 'text-[#0a56e0] font-semibold' : ''}`}
+                      >
+                        <span>{listName}</span>
+                        {menuConv.list_id === listName && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    ))}
+                    {menuConv.list_id && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetList(menuConv, null)}
+                        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#e0102f] border-t border-[#f0f3fa] mt-1 pt-1.5"
+                      >
+                        Remove from list
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 8. Block */}
+              <button
+                type="button"
+                onClick={() => handleOpenActionModal('block', menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                <Ban className="w-4 h-4 text-[#6b7a99]" />
+                <span className="font-medium">Block</span>
+              </button>
+
+              {/* 9. Clear chat */}
+              <button
+                type="button"
+                onClick={() => handleOpenActionModal('clear', menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
+              >
+                <Eraser className="w-4 h-4 text-[#6b7a99]" />
+                <span className="font-medium">Clear chat</span>
+              </button>
+
+              <div className="h-px bg-[#f0f3fa] my-1" />
+
+              {/* 10. Delete chat */}
+              <button
+                type="button"
+                onClick={() => handleOpenActionModal('delete', menuConv)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#fde8ee] text-left text-[#e0102f] transition-colors"
+              >
+                <Trash2 className="w-4 h-4 text-[#e0102f]" />
+                <span className="font-semibold">Delete chat</span>
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
