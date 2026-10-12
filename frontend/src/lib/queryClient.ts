@@ -95,4 +95,5 @@ export function invalidateInteractionCache() {
 export function invalidateConversationCache() {
   queryClient.invalidateQueries({ queryKey: ['conversations'] })
   queryClient.invalidateQueries({ queryKey: ['interactions', 'summary'] })
+  queryClient.invalidateQueries({ queryKey: ['dashboard'] })
 }

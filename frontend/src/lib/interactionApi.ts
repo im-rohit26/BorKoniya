@@ -1,5 +1,6 @@
 import { getAuthHeaders } from './authApi';
 import { API_BASE_URL } from './config';
+import { invalidateConversationCache } from './queryClient';
 
 export interface InterestItem {
   id: string;
@@ -303,7 +304,12 @@ export async function startOrGetConversation(targetProfileId: string, initialMes
     const err = await res.json().catch(() => ({ detail: 'Failed to start conversation' }));
     throw new Error(err.detail || 'Failed to start conversation');
   }
-  return res.json();
+  const data = await res.json();
+  invalidateConversationCache();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:conversations-updated'));
+  }
+  return data;
 }
 
 export async function getMessages(conversationId: string): Promise<MessageItem[]> {
@@ -394,7 +400,12 @@ export async function deleteConversationForMe(conversationId: string) {
     const err = await res.json().catch(() => ({ detail: 'Failed to delete conversation' }));
     throw new Error(err.detail || 'Failed to delete conversation');
   }
-  return res.json();
+  const data = await res.json();
+  invalidateConversationCache();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('borkonya:conversations-updated'));
+  }
+  return data;
 }
 
 export async function clearConversation(conversationId: string) {

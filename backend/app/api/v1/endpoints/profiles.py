@@ -349,8 +349,9 @@ def get_my_dashboard_stats(
             detail="Profile not found for this account.",
         )
 
-    from app.models.entities import Interest, Shortlist, ConversationMember, MatchScore, ProfilePhoto
-    from sqlalchemy import or_
+    from app.models.entities import Interest, Shortlist, Conversation, ConversationMember, MatchScore, ProfilePhoto, User
+    from sqlalchemy.orm import aliased
+    from sqlalchemy import or_, func, distinct
 
     target_gender = "MALE" if (profile.gender and profile.gender.upper() == "FEMALE") else "FEMALE"
 
@@ -399,11 +400,24 @@ def get_my_dashboard_stats(
         Shortlist.user_profile_id == profile.id,
     ).count()
 
-    # 6. Active conversations count
-    active_conversations_count = db.query(ConversationMember).filter(
-        ConversationMember.profile_id == profile.id,
-        ConversationMember.is_hidden == False,
-    ).count()
+    # 6. Active conversations count (strictly matching available chats in Messages)
+    other_member_alias = aliased(ConversationMember)
+    other_profile_alias = aliased(Profile)
+
+    active_conversations_count = (
+        db.query(func.count(distinct(Conversation.id)))
+        .join(ConversationMember, ConversationMember.conversation_id == Conversation.id)
+        .join(other_member_alias, other_member_alias.conversation_id == Conversation.id)
+        .join(other_profile_alias, other_profile_alias.id == other_member_alias.profile_id)
+        .join(User, User.id == other_profile_alias.user_id)
+        .filter(
+            ConversationMember.profile_id == profile.id,
+            ConversationMember.is_hidden == False,
+            other_member_alias.profile_id != profile.id,
+            other_profile_alias.status == "ACTIVE",
+        )
+        .scalar()
+    ) or 0
 
     # 7. Profile views / impressions
     profile_views_count = db.query(MatchScore).filter(

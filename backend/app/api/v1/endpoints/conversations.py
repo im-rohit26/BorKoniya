@@ -83,6 +83,48 @@ def check_chat_entitlement(
     return False
 
 
+def cleanup_orphaned_conversations(db: Session) -> int:
+    """
+    Finds and permanently deletes conversations that:
+    1. Have fewer than 2 valid active members (e.g. partner account/profile was deleted), or
+    2. Contain orphaned members without an active partner.
+    Returns the count of deleted conversations.
+    """
+    from sqlalchemy import func, or_
+
+    valid_members_subq = (
+        db.query(
+            ConversationMember.conversation_id,
+            func.count(ConversationMember.profile_id).label("valid_count")
+        )
+        .join(Profile, Profile.id == ConversationMember.profile_id)
+        .join(User, User.id == Profile.user_id)
+        .filter(Profile.status == "ACTIVE")
+        .group_by(ConversationMember.conversation_id)
+        .subquery()
+    )
+
+    orphaned_conv_ids = [
+        r[0] for r in db.query(Conversation.id)
+        .outerjoin(valid_members_subq, valid_members_subq.c.conversation_id == Conversation.id)
+        .filter(
+            or_(
+                valid_members_subq.c.valid_count == None,
+                valid_members_subq.c.valid_count < 2
+            )
+        )
+        .all()
+    ]
+
+    if orphaned_conv_ids:
+        db.query(Message).filter(Message.conversation_id.in_(orphaned_conv_ids)).delete(synchronize_session=False)
+        db.query(ConversationMember).filter(ConversationMember.conversation_id.in_(orphaned_conv_ids)).delete(synchronize_session=False)
+        db.query(Conversation).filter(Conversation.id.in_(orphaned_conv_ids)).delete(synchronize_session=False)
+        db.commit()
+        return len(orphaned_conv_ids)
+    return 0
+
+
 @router.get("", response_model=List[ConversationSummaryResponse])
 def get_conversations(
     current_profile: Profile = Depends(get_current_profile),
@@ -90,6 +132,9 @@ def get_conversations(
     db: Session = Depends(get_db),
 ):
     from sqlalchemy import func, and_, or_, case
+
+    # Clean up any orphaned conversations (e.g. partner accounts that were deleted)
+    cleanup_orphaned_conversations(db)
 
     # Filter out conversations that this member marked as hidden ("Delete chat for me")
     my_member_records = (
@@ -183,15 +228,26 @@ def get_conversations(
         )
         .join(ConversationMember, ConversationMember.conversation_id == Conversation.id)
         .join(Profile, Profile.id == ConversationMember.profile_id)
+        .join(User, User.id == Profile.user_id)
         .outerjoin(last_msg_subq, last_msg_subq.c.conversation_id == Conversation.id)
         .outerjoin(unread_subq, unread_subq.c.conversation_id == Conversation.id)
         .filter(
             Conversation.id.in_(my_conv_ids),
-            ConversationMember.profile_id != current_profile.id
+            ConversationMember.profile_id != current_profile.id,
+            Profile.status == "ACTIVE"
         )
         .order_by(Conversation.updated_at.desc())
         .all()
     )
+
+    # Deduplicate rows by Conversation.id
+    seen_conv_ids = set()
+    deduped_rows = []
+    for r in rows:
+        if r[0].id not in seen_conv_ids:
+            seen_conv_ids.add(r[0].id)
+            deduped_rows.append(r)
+    rows = deduped_rows
 
     active_sub = (
         db.query(Subscription)
@@ -332,6 +388,16 @@ def start_or_get_conversation(
 
     if shared_conv:
         conv_id = shared_conv.id
+        my_member = (
+            db.query(ConversationMember)
+            .filter(
+                ConversationMember.conversation_id == shared_conv.id,
+                ConversationMember.profile_id == current_profile.id,
+            )
+            .first()
+        )
+        if my_member and my_member.is_hidden:
+            my_member.is_hidden = False
     else:
         # Create new conversation
         new_conv = Conversation()

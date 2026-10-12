@@ -369,7 +369,23 @@ def delete_my_account(
     Permanently delete the authenticated user's account and all associated data.
     Foreign key cascading will remove the associated profile, photos, messages,
     conversations memberships, subscriptions, interests, and shortlists.
+    Also removes all 1-to-1 conversations that this user's profile was part of
+    so no orphaned chat records remain for conversation partners.
     """
+    from app.models.entities import Conversation, ConversationMember, Message
+
+    if current_user.profile:
+        user_conv_ids = [
+            m.conversation_id
+            for m in db.query(ConversationMember.conversation_id)
+            .filter(ConversationMember.profile_id == current_user.profile.id)
+            .all()
+        ]
+        if user_conv_ids:
+            db.query(Message).filter(Message.conversation_id.in_(user_conv_ids)).delete(synchronize_session=False)
+            db.query(ConversationMember).filter(ConversationMember.conversation_id.in_(user_conv_ids)).delete(synchronize_session=False)
+            db.query(Conversation).filter(Conversation.id.in_(user_conv_ids)).delete(synchronize_session=False)
+
     db.delete(current_user)
     db.commit()
     return {"status": "SUCCESS", "message": "Account deleted permanently."}

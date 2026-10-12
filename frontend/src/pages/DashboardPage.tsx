@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Header } from '../components/common/Header'
 import { Footer } from '../components/common/Footer'
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal'
@@ -45,12 +45,26 @@ export const DashboardPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Central query caching for dashboard stats (60s stale time)
-  const { data: dashboardData = null, isLoading: loadingMatches } = useQuery<DashboardStatsResponse | null>({
+  // Central query caching for dashboard stats with reactive refetch on mount and updates
+  const { data: dashboardData = null, isLoading: loadingMatches, refetch: refetchDashboard } = useQuery<DashboardStatsResponse | null>({
     queryKey: queryKeys.dashboard.stats(user?.user_id),
     queryFn: () => getDashboardStats().catch(() => null),
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always',
   })
+
+  // Listen for real-time interaction & conversation updates across pages
+  useEffect(() => {
+    const handleUpdate = () => {
+      refetchDashboard()
+    }
+    window.addEventListener('borkonya:conversations-updated', handleUpdate)
+    window.addEventListener('borkonya:interests-updated', handleUpdate)
+    return () => {
+      window.removeEventListener('borkonya:conversations-updated', handleUpdate)
+      window.removeEventListener('borkonya:interests-updated', handleUpdate)
+    }
+  }, [refetchDashboard])
 
   // Purely reactive matches computed from query data & cached interaction sets
   const matches = useMemo(() => {
@@ -126,10 +140,7 @@ export const DashboardPage: React.FC = () => {
     (dashboardData?.metrics?.received_interests_count ?? 0) +
     (dashboardData?.metrics?.sent_interests_count ?? 0)
   const shortlistedCount = dashboardData?.metrics?.shortlist_count ?? 0
-  const messagesCount =
-    dashboardData?.metrics?.active_conversations_count ??
-    dashboardData?.metrics?.total_active_connections ??
-    0
+  const messagesCount = dashboardData?.metrics?.active_conversations_count ?? 0
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfbf9]">
