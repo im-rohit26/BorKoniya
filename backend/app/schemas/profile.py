@@ -58,6 +58,11 @@ class ProfileResponse(ProfileBase):
     is_contact_revealed: bool = False
     revealed_phone: Optional[str] = None
     revealed_email: Optional[str] = None
+    phone_shared: bool = False
+    email_shared: bool = False
+
+    # Subscription access lock flag
+    is_locked: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

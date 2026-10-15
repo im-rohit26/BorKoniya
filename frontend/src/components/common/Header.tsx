@@ -15,7 +15,6 @@ import {
   Heart,
   MessageSquare,
   MessageSquareMore,
-  Calendar,
   Home,
   Search,
   Phone,
@@ -109,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
       path: '/messages',
       badge: unreadMessagesCount > 0 ? (unreadMessagesCount > 99 ? '99+' : String(unreadMessagesCount)) : null,
     },
-    { name: t('nav.plans', 'Plans'), path: '/subscription' },
+    // { name: t('nav.plans', 'Plans'), path: '/subscription' },
   ]
 
   // Mobile menu items matching exact design reference
@@ -169,12 +168,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanguageModal, onOpenRegis
       iconColor: 'text-slate-800',
       badge: unreadMessagesCount > 0 ? (unreadMessagesCount > 99 ? '99+' : String(unreadMessagesCount)) : null,
     },
-    {
-      name: t('nav.plans', 'Plans'),
-      path: '/subscription',
-      icon: Calendar,
-      iconColor: 'text-slate-800',
-    },
+    // {
+    //   name: t('nav.plans', 'Plans'),
+    //   path: '/subscription',
+    //   icon: Calendar,
+    //   iconColor: 'text-slate-800',
+    // },
     {
       isDivider: true,
     },

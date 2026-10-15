@@ -57,6 +57,8 @@ import { useInteractionStatus, useUserSubscription, useMasterData } from '../hoo
 import { queryKeys, queryClient, invalidateInteractionCache } from '../lib/queryClient'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileDetailsSkeleton } from '../components/skeletons'
+import { ContactPrivacyModal } from '../components/privacy/ContactPrivacyModal'
+import { getConnectionPrivacyList, type ConnectionPrivacyItem } from '../lib/contactPrivacyApi'
 
 // Decorative Botanical Leaf SVG Watermark matching 2-color brand theme (Navy Blue subtle tint)
 const LeafWatermark: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -139,6 +141,30 @@ export const ProfileDetailPage: React.FC = () => {
     setLocalInterestSent(null)
     setLocalShortlisted(null)
   }, [id])
+
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false)
+  const { data: privacyConnections = [], refetch: refetchPrivacy } = useQuery({
+    queryKey: ['connections', 'contact-privacy', user?.user_id],
+    queryFn: getConnectionPrivacyList,
+    enabled: Boolean(user && isConnected),
+    staleTime: 30 * 1000,
+  })
+
+  const matchedConnection = privacyConnections.find(
+    (c) => c.other_profile_id === profile?.id || c.other_user_id === profile?.user_id
+  )
+  const connectionItemForModal: ConnectionPrivacyItem | null = matchedConnection || (profile ? {
+    connection_id: profile.id,
+    other_user_id: profile.user_id,
+    other_profile_id: profile.id,
+    other_name: `${profile.first_name} ${profile.last_name || ''}`.trim() || 'Member Profile',
+    other_gender: profile.gender,
+    other_photo_url: profile.photo_url,
+    my_sharing_phone: false,
+    my_sharing_email: false,
+    their_sharing_phone: Boolean(profile.phone_shared),
+    their_sharing_email: Boolean(profile.email_shared),
+  } : null)
 
   // Editing state for Owner view
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -308,7 +334,7 @@ export const ProfileDetailPage: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!profile) return
-    if (!isPremiumUser && !isConnected) {
+    if (!isPremiumUser) {
       openUpgradeModal('Unlimited Direct Messaging')
       return
     }
@@ -399,6 +425,30 @@ export const ProfileDetailPage: React.FC = () => {
           </div>
         ) : (
           <>
+            {/* Locked Profile Notification Banner */}
+            {profile.is_locked && (
+              <div className="mb-6 rounded-3xl bg-gradient-to-r from-navy-950 via-navy-900 to-crimson-950 text-white p-5 sm:p-6 shadow-md border border-crimson-900/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center space-x-3.5 text-center sm:text-left">
+                  <div className="w-12 h-12 rounded-2xl bg-crimson-600/30 border border-crimson-500/40 flex items-center justify-center flex-shrink-0">
+                    <Lock className="w-6 h-6 text-crimson-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-white font-serif">This Profile is Locked</h3>
+                    <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                      You are viewing a free preview profile. Active subscribers can unlock all bride & groom profiles, direct unlimited chat, and full verified details.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  to="/subscription"
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-crimson-600 to-crimson-700 hover:brightness-110 text-white text-xs font-bold shadow-md transition-all whitespace-nowrap"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>View Subscription Plans</span>
+                </Link>
+              </div>
+            )}
+
             {/* ======================================================== */}
             {/* 1. TOP PROFILE SUMMARY CARD                              */}
             {/* ======================================================== */}
@@ -529,57 +579,79 @@ export const ProfileDetailPage: React.FC = () => {
                   {/* VISITOR ACTION BUTTONS (Shown strictly when NOT owner) */}
                   {!isOwner && (
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 pt-3 border-t border-slate-200/60">
-                      {isConnected ? (
-                        <button
-                          disabled
-                          className="min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold bg-navy-50 text-navy-800 border border-navy-300 cursor-default"
-                        >
-                          <CheckCircle className="h-4 w-4 text-navy-800" />
-                          <span>Connected</span>
-                        </button>
+                      {profile.is_locked ? (
+                        <div className="flex flex-wrap items-center gap-2.5 w-full">
+                          <Link
+                            to="/subscription"
+                            className="min-h-[44px] flex-1 sm:flex-initial inline-flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-crimson-700 to-crimson-800 hover:brightness-110 px-5 py-2.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
+                          >
+                            <Lock className="h-4 w-4" />
+                            <span>Subscribe to Unlock Full Profile & Chat</span>
+                          </Link>
+                          <button
+                            onClick={() => setReportModalOpen(true)}
+                            className="min-h-[44px] flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                            title="Report Profile"
+                          >
+                            <Flag className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Report</span>
+                          </button>
+                        </div>
                       ) : (
-                        <button
-                          onClick={handleInterest}
-                          disabled={interestSent}
-                          className={`min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                            interestSent
-                              ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
-                              : 'bg-crimson-700 text-white hover:bg-crimson-800 active:bg-crimson-900 shadow-xs'
-                          }`}
-                        >
-                          {interestSent ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-                          <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
-                        </button>
+                        <>
+                          {isConnected ? (
+                            <button
+                              disabled
+                              className="min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold bg-navy-50 text-navy-800 border border-navy-300 cursor-default"
+                            >
+                              <CheckCircle className="h-4 w-4 text-navy-800" />
+                              <span>Connected</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleInterest}
+                              disabled={interestSent}
+                              className={`min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                                interestSent
+                                  ? 'bg-crimson-50 text-crimson-700 border border-crimson-200 cursor-default'
+                                  : 'bg-crimson-700 text-white hover:bg-crimson-800 active:bg-crimson-900 shadow-xs'
+                              }`}
+                            >
+                              {interestSent ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
+                              <span>{interestSent ? 'Interested' : 'Express Interest'}</span>
+                            </button>
+                          )}
+
+                          <button
+                            onClick={handleShortlist}
+                            className={`min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold border transition-all cursor-pointer ${
+                              isShortlisted
+                                ? 'bg-navy-50 text-navy-800 border-navy-300 shadow-xs'
+                                : 'bg-white text-navy-800 border-navy-200 hover:bg-navy-50 active:bg-navy-100'
+                            }`}
+                          >
+                            <Bookmark className={`h-4 w-4 ${isShortlisted ? 'fill-navy-800 text-navy-800' : 'text-navy-800'}`} />
+                            <span>{isShortlisted ? 'Shortlisted' : 'Shortlist'}</span>
+                          </button>
+
+                          <button
+                            onClick={handleSendMessage}
+                            className="min-h-[40px] flex items-center space-x-2 rounded-xl bg-navy-800 hover:bg-navy-900 active:bg-navy-950 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            <span>Send Message</span>
+                          </button>
+
+                          <button
+                            onClick={() => setReportModalOpen(true)}
+                            className="min-h-[40px] flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                            title="Report Profile"
+                          >
+                            <Flag className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Report</span>
+                          </button>
+                        </>
                       )}
-
-                      <button
-                        onClick={handleShortlist}
-                        className={`min-h-[40px] flex items-center space-x-2 rounded-xl px-4 py-2 text-xs font-bold border transition-all cursor-pointer ${
-                          isShortlisted
-                            ? 'bg-navy-50 text-navy-800 border-navy-300 shadow-xs'
-                            : 'bg-white text-navy-800 border-navy-200 hover:bg-navy-50 active:bg-navy-100'
-                        }`}
-                      >
-                        <Bookmark className={`h-4 w-4 ${isShortlisted ? 'fill-navy-800 text-navy-800' : 'text-navy-800'}`} />
-                        <span>{isShortlisted ? 'Shortlisted' : 'Shortlist'}</span>
-                      </button>
-
-                      <button
-                        onClick={handleSendMessage}
-                        className="min-h-[40px] flex items-center space-x-2 rounded-xl bg-navy-800 hover:bg-navy-900 active:bg-navy-950 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        <span>Send Message</span>
-                      </button>
-
-                      <button
-                        onClick={() => setReportModalOpen(true)}
-                        className="min-h-[40px] flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                        title="Report Profile"
-                      >
-                        <Flag className="h-3.5 w-3.5" />
-                        <span>Report</span>
-                      </button>
                     </div>
                   )}
                 </div>
@@ -892,9 +964,9 @@ export const ProfileDetailPage: React.FC = () => {
                     )}
                   </div>
 
-                  {isOwner || isPremiumUser ? (
+                  {isOwner ? (
                     <div className="mt-5 space-y-4">
-                      {/* Row 1: Email (Read-Only) */}
+                      {/* Row 1: Email (Owner) */}
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
                         <div className="flex items-center space-x-3 min-w-0">
                           <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0">
@@ -924,7 +996,7 @@ export const ProfileDetailPage: React.FC = () => {
                         </button>
                       </div>
 
-                      {/* Row 2: Family Phone (Read-Only) */}
+                      {/* Row 2: Family Phone (Owner) */}
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
                         <div className="flex items-center space-x-3 min-w-0">
                           <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 flex items-center justify-center flex-shrink-0">
@@ -954,7 +1026,7 @@ export const ProfileDetailPage: React.FC = () => {
                         </button>
                       </div>
 
-                      {/* Row 3: Address (Editable via pencil!) */}
+                      {/* Row 3: Address (Owner) */}
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
                         <div className="flex items-center space-x-3 min-w-0">
                           <div className="w-9 h-9 rounded-xl bg-crimson-50 text-crimson-700 flex items-center justify-center flex-shrink-0">
@@ -985,63 +1057,200 @@ export const ProfileDetailPage: React.FC = () => {
                       </div>
 
                       {/* PHOTO PROMO BANNER (Only when Owner) */}
-                      {isOwner && (
-                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy-50 to-slate-50 border border-navy-100 p-4 flex items-center justify-between shadow-2xs mt-4">
-                          <LeafWatermark className="absolute -bottom-4 -right-4 w-32 h-32 text-navy-800/10" />
+                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy-50 to-slate-50 border border-navy-100 p-4 flex items-center justify-between shadow-2xs mt-4">
+                        <LeafWatermark className="absolute -bottom-4 -right-4 w-32 h-32 text-navy-800/10" />
 
-                          <div className="relative z-10 flex items-center space-x-3 min-w-0">
-                            <div className="w-10 h-10 rounded-full bg-navy-100 text-navy-800 flex items-center justify-center flex-shrink-0">
-                              <User className="w-5 h-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <h3 className="text-xs sm:text-sm font-bold text-navy-950 font-sans">
-                                You can add your profile photo
-                              </h3>
-                              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
-                                Make your profile more personal and help others know you better.
-                              </p>
-                            </div>
+                        <div className="relative z-10 flex items-center space-x-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-navy-100 text-navy-800 flex items-center justify-center flex-shrink-0">
+                            <User className="w-5 h-5" />
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploadingPhoto}
-                            className="relative z-10 w-9 h-9 rounded-xl bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 flex-shrink-0 ml-3 cursor-pointer"
-                            title="Upload Profile Photo"
-                            aria-label="Upload Profile Photo"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+                          <div className="min-w-0">
+                            <h3 className="text-xs sm:text-sm font-bold text-navy-950 font-sans">
+                              You can add your profile photo
+                            </h3>
+                            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
+                              Make your profile more personal and help others know you better.
+                            </p>
+                          </div>
                         </div>
-                      )}
+
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingPhoto}
+                          className="relative z-10 w-9 h-9 rounded-xl bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 flex-shrink-0 ml-3 cursor-pointer"
+                          title="Upload Profile Photo"
+                          aria-label="Upload Profile Photo"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    /* VISITOR PROTECTED CONTACT DETAILS */
+                    /* VISITOR GRANULAR CONTACT DETAILS */
                     <div className="mt-5 space-y-4">
-                      <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 text-center">
-                        <Lock className="w-8 h-8 text-crimson-700 mx-auto mb-2" />
-                        <h4 className="text-xs font-bold text-navy-950 mb-1">Protected Contact Details</h4>
-                        <p className="text-[11px] text-slate-600 mb-3">
-                          Direct phone numbers and verified emails are hidden to maintain family privacy.
-                        </p>
+                      {/* Row 1: Direct Phone Number */}
+                      <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              profile?.phone_shared && profile?.revealed_phone
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-slate-200/70 text-slate-500'
+                            }`}>
+                              <Phone className="w-4 h-4" />
+                            </div>
+                            <span className="text-[11px] font-bold text-navy-950">
+                              Phone Number
+                            </span>
+                          </div>
+                          {profile?.phone_shared && profile?.revealed_phone ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                              Shared by Owner
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                              <Lock className="w-3 h-3 text-slate-500" />
+                              <span>Private</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pl-10">
+                          {profile?.phone_shared && profile?.revealed_phone ? (
+                            <>
+                              <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
+                                {profile.revealed_phone}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(profile.revealed_phone || '', 'Phone')}
+                                className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors cursor-pointer"
+                                title="Copy Phone"
+                                aria-label="Copy Phone"
+                              >
+                                {copiedField === 'Phone' ? (
+                                  <Check className="w-4 h-4 text-crimson-700" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                            <p className="text-[11px] text-slate-500 leading-snug">
+                              Contact details are private. Only profile owner can share.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 2: Verified Email Address */}
+                      <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              profile?.email_shared && profile?.revealed_email
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-slate-200/70 text-slate-500'
+                            }`}>
+                              <Mail className="w-4 h-4" />
+                            </div>
+                            <span className="text-[11px] font-bold text-navy-950">
+                              Email Address
+                            </span>
+                          </div>
+                          {profile?.email_shared && profile?.revealed_email ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                              Shared by Owner
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                              <Lock className="w-3 h-3 text-slate-500" />
+                              <span>Private</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pl-10">
+                          {profile?.email_shared && profile?.revealed_email ? (
+                            <>
+                              <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
+                                {profile.revealed_email}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(profile.revealed_email || '', 'Email')}
+                                className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors cursor-pointer"
+                                title="Copy Email"
+                                aria-label="Copy Email"
+                              >
+                                {copiedField === 'Email' ? (
+                                  <Check className="w-4 h-4 text-crimson-700" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                            <p className="text-[11px] text-slate-500 leading-snug">
+                              Contact details are private. Only profile owner can share.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 3: Family Location */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-crimson-50 text-crimson-700 flex items-center justify-center flex-shrink-0">
+                            <MapPin className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="block text-[11px] font-medium text-slate-400">
+                              Address
+                            </span>
+                            <span className="block text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                              Family Address: {displayLocation}
+                            </span>
+                          </div>
+                        </div>
                         <button
-                          onClick={() => openUpgradeModal('Direct Contact Numbers')}
-                          className="w-full py-2.5 px-4 rounded-xl bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900 text-white text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center space-x-1.5"
+                          type="button"
+                          onClick={() => handleCopy(`Family Address: ${displayLocation}`, 'Address')}
+                          className="p-1.5 text-slate-400 hover:text-navy-900 hover:bg-slate-200/70 rounded-lg transition-colors flex-shrink-0 ml-2 cursor-pointer"
+                          title="Copy Address"
+                          aria-label="Copy Address"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>Upgrade to View Verified Contacts</span>
+                          {copiedField === 'Address' ? (
+                            <Check className="w-4 h-4 text-crimson-700" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
 
+                      {/* If connected, allow current user to manage what they share with this connection */}
+                      {isConnected && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setPrivacyModalOpen(true)}
+                            className="w-full py-2.5 px-4 rounded-xl bg-navy-50 hover:bg-navy-100 border border-navy-200 text-navy-950 text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-2xs"
+                          >
+                            <ShieldCheck className="w-4 h-4 text-crimson-700" />
+                            <span>Manage What You Share With {displayName}</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* Trust Advice */}
-                      <div className="rounded-xl bg-navy-50/70 p-3.5 border border-navy-100 text-xs text-navy-950">
+                      <div className="rounded-xl bg-navy-50/70 p-3.5 border border-navy-100 text-xs text-navy-950 mt-3">
                         <h5 className="font-bold mb-1 flex items-center space-x-1.5 text-navy-900">
                           <ShieldCheck className="h-4 w-4 text-crimson-700" />
                           <span>Trust & Safety Advice</span>
                         </h5>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
-                          Always communicate via BorKoniya in-app chat first. Never transfer funds or disclose banking OTPs to anyone.
+                          Always communicate via BorKonya in-app chat first. Contact details remain private until explicitly shared by the respective member. Even premium members cannot access unshared contacts.
                         </p>
                       </div>
                     </div>
@@ -1662,6 +1871,20 @@ export const ProfileDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Contact Privacy Modal */}
+      <ContactPrivacyModal
+        isOpen={privacyModalOpen}
+        onClose={() => setPrivacyModalOpen(false)}
+        connection={connectionItemForModal}
+        myPhone={user?.phone_number}
+        myEmail={user?.email}
+        onSuccess={() => {
+          refetchPrivacy();
+          queryClient.invalidateQueries({ queryKey: queryKeys.profiles.detail(id || '') });
+        }}
+      />
     </div>
   )
 }
+

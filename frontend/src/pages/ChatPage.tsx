@@ -167,7 +167,8 @@ export const ChatPage: React.FC = () => {
   const [menuConv, setMenuConv] = useState<ConversationSummary | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'mute' | 'list' | null>(null);
-  const chatItemMenuRef = useRef<HTMLDivElement>(null);
+  const mobileChatItemMenuRef = useRef<HTMLDivElement>(null);
+  const desktopChatItemMenuRef = useRef<HTMLDivElement>(null);
 
   const [actionModal, setActionModal] = useState<{
     type: 'delete' | 'clear' | 'block';
@@ -462,10 +463,14 @@ export const ChatPage: React.FC = () => {
   // Close chat item dropdown menu on outside click or scroll
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (chatItemMenuRef.current && !chatItemMenuRef.current.contains(e.target as Node)) {
-        setMenuConv(null);
-        setActiveSubmenu(null);
+      const target = e.target as Node;
+      const isInsideMobile = mobileChatItemMenuRef.current?.contains(target);
+      const isInsideDesktop = desktopChatItemMenuRef.current?.contains(target);
+      if (isInsideMobile || isInsideDesktop) {
+        return;
       }
+      setMenuConv(null);
+      setActiveSubmenu(null);
     };
     if (menuConv) {
       window.addEventListener('mousedown', handleOutsideClick);
@@ -1081,6 +1086,8 @@ export const ChatPage: React.FC = () => {
     setConversations((prev) => prev.filter((c) => c.id !== targetId));
     if (activeConvId === targetId) {
       setActiveConvId(null);
+      const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+      navigate(basePath, { replace: true });
     }
     try {
       await deleteConversationForMe(targetId);
@@ -1129,6 +1136,8 @@ export const ChatPage: React.FC = () => {
       setConversations((prev) => prev.filter((c) => c.id !== targetId));
       if (activeConvId === targetId) {
         setActiveConvId(null);
+        const basePath = location.pathname.startsWith('/chat') ? '/chat' : '/messages';
+        navigate(basePath, { replace: true });
       }
       await fetchConversations(true);
     } catch (err: any) {
@@ -2041,10 +2050,14 @@ export const ChatPage: React.FC = () => {
                                 e.stopPropagation();
                                 const isMobile = window.innerWidth < 768;
                                 if (isMobile) {
-                                  // Mobile: open bottom sheet or centered popup
-                                  setMenuConv(c);
-                                  setMenuPosition({ top: 0, left: 0 });
-                                  setActiveSubmenu(null);
+                                  if (menuConv?.id === c.id) {
+                                    setMenuConv(null);
+                                    setActiveSubmenu(null);
+                                  } else {
+                                    setMenuConv(c);
+                                    setMenuPosition(null);
+                                    setActiveSubmenu(null);
+                                  }
                                   return;
                                 }
 
@@ -2743,19 +2756,19 @@ export const ChatPage: React.FC = () => {
                                 : 'bg-white text-[#0b2a5b] rounded-bl-lg shadow-md shadow-[#0b2a5b]/5'
                             }`}
                           >
-                            {/* Desktop Chevron Down button - appears on hover or when menu is open */}
+                            {/* Message options chevron button - accessible on mobile/touch, appears on hover on desktop */}
                             {!isSelectMode && !m.deleted_for_everyone && (
                               <button
                                 type="button"
                                 onClick={(e) => handleOpenActionMenu(e, m, false)}
-                                className={`hidden md:flex absolute top-1.5 right-1.5 w-6 h-6 items-center justify-center rounded-full transition-all duration-150 z-10 cursor-pointer ${
+                                className={`flex absolute top-1.5 right-1.5 w-6 h-6 items-center justify-center rounded-full transition-all duration-150 z-10 cursor-pointer ${
                                   isMenuOpen
                                     ? onBlue
                                       ? 'opacity-100 bg-white/25 text-white'
                                       : 'opacity-100 bg-[#eef3fb] text-[#0b2a5b]'
                                     : onBlue
-                                    ? 'opacity-0 group-hover:opacity-100 hover:bg-white/20 text-white/80 hover:text-white'
-                                    : 'opacity-0 group-hover:opacity-100 hover:bg-[#eef3fb] text-[#8a96b0] hover:text-[#0b2a5b]'
+                                    ? 'opacity-80 md:opacity-0 md:group-hover:opacity-100 hover:bg-white/20 text-white/90 hover:text-white'
+                                    : 'opacity-80 md:opacity-0 md:group-hover:opacity-100 hover:bg-[#eef3fb] text-[#8a96b0] hover:text-[#0b2a5b]'
                                 }`}
                                 title="Message options"
                                 aria-label="Message options"
@@ -3290,7 +3303,7 @@ export const ChatPage: React.FC = () => {
               }}
             />
             <div
-              ref={chatItemMenuRef}
+              ref={mobileChatItemMenuRef}
               className="fixed bottom-0 left-0 right-0 z-[9999] bg-white rounded-t-3xl shadow-2xl border-t border-[#e3e9f5] p-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
             >
               <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
@@ -3324,26 +3337,25 @@ export const ChatPage: React.FC = () => {
                 <div>
                   <button
                     type="button"
-                    onClick={() => setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute')}
+                    onClick={() => {
+                      if (menuConv.is_muted) {
+                        handleMute(menuConv, 0);
+                      } else {
+                        setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute');
+                      }
+                    }}
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#f6f9ff] text-left transition-colors min-h-[44px]"
                   >
                     <div className="flex items-center gap-3">
                       {menuConv.is_muted ? <Volume2 className="w-5 h-5 text-[#6b7a99]" /> : <VolumeX className="w-5 h-5 text-[#6b7a99]" />}
                       <span className="font-medium">{menuConv.is_muted ? 'Unmute notifications' : 'Mute notifications'}</span>
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${activeSubmenu === 'mute' ? 'rotate-180' : ''}`} />
+                    {!menuConv.is_muted && (
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${activeSubmenu === 'mute' ? 'rotate-180' : ''}`} />
+                    )}
                   </button>
-                  {activeSubmenu === 'mute' && (
+                  {!menuConv.is_muted && activeSubmenu === 'mute' && (
                     <div className="ml-8 pl-3 border-l-2 border-[#eef2fa] space-y-1 py-1">
-                      {menuConv.is_muted && (
-                        <button
-                          type="button"
-                          onClick={() => handleMute(menuConv, 0)}
-                          className="w-full text-left py-2 px-2 text-sm text-[#0a56e0] font-semibold"
-                        >
-                          Unmute
-                        </button>
-                      )}
                       <button type="button" onClick={() => handleMute(menuConv, 8)} className="w-full text-left py-2 px-2 text-sm text-[#0b2a5b]">
                         8 hours
                       </button>
@@ -3467,7 +3479,7 @@ export const ChatPage: React.FC = () => {
           {/* Desktop / Tablet Floating Dropdown (>= 768px) */}
           {menuPosition && (
             <div
-              ref={chatItemMenuRef}
+              ref={desktopChatItemMenuRef}
               style={{
                 position: 'fixed',
                 top: `${menuPosition.top}px`,
@@ -3489,27 +3501,28 @@ export const ChatPage: React.FC = () => {
               {/* 2. Mute notifications */}
               <div
                 className="relative"
-                onMouseEnter={() => setActiveSubmenu('mute')}
+                onMouseEnter={() => !menuConv.is_muted && setActiveSubmenu('mute')}
                 onMouseLeave={() => setActiveSubmenu(null)}
               >
                 <button
                   type="button"
-                  onClick={() => setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute')}
+                  onClick={() => {
+                    if (menuConv.is_muted) {
+                      handleMute(menuConv, 0);
+                    } else {
+                      setActiveSubmenu(activeSubmenu === 'mute' ? null : 'mute');
+                    }
+                  }}
                   className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f6f9ff] text-left transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     {menuConv.is_muted ? <Volume2 className="w-4 h-4 text-[#6b7a99]" /> : <VolumeX className="w-4 h-4 text-[#6b7a99]" />}
                     <span className="font-medium">{menuConv.is_muted ? 'Unmute notifications' : 'Mute notifications'}</span>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />
+                  {!menuConv.is_muted && <ChevronRight className="w-3.5 h-3.5 text-[#8a96b0]" />}
                 </button>
-                {activeSubmenu === 'mute' && (
+                {!menuConv.is_muted && activeSubmenu === 'mute' && (
                   <div className="absolute left-full top-0 ml-1 w-44 bg-white rounded-2xl shadow-2xl border border-[#e3e9f5] py-1.5 z-50 text-xs animate-in fade-in zoom-in-95">
-                    {menuConv.is_muted && (
-                      <button type="button" onClick={() => handleMute(menuConv, 0)} className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left text-[#0a56e0] font-semibold">
-                        Unmute
-                      </button>
-                    )}
                     <button type="button" onClick={() => handleMute(menuConv, 8)} className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#f6f9ff] text-left">
                       8 hours
                     </button>

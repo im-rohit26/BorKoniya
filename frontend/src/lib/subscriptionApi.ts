@@ -5,7 +5,9 @@ export interface SubscriptionPlan {
   id: string;
   name: string;
   price_inr: number;
+  duration_months?: number;
   duration_days: number;
+  savings_inr?: number;
   features: Record<string, any>;
   is_popular?: boolean;
 }
@@ -53,43 +55,51 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   if (!res.ok) {
     return [
       {
-        id: 'monthly_premium',
-        name: 'Monthly Premium',
+        id: 'monthly',
+        name: 'Monthly',
         price_inr: 200,
+        duration_months: 1,
         duration_days: 30,
+        savings_inr: 0,
         features: {
           unlimited_chat: true,
           view_contacts: true,
           who_viewed_me: true,
           priority_listing: true,
+          verified_family_tag: true,
         },
       },
       {
-        id: 'quarterly_gold',
-        name: 'Quarterly Gold (3 Months)',
+        id: 'quarterly',
+        name: 'Quarterly',
         price_inr: 500,
+        duration_months: 3,
         duration_days: 90,
+        savings_inr: 100,
         features: {
           unlimited_chat: true,
           view_contacts: true,
           who_viewed_me: true,
           priority_listing: true,
-          save_pct: 17,
+          verified_family_tag: true,
+          save_amount: 100,
         },
         is_popular: true,
       },
       {
-        id: 'annual_diamond',
-        name: 'Annual Diamond (12 Months)',
-        price_inr: 1500,
-        duration_days: 365,
+        id: 'half_yearly',
+        name: 'Half-yearly',
+        price_inr: 900,
+        duration_months: 6,
+        duration_days: 180,
+        savings_inr: 300,
         features: {
           unlimited_chat: true,
           view_contacts: true,
           who_viewed_me: true,
           priority_listing: true,
-          dedicated_matchmaker_support: true,
-          save_pct: 37,
+          verified_family_tag: true,
+          save_amount: 300,
         },
       },
     ];

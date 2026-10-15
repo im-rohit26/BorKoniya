@@ -191,10 +191,28 @@ export const DashboardPage: React.FC = () => {
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-300">
-                <span>Add Family Horoscope (+15%)</span>
-                <Link to="/profile/edit" className="text-crimson-300 font-semibold underline hover:text-white">
-                  Complete Now
-                </Link>
+                {completionPct >= 100 ? (
+                  <>
+                    <span className="flex items-center gap-1.5 text-slate-200">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      All details completed
+                    </span>
+                    <Link
+                      to="/profile/edit"
+                      className="text-emerald-400 font-bold hover:text-white flex items-center gap-1 transition-colors"
+                      title="Profile Completed - Click to view or edit details"
+                    >
+                      Completed
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <span>Add Family Horoscope (+15%)</span>
+                    <Link to="/profile/edit" className="text-crimson-300 font-semibold underline hover:text-white">
+                      Complete Now
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

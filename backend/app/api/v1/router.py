@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     conversations,
     safety,
     calls,
+    connections,
 )
 
 api_router = APIRouter()
@@ -27,5 +28,6 @@ api_router.include_router(shortlist.router)
 api_router.include_router(conversations.router)
 api_router.include_router(safety.router)
 api_router.include_router(calls.router)
+api_router.include_router(connections.router)
 
 

@@ -282,7 +282,9 @@ class SubscriptionPlan(Base):
     id = Column(String(50), primary_key=True)
     name = Column(String(100), nullable=False)
     price_inr = Column(Numeric(10, 2), default=200.00, nullable=False)
+    duration_months = Column(Integer, default=1, nullable=False)
     duration_days = Column(Integer, default=30)
+    savings_inr = Column(Numeric(10, 2), default=0.00)
     features_json = Column(JSON, default={})
     is_active = Column(Boolean, default=True)
 
@@ -304,7 +306,7 @@ class Subscription(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     plan_id = Column(String(50), ForeignKey("subscription_plans.id"), nullable=False)
-    status = Column(String(30), default="ACTIVE")
+    status = Column(String(30), default="ACTIVE")  # INACTIVE, PENDING_PAYMENT, ACTIVE, EXPIRED, CANCELLED
     starts_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=False)
 
@@ -314,10 +316,13 @@ class PaymentTransaction(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    plan_id = Column(String(50), nullable=True)
+    order_id = Column(String(100), nullable=True, index=True)
+    payment_id = Column(String(100), nullable=True)
     amount_inr = Column(Numeric(10, 2), nullable=False)
     discount_inr = Column(Numeric(10, 2), default=0.00)
     net_amount_inr = Column(Numeric(10, 2), nullable=False)
-    status = Column(String(20), default="SUCCESS")
+    status = Column(String(20), default="SUCCESS")  # SUCCESS, FAILED, PENDING
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -361,6 +366,45 @@ class MatchScore(Base):
         UniqueConstraint('profile_a_id', 'profile_b_id', name='uq_match_score_pair'),
         Index('ix_match_scores_profile_a_id', 'profile_a_id'),
         Index('ix_match_scores_profile_b_id', 'profile_b_id'),
+    )
+
+
+class ContactSharingPermission(Base):
+    __tablename__ = "contact_sharing_permissions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    owner_user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    recipient_user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    phone_shared = Column(Boolean, default=False, nullable=False)
+    email_shared = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    revoked_at = Column(DateTime, nullable=True)
+
+    owner = relationship("User", foreign_keys=[owner_user_id])
+    recipient = relationship("User", foreign_keys=[recipient_user_id])
+
+    __table_args__ = (
+        UniqueConstraint('owner_user_id', 'recipient_user_id', name='uq_contact_sharing_owner_recipient'),
+        Index('ix_contact_sharing_owner', 'owner_user_id'),
+        Index('ix_contact_sharing_recipient', 'recipient_user_id'),
+    )
+
+
+class ContactSharingAuditLog(Base):
+    __tablename__ = "contact_sharing_audit_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    permission_id = Column(String(36), nullable=True)
+    owner_user_id = Column(String(36), nullable=False)
+    recipient_user_id = Column(String(36), nullable=False)
+    action = Column(String(50), nullable=False)  # GRANTED, UPDATED, REVOKED
+    phone_shared = Column(Boolean, nullable=False)
+    email_shared = Column(Boolean, nullable=False)
+    changed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index('ix_contact_sharing_audit_owner', 'owner_user_id'),
     )
 
 

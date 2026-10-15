@@ -43,6 +43,9 @@ export interface ProfileResponse {
   is_contact_revealed: boolean;
   revealed_phone?: string;
   revealed_email?: string;
+  phone_shared?: boolean;
+  email_shared?: boolean;
+  is_locked?: boolean;
 }
 
 export interface PhotoItem {
@@ -88,6 +91,7 @@ export function mapProfileResponseToCard(
     isInterestSent: isInterestSent,
     isConnected: isConnected,
     gender: p.gender,
+    isLocked: p.is_locked,
   };
 }
 

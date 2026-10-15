@@ -43,6 +43,7 @@ import { useMasterData } from '../hooks/useSharedData'
 import { queryKeys, queryClient } from '../lib/queryClient'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileDetailsSkeleton } from '../components/skeletons'
+import { ContactPrivacySection } from '../components/privacy/ContactPrivacySection'
 
 // Decorative Botanical Leaf SVG Watermark matching 2-color brand theme (Navy Blue subtle tint)
 const LeafWatermark: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -934,6 +935,13 @@ export const MyProfilePage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </section>
+
+            {/* ======================================================== */}
+            {/* 4. CONTACT PRIVACY & GRANULAR SHARING SETTINGS          */}
+            {/* ======================================================== */}
+            <section aria-label="Contact Privacy & Sharing" className="mt-6">
+              <ContactPrivacySection />
             </section>
           </>
         )}

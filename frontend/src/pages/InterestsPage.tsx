@@ -35,8 +35,10 @@ import { InterestListSkeleton } from '../components/skeletons';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { invalidateInteractionCache } from '../lib/queryClient';
+import { ContactPrivacySection } from '../components/privacy/ContactPrivacySection';
+import { ShieldCheck } from 'lucide-react';
 
-type TabType = 'RECEIVED' | 'SENT' | 'ACCEPTED' | 'DECLINED';
+type TabType = 'RECEIVED' | 'SENT' | 'ACCEPTED' | 'DECLINED' | 'CONTACT_PRIVACY';
 
 export const InterestsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -323,10 +325,24 @@ export const InterestsPage: React.FC = () => {
             <XCircle className="w-4 h-4" />
             <span>Declined / Cancelled</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('CONTACT_PRIVACY')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'CONTACT_PRIVACY'
+                ? 'bg-crimson-700 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Contact Privacy & Sharing</span>
+          </button>
         </div>
 
-        {/* List Content */}
-        {isLoading && displayedItems.length === 0 ? (
+        {/* Tab Content */}
+        {activeTab === 'CONTACT_PRIVACY' ? (
+          <ContactPrivacySection />
+        ) : isLoading && displayedItems.length === 0 ? (
           <InterestListSkeleton count={4} />
         ) : displayedItems.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-gray-200/80 shadow-sm space-y-4">
@@ -342,7 +358,7 @@ export const InterestsPage: React.FC = () => {
             <p className="text-sm text-gray-500 max-w-md mx-auto">
               {activeTab === 'RECEIVED' && 'When verified members express interest in your profile, their requests will appear here for you to accept or decline.'}
               {activeTab === 'SENT' && 'Explore matches and express interest in profiles that align with your family traditions and preferences.'}
-              {activeTab === 'ACCEPTED' && 'Once both parties accept interest, you will be able to message each other directly and view family contacts.'}
+              {activeTab === 'ACCEPTED' && 'Once both parties accept interest, you will be able to message each other directly and manage granular contact sharing.'}
               {activeTab === 'DECLINED' && 'Any declined or cancelled requests are archived here.'}
             </p>
             <button

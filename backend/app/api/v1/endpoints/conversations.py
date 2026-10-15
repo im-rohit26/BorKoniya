@@ -39,6 +39,9 @@ from app.models.entities import ProfilePhoto
 router = APIRouter(prefix="/conversations", tags=["In-App Messaging & Chat"])
 
 
+from app.services.entitlement_service import entitlement_service
+
+
 def check_chat_entitlement(
     user_id: str,
     my_profile_id: str,
@@ -46,43 +49,10 @@ def check_chat_entitlement(
     db: Session,
 ) -> bool:
     """
-    Returns True if:
-    1. The user has an active premium subscription, OR
-    2. There is a mutual accepted interest between the two profiles.
+    Starting a new chat and sending messages strictly require an active subscription.
+    Both participants must satisfy safety, block, and active status checks.
     """
-    # 1. Active subscription
-    active_sub = (
-        db.query(Subscription)
-        .filter(
-            Subscription.user_id == user_id,
-            Subscription.status == "ACTIVE",
-            Subscription.expires_at > datetime.now(timezone.utc),
-        )
-        .first()
-    )
-    if active_sub:
-        return True
-
-    # 2. Mutual accepted interest
-    mutual_interest = (
-        db.query(Interest)
-        .filter(
-            Interest.status == "ACCEPTED",
-            (
-                (Interest.sender_profile_id == my_profile_id)
-                & (Interest.receiver_profile_id == other_profile_id)
-            )
-            | (
-                (Interest.sender_profile_id == other_profile_id)
-                & (Interest.receiver_profile_id == my_profile_id)
-            ),
-        )
-        .first()
-    )
-    if mutual_interest:
-        return True
-
-    return False
+    return entitlement_service.is_user_subscribed(user_id, db)
 
 
 def cleanup_orphaned_conversations(db: Session) -> int:
@@ -251,16 +221,7 @@ def get_conversations(
             deduped_rows.append(r)
     rows = deduped_rows
 
-    active_sub = (
-        db.query(Subscription)
-        .filter(
-            Subscription.user_id == current_user.id,
-            Subscription.status == "ACTIVE",
-            Subscription.expires_at > datetime.now(timezone.utc),
-        )
-        .first()
-    )
-    is_premium = bool(active_sub)
+    is_premium = entitlement_service.is_user_subscribed(current_user.id, db)
 
     accepted_interests = (
         db.query(Interest)
@@ -298,7 +259,7 @@ def get_conversations(
 
     results = []
     for conv, other_profile, last_msg_content, last_msg_time, unread in rows:
-        can_chat = is_premium or (other_profile.id in mutual_ids)
+        can_chat = is_premium
         last_name_display = other_profile.last_name if can_chat else f"{other_profile.last_name[0]}."
 
         other_photo_url = photo_map.get(other_profile.id)

@@ -84,26 +84,11 @@ def save_photo_file(file: UploadFile, base_id: str) -> str:
     return f"{base_url}/uploads/photos/{unique_filename}"
 
 
+from app.services.entitlement_service import entitlement_service
+
+
 def is_user_premium(user_id: str, db: Session) -> bool:
-    subs = (
-        db.query(Subscription)
-        .filter(
-            Subscription.user_id == user_id,
-            Subscription.status == "ACTIVE",
-        )
-        .all()
-    )
-    now = datetime.now(timezone.utc)
-    for s in subs:
-        exp = s.expires_at
-        if exp:
-            if exp.tzinfo is None:
-                exp = exp.replace(tzinfo=timezone.utc)
-            else:
-                exp = exp.astimezone(timezone.utc)
-            if exp > now:
-                return True
-    return False
+    return entitlement_service.is_user_subscribed(user_id, db)
 
 
 def calculate_profile_completion(profile: Profile) -> int:
@@ -145,6 +130,9 @@ def format_profile_response(
     is_owner: bool = False,
     is_premium: bool = False,
     match_score: Optional[int] = None,
+    is_locked: bool = False,
+    can_view_phone: bool = False,
+    can_view_email: bool = False,
 ) -> ProfileResponse:
 
     age = matching_service.calculate_age(profile.date_of_birth)
@@ -170,25 +158,29 @@ def format_profile_response(
         primary_photo = next((p for p in photos_list if p.is_primary), photos_list[0])
         photo_url = primary_photo.storage_path
 
-    # Mask contact information unless authorized (owner or active premium member)
+    # Contact information privacy: strictly owner or explicit permission (independent of subscription)
     phone_raw = user.phone_number if user else ""
     email_raw = user.email if (user and user.email) else ""
 
-    if len(phone_raw) >= 10:
-        masked_phone = phone_raw[:3] + "••••••" + phone_raw[-2:]
-    else:
-        masked_phone = "••••••••••"
+    allow_phone = bool(is_owner or can_view_phone)
+    allow_email = bool(is_owner or can_view_email)
 
-    masked_email = f"{email_raw[:2]}••••••@{email_raw.split('@')[-1]}" if "@" in email_raw else "••••••@•••••.com"
+    revealed_phone = phone_raw if allow_phone else None
+    revealed_email = email_raw if allow_email else None
+    is_contact_revealed = bool(allow_phone or allow_email)
 
-    can_view_contact = is_owner or is_premium
+    # Never leak partial phone digits or email address unless authorized
+    contact_phone_masked = revealed_phone if allow_phone else "Contact details are private."
+    contact_email_masked = revealed_email if allow_email else "Contact details are private."
+
+    can_view_full_name = is_owner or is_premium or allow_phone or allow_email
     completion_pct = profile.profile_completion_pct or calculate_profile_completion(profile)
 
-    return ProfileResponse(
+    res = ProfileResponse(
         id=profile.id,
         user_id=profile.user_id,
         first_name=profile.first_name,
-        last_name=profile.last_name if (is_owner or can_view_contact) else f"{profile.last_name[0]}.",
+        last_name=profile.last_name if can_view_full_name else f"{profile.last_name[0]}.",
         gender=display_gender,
         date_of_birth=profile.date_of_birth,
         age=age,
@@ -225,12 +217,20 @@ def format_profile_response(
         ],
         photo_url=photo_url,
         photos=photos_list,
-        contact_phone_masked=masked_phone,
-        contact_email_masked=masked_email,
-        is_contact_revealed=can_view_contact,
-        revealed_phone=phone_raw if can_view_contact else None,
-        revealed_email=email_raw if can_view_contact else None,
+        contact_phone_masked=contact_phone_masked,
+        contact_email_masked=contact_email_masked,
+        is_contact_revealed=is_contact_revealed,
+        revealed_phone=revealed_phone,
+        revealed_email=revealed_email,
+        phone_shared=allow_phone,
+        email_shared=allow_email,
+        is_locked=is_locked,
     )
+
+    if is_locked:
+        res = entitlement_service.sanitize_locked_profile(res)
+
+    return res
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -456,9 +456,13 @@ def get_my_dashboard_stats(
             other_id = s.profile_b_id if s.profile_a_id == profile.id else s.profile_a_id
             score_map[other_id] = s.score
 
+    is_premium = is_user_premium(current_user.id, db)
+    unlocked_ids = set() if is_premium else entitlement_service.get_unlocked_profile_ids(current_user.id, profile, db)
+
     top_matches = []
     for m in top_profiles:
-        res = format_profile_response(m, user=m.user)
+        m_locked = (not is_premium) and (m.id not in unlocked_ids)
+        res = format_profile_response(m, user=m.user, is_premium=is_premium, is_locked=m_locked)
         cached_score = score_map.get(m.id)
         if cached_score is not None:
             res.match_score = cached_score
@@ -476,8 +480,6 @@ def get_my_dashboard_stats(
     if not primary_photo and profile.photos:
         primary_photo = profile.photos[0]
     photo_url = primary_photo.storage_path if primary_photo else None
-
-    is_premium = is_user_premium(current_user.id, db)
 
     return {
         "user": {
@@ -536,6 +538,14 @@ def get_profile_by_id(
                 )
 
     is_premium = is_user_premium(current_user.id, db) if current_user else False
+    is_locked = False
+    if not is_owner:
+        is_locked = entitlement_service.is_profile_locked(
+            profile.id,
+            current_user.id if current_user else None,
+            viewer_profile,
+            db,
+        )
 
     # Fetch Match Score
     match_score_val = None
@@ -548,7 +558,29 @@ def get_profile_by_id(
         if score_record:
             match_score_val = score_record.score
 
-    return format_profile_response(profile, user=user, is_owner=is_owner, is_premium=is_premium, match_score=match_score_val)
+    can_view_phone = False
+    can_view_email = False
+    if is_owner:
+        can_view_phone = True
+        can_view_email = True
+    elif current_user:
+        from app.services.contact_privacy_service import contact_privacy_service
+        can_view_phone, can_view_email = contact_privacy_service.check_contact_access(
+            owner_user_id=profile.user_id,
+            viewer_user_id=current_user.id,
+            db=db,
+        )
+
+    return format_profile_response(
+        profile,
+        user=user,
+        is_owner=is_owner,
+        is_premium=is_premium,
+        match_score=match_score_val,
+        is_locked=is_locked,
+        can_view_phone=can_view_phone,
+        can_view_email=can_view_email,
+    )
 
 
 @router.put("/privacy")

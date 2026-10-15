@@ -10,8 +10,6 @@ import {
   CheckCircle2,
   Lock,
   Shield,
-  Zap,
-  Star,
   RefreshCw,
   QrCode,
   Clock,
@@ -32,10 +30,12 @@ import { queryKeys, queryClient } from '../lib/queryClient';
 import { useQuery } from '@tanstack/react-query';
 
 const FALLBACK_PLAN: SubscriptionPlan = {
-  id: 'monthly_premium',
-  name: '1 Month Premium',
+  id: 'monthly',
+  name: 'Monthly',
   price_inr: 200,
+  duration_months: 1,
   duration_days: 30,
+  savings_inr: 0,
   features: {},
   is_popular: false,
 };
@@ -43,7 +43,7 @@ const FALLBACK_PLAN: SubscriptionPlan = {
 export const SubscriptionPage: React.FC = () => {
   const { user } = useAuth();
   const [langModalOpen, setLangModalOpen] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('monthly_premium');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('quarterly');
   const [couponCode, setCouponCode] = useState('BOR50');
   const [couponResult, setCouponResult] = useState<CouponResult | null>(null);
   const [couponError, setCouponError] = useState('');
@@ -166,16 +166,29 @@ export const SubscriptionPage: React.FC = () => {
               </div>
               <h2 className="text-2xl font-serif font-bold">{userStatus.plan_name || 'Premium Plan'}</h2>
               <p className="text-xs text-slate-200">
-                All features unlocked: Unlimited in-app chat, direct verified contact view, and visitor analytics.
+                All features unlocked: Unlimited in-app chat, all bride & groom profiles unlocked, and verified contact reveals.
               </p>
+              {userStatus.expires_at && (
+                <p className="text-xs text-crimson-300 font-medium pt-1">
+                  Expires on: {new Date(userStatus.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              )}
             </div>
 
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20">
-              <Clock className="w-8 h-8 text-crimson-300 flex-shrink-0" />
-              <div>
-                <span className="text-2xl font-black">{userStatus.days_remaining}</span>
-                <span className="text-xs text-slate-200 block font-medium">Days Remaining</span>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20">
+                <Clock className="w-8 h-8 text-crimson-300 flex-shrink-0" />
+                <div>
+                  <span className="text-2xl font-black">{userStatus.days_remaining}</span>
+                  <span className="text-xs text-slate-200 block font-medium">Days Remaining</span>
+                </div>
               </div>
+              <a
+                href="#plan-selection"
+                className="px-4 py-2.5 rounded-xl bg-crimson-700 hover:bg-crimson-800 text-white text-xs font-bold shadow-md transition-all whitespace-nowrap"
+              >
+                Renew / Extend
+              </a>
             </div>
           </div>
         )}
@@ -218,131 +231,155 @@ export const SubscriptionPage: React.FC = () => {
         )}
 
         {/* Plan Cards Grid */}
-        {isLoadingPlans && plans.length === 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 animate-pulse space-y-6 flex flex-col justify-between h-[420px]"
-              >
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="h-6 w-32 bg-slate-200 rounded-lg" />
-                    <div className="w-5 h-5 rounded-full bg-slate-200" />
-                  </div>
-                  <div className="h-10 w-28 bg-slate-200 rounded-lg mb-6" />
-                  <div className="space-y-3 pt-6 border-t border-slate-100">
-                    <div className="h-4 w-full bg-slate-100 rounded" />
-                    <div className="h-4 w-4/5 bg-slate-100 rounded" />
-                    <div className="h-4 w-3/4 bg-slate-100 rounded" />
-                    <div className="h-4 w-5/6 bg-slate-100 rounded" />
-                  </div>
-                </div>
-                <div className="h-12 w-full bg-slate-200 rounded-2xl" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {plans.map((plan) => {
-              const isSelected = plan.id === selectedPlanId;
-              const isPopular = plan.is_popular || plan.id === 'quarterly_gold';
-
-              return (
+        <div id="plan-selection" className="scroll-mt-8">
+          {isLoadingPlans && plans.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              {[1, 2, 3].map((i) => (
                 <div
-                  key={plan.id}
-                  onClick={() => {
-                    setSelectedPlanId(plan.id);
-                    if (couponResult) {
-                      applyCoupon(couponResult.coupon_code, plan.id).then(setCouponResult);
-                    }
-                  }}
-                  className={`relative rounded-3xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-white border-2 border-crimson-700 shadow-xl scale-[1.02]'
-                      : 'bg-white border border-slate-200 hover:border-slate-300 shadow-sm'
-                  }`}
+                  key={i}
+                  className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 animate-pulse space-y-6 flex flex-col justify-between h-[420px]"
                 >
-                  {isPopular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-crimson-700 px-4 py-1 text-[11px] font-extrabold text-white shadow-md uppercase tracking-wider">
-                      Most Popular
-                    </div>
-                  )}
-
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold font-serif text-navy-950">{plan.name}</h3>
-                      <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          isSelected ? 'border-crimson-700 bg-crimson-700 text-white' : 'border-slate-300'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
+                    <div className="flex justify-between items-center mb-6">
+                      <div className="h-6 w-32 bg-slate-200 rounded-lg" />
+                      <div className="w-5 h-5 rounded-full bg-slate-200" />
                     </div>
-
-                    <div className="mb-6 pb-6 border-b border-slate-100">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl sm:text-4xl font-black text-navy-950">
-                          ₹{plan.price_inr}
-                        </span>
-                        <span className="text-xs text-slate-500 font-medium">
-                          / {plan.duration_days} days
-                        </span>
-                      </div>
-                      <p className="text-xs text-emerald-600 font-semibold mt-1">
-                        Use code BOR50 for 50% discount
-                      </p>
-                    </div>
-
-                    {/* Feature Checkmarks */}
-                    <div className="space-y-3 text-xs text-slate-700 mb-8">
-                      <div className="flex items-center gap-2.5 font-medium">
-                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                        <span>Unlimited in-app messaging with matches</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 font-medium">
-                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                        <span>View verified family phone & email</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 font-medium">
-                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                        <span>See who viewed your profile</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 font-medium">
-                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                        <span>Priority placement in community searches</span>
-                      </div>
-                      {plan.duration_days >= 90 && (
-                        <div className="flex items-center gap-2.5 font-medium text-crimson-900">
-                          <Star className="w-4 h-4 text-crimson-700 fill-crimson-700 flex-shrink-0" />
-                          <span>Featured profile badge & save 17%</span>
-                        </div>
-                      )}
-                      {plan.duration_days >= 365 && (
-                        <div className="flex items-center gap-2.5 font-medium text-navy-900">
-                          <Zap className="w-4 h-4 text-navy-700 fill-navy-700 flex-shrink-0" />
-                          <span>Dedicated community matchmaker assistance</span>
-                        </div>
-                      )}
+                    <div className="h-10 w-28 bg-slate-200 rounded-lg mb-6" />
+                    <div className="space-y-3 pt-6 border-t border-slate-100">
+                      <div className="h-4 w-full bg-slate-100 rounded" />
+                      <div className="h-4 w-4/5 bg-slate-100 rounded" />
+                      <div className="h-4 w-3/4 bg-slate-100 rounded" />
+                      <div className="h-4 w-5/6 bg-slate-100 rounded" />
                     </div>
                   </div>
+                  <div className="h-12 w-full bg-slate-200 rounded-2xl" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              {plans.map((plan) => {
+                const isSelected = plan.id === selectedPlanId;
+                const isPopular = plan.is_popular || plan.id === 'quarterly';
+                const isBestValue = plan.id === 'half_yearly';
 
-                  <button
-                    type="button"
-                    className={`w-full py-3 rounded-2xl text-xs font-bold transition-all ${
+                const durationLabel = plan.duration_months
+                  ? (plan.duration_months === 1 ? '1 month' : `${plan.duration_months} months`)
+                  : (plan.id === 'quarterly' ? '3 months' : (plan.id === 'half_yearly' ? '6 months' : '1 month'));
+
+                const savingsAmount = plan.savings_inr !== undefined
+                  ? plan.savings_inr
+                  : (plan.id === 'quarterly' ? 100 : (plan.id === 'half_yearly' ? 300 : 0));
+
+                return (
+                  <div
+                    key={plan.id}
+                    onClick={() => {
+                      setSelectedPlanId(plan.id);
+                      if (couponResult) {
+                        applyCoupon(couponResult.coupon_code, plan.id).then(setCouponResult);
+                      }
+                    }}
+                    className={`relative rounded-3xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between ${
                       isSelected
-                        ? 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-md'
-                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                        ? 'bg-white border-2 border-crimson-700 shadow-xl scale-[1.02]'
+                        : 'bg-white border border-slate-200 hover:border-slate-300 shadow-sm'
                     }`}
                   >
-                    {isSelected ? 'Selected Plan' : 'Select Plan'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    {isPopular && (
+                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-crimson-700 px-4 py-1 text-[11px] font-extrabold text-white shadow-md uppercase tracking-wider">
+                        Most Popular
+                      </div>
+                    )}
+                    {isBestValue && !isPopular && (
+                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-navy-900 px-4 py-1 text-[11px] font-extrabold text-white shadow-md uppercase tracking-wider">
+                        Best Value
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xl font-bold font-serif text-navy-950">{plan.name}</h3>
+                        <div
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? 'border-crimson-700 bg-crimson-700 text-white' : 'border-slate-300'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+
+                      {/* Duration & Savings Badges */}
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                          {durationLabel}
+                        </span>
+                        {savingsAmount > 0 ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Save ₹{savingsAmount}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium">
+                            Standard
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mb-6 pb-6 border-b border-slate-100">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl sm:text-4xl font-black text-navy-950">
+                            ₹{plan.price_inr}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">
+                            / {durationLabel}
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-600 font-semibold mt-1">
+                          Use code BOR50 for 50% community discount
+                        </p>
+                      </div>
+
+                      {/* Feature Checkmarks */}
+                      <div className="space-y-3 text-xs text-slate-700 mb-8">
+                        <div className="flex items-center gap-2.5 font-medium">
+                          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>Unlock all eligible bride & groom profiles</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 font-medium">
+                          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>Unlimited direct in-app messaging & chat</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 font-medium">
+                          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>View verified family phone & email</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 font-medium">
+                          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>See who viewed & shortlisted your profile</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 font-medium">
+                          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>Priority placement in community searches</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className={`w-full py-3 rounded-2xl text-xs font-bold transition-all ${
+                        isSelected
+                          ? 'bg-crimson-700 text-white hover:bg-crimson-800 shadow-md'
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                      }`}
+                    >
+                      {isSelected ? 'Selected Plan' : 'Select Plan'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Checkout & Coupon Section */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
@@ -464,9 +501,14 @@ export const SubscriptionPage: React.FC = () => {
                   <td className="py-3.5 text-center text-emerald-600 font-bold">✓ Unlimited</td>
                 </tr>
                 <tr>
-                  <td className="py-3.5 font-medium">In-App Chat Messaging</td>
-                  <td className="py-3.5 text-center text-slate-400">Mutual Acceptance Only</td>
-                  <td className="py-3.5 text-center text-emerald-600 font-bold">✓ Direct Instant Chat</td>
+                  <td className="py-3.5 font-medium">Eligible Opposite-Gender Profiles Access</td>
+                  <td className="py-3.5 text-center text-slate-500 font-semibold">3 Free Profiles</td>
+                  <td className="py-3.5 text-center text-emerald-600 font-bold">✓ All Eligible Profiles Unlocked</td>
+                </tr>
+                <tr>
+                  <td className="py-3.5 font-medium">In-App Chat & Messaging</td>
+                  <td className="py-3.5 text-center text-slate-400">Locked (Subscription Required)</td>
+                  <td className="py-3.5 text-center text-emerald-600 font-bold">✓ Unlimited Direct Messaging</td>
                 </tr>
                 <tr>
                   <td className="py-3.5 font-medium">View Verified Family Contact Numbers (Phone & Email)</td>

@@ -212,10 +212,21 @@ def get_received_interests(
     results = []
 
     for item, sender, user in rows:
+        can_view_phone = False
+        can_view_email = False
+        if item.status == "ACCEPTED":
+            from app.services.contact_privacy_service import contact_privacy_service
+            can_view_phone, can_view_email = contact_privacy_service.check_contact_access(
+                owner_user_id=sender.user_id,
+                viewer_user_id=current_profile.user_id,
+                db=db,
+            )
         formatted = format_profile_response(
             sender,
             user=user,
-            is_premium=(item.status == "ACCEPTED"),
+            is_premium=False,
+            can_view_phone=can_view_phone,
+            can_view_email=can_view_email,
         )
         results.append(
             InterestItemResponse(
@@ -251,10 +262,21 @@ def get_sent_interests(
     results = []
 
     for item, receiver, user in rows:
+        can_view_phone = False
+        can_view_email = False
+        if item.status == "ACCEPTED":
+            from app.services.contact_privacy_service import contact_privacy_service
+            can_view_phone, can_view_email = contact_privacy_service.check_contact_access(
+                owner_user_id=receiver.user_id,
+                viewer_user_id=current_profile.user_id,
+                db=db,
+            )
         formatted = format_profile_response(
             receiver,
             user=user,
-            is_premium=(item.status == "ACCEPTED"),
+            is_premium=False,
+            can_view_phone=can_view_phone,
+            can_view_email=can_view_email,
         )
         results.append(
             InterestItemResponse(

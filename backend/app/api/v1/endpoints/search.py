@@ -12,6 +12,8 @@ from app.api.v1.endpoints.profiles import format_profile_response
 from app.services.matching_service import matching_service, get_match_score
 from pydantic import BaseModel
 
+from app.services.entitlement_service import entitlement_service
+
 router = APIRouter(prefix="/search", tags=["Matrimonial Search"])
 
 
@@ -144,8 +146,13 @@ def search_profiles(
             other_id = s.profile_b_id if s.profile_a_id == ref_profile.id else s.profile_a_id
             scores_map[other_id] = s.score
 
+    user_id = current_user.id if current_user else None
+    is_sub = entitlement_service.is_user_subscribed(user_id, db) if user_id else False
+    unlocked_ids = set() if is_sub else entitlement_service.get_unlocked_profile_ids(user_id, my_profile, db)
+
     for p, user in profiles_users:
-        res = format_profile_response(p, user=user)
+        is_locked = (not is_sub) and (p.id not in unlocked_ids) and (not my_profile or p.id != my_profile.id)
+        res = format_profile_response(p, user=user, is_premium=is_sub, is_locked=is_locked)
 
         # Calculate actual age
         calculated_age = today.year - p.date_of_birth.year - (

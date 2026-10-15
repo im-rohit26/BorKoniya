@@ -7,14 +7,16 @@ class SubscriptionPlanResponse(BaseModel):
     id: str
     name: str
     price_inr: float
-    duration_days: int
-    features: Dict[str, Any]
+    duration_months: int = 1
+    duration_days: int = 30
+    savings_inr: float = 0.0
+    features: Dict[str, Any] = {}
     is_popular: bool = False
 
 
 class CouponApplyRequest(BaseModel):
     code: str
-    plan_id: str = "monthly_premium"
+    plan_id: str = "monthly"
 
 
 class CouponApplyResponse(BaseModel):
@@ -27,9 +29,11 @@ class CouponApplyResponse(BaseModel):
 
 
 class CheckoutRequest(BaseModel):
-    plan_id: str = "monthly_premium"
+    plan_id: str = "monthly"
     coupon_code: Optional[str] = None
     payment_method: Optional[str] = "UPI"
+    order_id: Optional[str] = None
+    payment_id: Optional[str] = None
 
 
 class CheckoutResponse(BaseModel):
@@ -42,7 +46,7 @@ class CheckoutResponse(BaseModel):
 
 
 class PaymentInitiateRequest(BaseModel):
-    plan_id: str = "monthly_premium"
+    plan_id: str = "monthly"
     coupon_code: Optional[str] = None
     payment_method: Optional[str] = "UPI"
 
@@ -62,7 +66,7 @@ class PaymentVerifyRequest(BaseModel):
     order_id: str
     payment_id: Optional[str] = None
     payment_signature: Optional[str] = None
-    plan_id: str
+    plan_id: str = "monthly"
     coupon_code: Optional[str] = None
 
 

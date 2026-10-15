@@ -179,3 +179,31 @@ html, body {
 .mb-safe {
   margin-bottom: max(1rem, env(safe-area-inset-bottom));
 }
+
+/* Subscription Locked Profile Card Styles */
+.locked-profile {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.locked-profile .profile-content {
+  filter: blur(8px);
+  -webkit-filter: blur(8px);
+  user-select: none;
+  pointer-events: none;
+}
+
+.locked-profile .lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 30;
+}
+

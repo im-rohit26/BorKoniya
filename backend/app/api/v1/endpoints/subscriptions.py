@@ -75,6 +75,8 @@ def checkout(
         user_id=current_user.id,
         plan_id=payload.plan_id,
         coupon_code=payload.coupon_code,
+        order_id=payload.order_id,
+        payment_id=payload.payment_id,
         db=db,
     )
 

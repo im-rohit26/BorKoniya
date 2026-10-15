@@ -13,6 +13,9 @@ from app.services.matching_service import matching_service, get_match_score
 router = APIRouter(prefix="/matches", tags=["Matching Engine"])
 
 
+from app.services.entitlement_service import entitlement_service
+
+
 def batch_format_matches(
     profiles: List[Profile],
     ref_profile: Optional[Profile],
@@ -46,10 +49,15 @@ def batch_format_matches(
             other_id = s.profile_b_id if s.profile_a_id == ref_profile.id else s.profile_a_id
             scores_map[other_id] = s.score
 
+    user_id = ref_profile.user_id if ref_profile else None
+    is_sub = entitlement_service.is_user_subscribed(user_id, db) if user_id else False
+    unlocked_ids = set() if is_sub else entitlement_service.get_unlocked_profile_ids(user_id, ref_profile, db)
+
     results = []
     for p in profiles:
         user = p.user
-        res = format_profile_response(p, user=user)
+        is_locked = (not is_sub) and (p.id not in unlocked_ids) and (not ref_profile or p.id != ref_profile.id)
+        res = format_profile_response(p, user=user, is_premium=is_sub, is_locked=is_locked)
         if ref_profile and p.id != ref_profile.id:
             if p.id in scores_map:
                 res.match_score = scores_map[p.id]
