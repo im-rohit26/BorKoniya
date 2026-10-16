@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { sendOtp, verifyOtp } from '../../lib/authApi'
 import { useAuth } from '../../context/AuthContext'
+import { AuthErrorModal } from '../common/AuthErrorModal'
 import logoImg from '../../assets/logo.jpeg'
 
 interface RegisterModalProps {
@@ -46,6 +47,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [showErrorModal, setShowErrorModal] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [resendSuccess, setResendSuccess] = useState<string | null>(null)
 
@@ -58,6 +60,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
   }, [resendCooldown])
 
   if (!isOpen) return null
+
+  const triggerError = (msg: string) => {
+    setErrorMessage(msg)
+    setShowErrorModal(true)
+  }
 
   const profileForOptions = [
     { id: 'MYSELF', label: t('onboarding.myself', 'Myself') },
@@ -86,18 +93,19 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     const cleanPhone = formData.phone.trim()
     const cleanEmail = formData.email.trim()
     if (!cleanPhone || cleanPhone.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number')
+      triggerError('Please enter a valid 10-digit mobile number')
       return
     }
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setErrorMessage('A valid email address is required for account verification')
+      triggerError('A valid email address is required for account verification')
       return
     }
     if (formData.password.length < 8) {
-      setErrorMessage('Password must contain at least 8 characters')
+      triggerError('Password must contain at least 8 characters')
       return
     }
     setErrorMessage('')
+    setShowErrorModal(false)
     setResendSuccess(null)
     setIsSubmitting(true)
 
@@ -106,7 +114,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
       setResendCooldown(60)
       setStep('otp_verification')
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send verification OTP')
+      triggerError(err.message || 'Failed to send verification OTP')
     } finally {
       setIsSubmitting(false)
     }
@@ -117,6 +125,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     const cleanPhone = formData.phone.trim()
     const cleanEmail = formData.email.trim()
     setErrorMessage('')
+    setShowErrorModal(false)
     setResendSuccess(null)
     setIsSubmitting(true)
 
@@ -126,7 +135,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
       setResendSuccess('New verification code sent successfully to your email.')
       setOtp(['', '', '', '', '', ''])
     } catch (err: any) {
-      setErrorMessage(err.message || 'Unable to resend OTP. Please wait a moment and try again.')
+      triggerError(err.message || 'Unable to resend OTP. Please wait a moment and try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -154,6 +163,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
 
     setIsSubmitting(true)
     setErrorMessage('')
+    setShowErrorModal(false)
     try {
       await verifyOtp({ phoneNumber: formData.phone.trim(), email: formData.email.trim() }, entered)
       await register({
@@ -181,17 +191,57 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
         })
       }, 1500)
     } catch (err: any) {
-      setErrorMessage(err.message || 'Registration failed')
+      triggerError(err.message || 'Registration failed')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-2 border-b border-slate-100 flex-shrink-0">
+    <>
+      {showErrorModal && errorMessage && (
+        <AuthErrorModal
+          isOpen={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          message={errorMessage}
+          onPrimaryAction={() => {
+            const lower = errorMessage.toLowerCase()
+            if (lower.includes('already exists') || lower.includes('already registered') || lower.includes('log in')) {
+              setShowErrorModal(false)
+              onClose()
+              window.location.href = '/login'
+            } else {
+              setShowErrorModal(false)
+            }
+          }}
+          primaryActionText={
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('log in')
+              ? 'Go to Login'
+              : 'Okay, Got It'
+          }
+          onSecondaryAction={
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('log in')
+              ? () => setShowErrorModal(false)
+              : undefined
+          }
+          secondaryActionText={
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('log in')
+              ? 'Change Details'
+              : undefined
+          }
+        />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="relative w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-2 border-b border-slate-100 flex-shrink-0">
           <img
             src={logoImg}
             alt="BorKoniya"
@@ -549,5 +599,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
         </div>
       </div>
     </div>
+    </>
   )
 }

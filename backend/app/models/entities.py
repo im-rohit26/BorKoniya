@@ -86,17 +86,36 @@ class Profile(Base):
     native_place = Column(String(150), nullable=True)
     community = Column(String(100), default="Sadgope")
     sub_community = Column(String(100), nullable=True)
+    gotra = Column(String(100), nullable=True)
+    family_origin_state = Column(String(100), nullable=True)
+
+    # Basic Details
+    has_children = Column(String(20), default="NO")
 
     # Education & Career
     highest_qualification = Column(String(150), default="Bachelor’s Degree")
     occupation = Column(String(150), default="Private Sector")
     company_name = Column(String(200), nullable=True)
     annual_income = Column(String(50), nullable=True)
+    college = Column(String(255), nullable=True)
+    work_location = Column(String(150), nullable=True)
+
+    # Family Details
+    father_occupation = Column(String(150), nullable=True)
+    mother_occupation = Column(String(150), nullable=True)
+    brothers_count = Column(String(20), default="0")
+    sisters_count = Column(String(20), default="0")
+    family_type = Column(String(50), default="NUCLEAR")
+    family_values = Column(String(50), default="TRADITIONAL")
+    family_location = Column(String(150), nullable=True)
 
     # Lifestyle & Horoscope
     diet = Column(String(30), default="NON_VEGETARIAN")
     smoking = Column(String(20), default="NO")
     drinking = Column(String(20), default="NO")
+    hobbies = Column(Text, nullable=True)
+    time_of_birth = Column(String(50), nullable=True)
+    place_of_birth = Column(String(150), nullable=True)
     rashi = Column(String(50), nullable=True)
     nakshatra = Column(String(50), nullable=True)
     is_manglik = Column(String(20), default="DONT_KNOW")

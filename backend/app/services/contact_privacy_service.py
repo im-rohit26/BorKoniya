@@ -400,22 +400,36 @@ class ContactPrivacyService:
                 primary_photo = next((p for p in other_profile.photos if p.is_primary), other_profile.photos[0])
                 photo_url = primary_photo.storage_path
 
+            other_first = other_profile.first_name or ""
+            other_last = other_profile.last_name or ""
+            other_name = f"{other_first} {other_last}".strip() or "Connected Member"
+
             results.append(
                 ConnectionPrivacyItem(
                     connection_id=conn.id,
                     other_profile_id=other_profile.id,
                     other_user_id=other_user.id,
-                    first_name=other_profile.first_name,
-                    last_name=other_profile.last_name,
+                    first_name=other_first,
+                    last_name=other_last,
+                    other_name=other_name,
                     gender=other_profile.gender,
+                    other_gender=other_profile.gender,
                     photo_url=photo_url,
+                    other_photo_url=photo_url,
                     community=other_profile.community,
                     occupation=other_profile.occupation,
+                    other_occupation=other_profile.occupation,
                     current_city=other_profile.current_city,
+                    other_city=other_profile.current_city,
                     current_state=other_profile.current_state,
+                    other_state=other_profile.current_state,
                     connected_at=conn.responded_at or conn.sent_at,
                     my_sharing=my_sharing,
                     their_sharing=their_sharing,
+                    my_sharing_phone=my_sharing.phone_shared,
+                    my_sharing_email=my_sharing.email_shared,
+                    their_sharing_phone=their_sharing.phone_shared,
+                    their_sharing_email=their_sharing.email_shared,
                     revealed_phone=revealed_phone,
                     revealed_email=revealed_email,
                 )

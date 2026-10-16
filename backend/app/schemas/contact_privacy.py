@@ -27,15 +27,25 @@ class ConnectionPrivacyItem(BaseModel):
     other_user_id: str
     first_name: str
     last_name: str
+    other_name: Optional[str] = None
     gender: Optional[str] = None
+    other_gender: Optional[str] = None
     photo_url: Optional[str] = None
+    other_photo_url: Optional[str] = None
     community: Optional[str] = None
     occupation: Optional[str] = None
+    other_occupation: Optional[str] = None
     current_city: Optional[str] = None
+    other_city: Optional[str] = None
     current_state: Optional[str] = None
+    other_state: Optional[str] = None
     connected_at: Optional[datetime] = None
     my_sharing: ContactPermissionUpdate
     their_sharing: ContactPermissionUpdate
+    my_sharing_phone: bool = False
+    my_sharing_email: bool = False
+    their_sharing_phone: bool = False
+    their_sharing_email: bool = False
     revealed_phone: Optional[str] = None
     revealed_email: Optional[str] = None
 

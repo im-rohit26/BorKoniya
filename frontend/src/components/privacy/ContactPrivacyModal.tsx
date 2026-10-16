@@ -12,6 +12,7 @@ import {
 import {
   updateContactPermissions,
   revokeContactPermissions,
+  getContactPermissionsForConnection,
   type ConnectionPrivacyItem,
 } from '../../lib/contactPrivacyApi';
 import { getDefaultAvatar } from '../../lib/utils';
@@ -40,9 +41,21 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
 
   useEffect(() => {
     if (connection) {
-      setPhoneShared(connection.my_sharing_phone);
-      setEmailShared(connection.my_sharing_email);
+      setPhoneShared(Boolean(connection.my_sharing_phone));
+      setEmailShared(Boolean(connection.my_sharing_email));
       setStatusMessage(null);
+
+      // Also directly sync with server for this connection to guarantee fresh state
+      getContactPermissionsForConnection(connection.connection_id)
+        .then((res) => {
+          if (res) {
+            setPhoneShared(Boolean(res.phone_shared));
+            setEmailShared(Boolean(res.email_shared));
+          }
+        })
+        .catch(() => {
+          // Keep current connection values if endpoint call fails
+        });
     }
   }, [connection]);
 
@@ -73,7 +86,8 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
   };
 
   const handleRevokeAll = async () => {
-    if (!window.confirm(`Revoke all contact sharing access for ${connection.other_name}? They will no longer see your phone or email.`)) {
+    const targetName = connection.other_name || 'this member';
+    if (!window.confirm(`Revoke all contact sharing access for ${targetName}? They will no longer see your phone or email.`)) {
       return;
     }
     setIsSubmitting(true);
@@ -99,6 +113,7 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
   };
 
   const otherAvatar = connection.other_photo_url || getDefaultAvatar(connection.other_gender);
+  const otherName = connection.other_name || 'Connected Member';
 
   return (
     <div
@@ -114,7 +129,7 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
             <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-crimson-600 bg-slate-100 flex-shrink-0">
               <img
                 src={otherAvatar}
-                alt={connection.other_name}
+                alt={otherName}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -123,7 +138,7 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
                 Contact Privacy Settings
               </h3>
               <p className="text-xs text-slate-500">
-                Manage what <span className="font-semibold text-slate-700">{connection.other_name}</span> can view
+                Manage what <span className="font-semibold text-slate-700">{otherName}</span> can view
               </p>
             </div>
           </div>
@@ -155,15 +170,7 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
           </div>
         )}
 
-        {/* Privacy Info Note */}
-        <div className="rounded-2xl bg-navy-50/80 p-3.5 border border-navy-100 text-xs text-navy-900 flex items-start space-x-2.5">
-          <ShieldCheck className="w-5 h-5 text-crimson-700 flex-shrink-0 mt-0.5" />
-          <div className="text-[11px] leading-relaxed text-slate-600">
-            <span className="font-bold text-navy-950">Strict Privacy Guarantee:</span> Your phone number and email address stay completely hidden unless you explicitly toggle them on here. Neither premium status nor connection acceptance reveals them.
-          </div>
-        </div>
-
-        {/* Granular Toggles */}
+        {/* Prominent Contact Sharing Toggles at TOP */}
         <div className="space-y-3">
           {/* Toggle 1: Phone */}
           <div className="p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors bg-white flex items-center justify-between">
@@ -248,6 +255,14 @@ export const ContactPrivacyModal: React.FC<ContactPrivacyModalProps> = ({
             >
               Share Nothing
             </button>
+          </div>
+        </div>
+
+        {/* Privacy Info Note (placed below toggles and presets) */}
+        <div className="rounded-2xl bg-navy-50/80 p-3.5 border border-navy-100 text-xs text-navy-900 flex items-start space-x-2.5">
+          <ShieldCheck className="w-5 h-5 text-crimson-700 flex-shrink-0 mt-0.5" />
+          <div className="text-[11px] leading-relaxed text-slate-600">
+            <span className="font-bold text-navy-950">Strict Privacy Guarantee:</span> Your phone number and email address stay completely hidden unless you explicitly toggle them on here. Neither premium status nor connection acceptance reveals them.
           </div>
         </div>
 

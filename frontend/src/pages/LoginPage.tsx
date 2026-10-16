@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, Lock, Phone, Eye, EyeOff, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
+import { AuthErrorModal } from '../components/common/AuthErrorModal';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
@@ -18,23 +19,30 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [langModalOpen, setLangModalOpen] = useState(false);
 
   const redirectPath = searchParams.get('redirect') || '/dashboard';
 
+  const triggerError = (msg: string) => {
+    setErrorMessage(msg);
+    setShowErrorModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneOrEmail.trim()) {
-      setErrorMessage('Please enter your mobile number or email address.');
+      triggerError('Please enter your mobile number or email address.');
       return;
     }
     if (!password) {
-      setErrorMessage('Please enter your password.');
+      triggerError('Please enter your password.');
       return;
     }
 
     setErrorMessage(null);
+    setShowErrorModal(false);
     setIsLoading(true);
 
     try {
@@ -43,8 +51,8 @@ export const LoginPage: React.FC = () => {
       navigate(redirectPath, { replace: true });
     } catch (err: any) {
       console.error('Login error:', err);
-      setErrorMessage(
-        err.message || 'Invalid mobile number/email or password. Please check your credentials.'
+      triggerError(
+        err.message || 'Incorrect mobile number/email or password.'
       );
     } finally {
       setIsLoading(false);
@@ -68,6 +76,21 @@ export const LoginPage: React.FC = () => {
           isOpen={forgotModalOpen}
           onClose={() => setForgotModalOpen(false)}
           initialPhoneOrEmail={phoneOrEmail}
+        />
+      )}
+
+      {showErrorModal && errorMessage && (
+        <AuthErrorModal
+          isOpen={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          message={errorMessage}
+          onPrimaryAction={() => setShowErrorModal(false)}
+          primaryActionText="Try Again"
+          onSecondaryAction={() => {
+            setShowErrorModal(false);
+            setForgotModalOpen(true);
+          }}
+          secondaryActionText="Forgot Password?"
         />
       )}
 

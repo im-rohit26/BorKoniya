@@ -22,12 +22,15 @@ export interface ConnectionPrivacyItem {
 }
 
 export interface ContactPermissionResponse {
-  id: string;
+  connection_id: string;
+  id?: string;
   owner_user_id: string;
   recipient_user_id: string;
   phone_shared: boolean;
   email_shared: boolean;
+  created_at?: string;
   updated_at?: string;
+  revoked_at?: string;
 }
 
 export interface ContactPermissionUpdate {
@@ -53,7 +56,33 @@ export async function getConnectionPrivacyList(): Promise<ConnectionPrivacyItem[
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || 'Failed to fetch contact privacy connections');
   }
-  return res.json();
+  const rawList = await res.json();
+  return (rawList || []).map((item: any) => {
+    const phoneShared = item.my_sharing_phone ?? item.my_sharing?.phone_shared ?? false;
+    const emailShared = item.my_sharing_email ?? item.my_sharing?.email_shared ?? false;
+    const theirPhoneShared = item.their_sharing_phone ?? item.their_sharing?.phone_shared ?? false;
+    const theirEmailShared = item.their_sharing_email ?? item.their_sharing?.email_shared ?? false;
+    const name = item.other_name || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Connected Member';
+
+    return {
+      connection_id: item.connection_id,
+      other_user_id: item.other_user_id,
+      other_profile_id: item.other_profile_id,
+      other_name: name,
+      other_gender: item.other_gender || item.gender,
+      other_photo_url: item.other_photo_url || item.photo_url,
+      other_city: item.other_city || item.current_city,
+      other_state: item.other_state || item.current_state,
+      other_occupation: item.other_occupation || item.occupation,
+      connected_at: item.connected_at,
+      my_sharing_phone: Boolean(phoneShared),
+      my_sharing_email: Boolean(emailShared),
+      their_sharing_phone: Boolean(theirPhoneShared),
+      their_sharing_email: Boolean(theirEmailShared),
+      revealed_phone: item.revealed_phone,
+      revealed_email: item.revealed_email,
+    };
+  });
 }
 
 export async function getContactPermissionsForConnection(

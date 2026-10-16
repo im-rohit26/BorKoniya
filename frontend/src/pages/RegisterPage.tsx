@@ -14,6 +14,7 @@ import { masterDataApi } from '../lib/masterDataApi';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
+import { AuthErrorModal } from '../components/common/AuthErrorModal';
 import logoImg from '../assets/logo.jpeg';
 
 export const RegisterPage: React.FC = () => {
@@ -44,6 +45,7 @@ export const RegisterPage: React.FC = () => {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const [profileForOptions, setProfileForOptions] = useState<any[]>([]);
   const [communities, setCommunities] = useState<any[]>([]);
@@ -55,6 +57,11 @@ export const RegisterPage: React.FC = () => {
     }).catch(() => {});
     masterDataApi.getCommunities().then(setCommunities).catch(() => {});
   }, []);
+
+  const triggerError = (msg: string) => {
+    setErrorMessage(msg);
+    setShowErrorModal(true);
+  };
 
   const handleSelectWhoFor = (val: string) => {
     setProfileFor(val);
@@ -69,24 +76,25 @@ export const RegisterPage: React.FC = () => {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setShowErrorModal(false);
 
     // Frontend validations
     const cleanPhone = formData.phone.trim();
     const cleanEmail = formData.email.trim();
     if (!cleanPhone || cleanPhone.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+      triggerError('Please enter a valid 10-digit mobile number.');
       return;
     }
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setErrorMessage('A valid email address is required for account verification.');
+      triggerError('A valid email address is required for account verification.');
       return;
     }
     if (formData.password.length < 8) {
-      setErrorMessage('Password must contain at least 8 characters.');
+      triggerError('Password must contain at least 8 characters.');
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      setErrorMessage('Passwords do not match. Please verify your password.');
+      triggerError('Passwords do not match. Please verify your password.');
       return;
     }
 
@@ -95,7 +103,7 @@ export const RegisterPage: React.FC = () => {
       await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail });
       setStep('otp_verification');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send verification OTP. Please try again.');
+      triggerError(err.message || 'Failed to send verification OTP. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -116,9 +124,10 @@ export const RegisterPage: React.FC = () => {
   const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setShowErrorModal(false);
     const enteredOtp = otp.join('');
     if (enteredOtp.length < 4) {
-      setErrorMessage('Please enter the full verification OTP.');
+      triggerError('Please enter the full verification OTP.');
       return;
     }
 
@@ -150,7 +159,7 @@ export const RegisterPage: React.FC = () => {
       }, 1500);
     } catch (err: any) {
       console.error('Registration error:', err);
-      setErrorMessage(err.message || 'Registration failed. Please check your information.');
+      triggerError(err.message || 'Registration failed. Please check your information.');
     } finally {
       setIsSubmitting(false);
     }
@@ -167,6 +176,44 @@ export const RegisterPage: React.FC = () => {
         isOpen={langModalOpen}
         onClose={() => setLangModalOpen(false)}
       />
+
+      {showErrorModal && errorMessage && (
+        <AuthErrorModal
+          isOpen={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          message={errorMessage}
+          onPrimaryAction={() => {
+            const lower = errorMessage.toLowerCase();
+            if (lower.includes('already exists') || lower.includes('already registered') || lower.includes('log in')) {
+              setShowErrorModal(false);
+              navigate('/login');
+            } else {
+              setShowErrorModal(false);
+            }
+          }}
+          primaryActionText={
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('log in')
+              ? 'Go to Login'
+              : 'Okay, Got It'
+          }
+          onSecondaryAction={
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('log in')
+              ? () => setShowErrorModal(false)
+              : undefined
+          }
+          secondaryActionText={
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('log in')
+              ? 'Change Details'
+              : undefined
+          }
+        />
+      )}
 
       <main className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-lg">

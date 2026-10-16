@@ -249,6 +249,7 @@ export const ProfileDetailPage: React.FC = () => {
       annual_income: profile.annual_income || '',
       community: profile.community || '',
       sub_community: profile.sub_community || '',
+      gotra: (profile as any).gotra || '',
       native_place: profile.native_place || '',
       current_city: profile.current_city || '',
       current_state: profile.current_state || '',
@@ -861,6 +862,23 @@ export const ProfileDetailPage: React.FC = () => {
                         </span>
                       </div>
                     </div>
+
+                    {/* Item 5: Gotra */}
+                    {(profile as any).gotra && (
+                      <div className="flex items-start space-x-3">
+                        <div className="w-9 h-9 rounded-xl bg-crimson-50 text-crimson-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="block text-[11px] sm:text-xs font-medium text-slate-400">
+                            Gotra
+                          </span>
+                          <span className="block text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
+                            {(profile as any).gotra}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1539,6 +1557,17 @@ export const ProfileDetailPage: React.FC = () => {
                       value={editForm.native_place || ''}
                       onChange={(e) => setEditForm({ ...editForm, native_place: e.target.value })}
                       placeholder="e.g. Bardhaman, Bankura, Hooghly"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-crimson-700/20 focus:border-crimson-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Gotra (Optional)</label>
+                    <input
+                      type="text"
+                      value={editForm.gotra || ''}
+                      onChange={(e) => setEditForm({ ...editForm, gotra: e.target.value })}
+                      placeholder="e.g. Kashyapa, Sandilya, Alambayana"
                       className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-crimson-700/20 focus:border-crimson-700"
                     />
                   </div>

@@ -189,17 +189,32 @@ def format_profile_response(
         mother_tongue=profile.mother_tongue,
         community=profile.community,
         sub_community=profile.sub_community,
+        gotra=getattr(profile, "gotra", None),
         native_place=profile.native_place,
+        family_origin_state=getattr(profile, "family_origin_state", None),
         current_state=profile.current_state,
         current_city=profile.current_city,
+        has_children=getattr(profile, "has_children", "NO"),
         highest_qualification=profile.highest_qualification,
+        college=getattr(profile, "college", None),
         occupation=profile.occupation,
         company_name=profile.company_name,
         annual_income=profile.annual_income,
+        work_location=getattr(profile, "work_location", None),
+        father_occupation=getattr(profile, "father_occupation", None),
+        mother_occupation=getattr(profile, "mother_occupation", None),
+        brothers_count=str(getattr(profile, "brothers_count", "0") or "0"),
+        sisters_count=str(getattr(profile, "sisters_count", "0") or "0"),
+        family_type=getattr(profile, "family_type", "NUCLEAR"),
+        family_values=getattr(profile, "family_values", "TRADITIONAL"),
+        family_location=getattr(profile, "family_location", None),
         diet=profile.diet,
         about_me=profile.about_me,
         smoking=getattr(profile, "smoking", "NO"),
         drinking=getattr(profile, "drinking", "NO"),
+        hobbies=getattr(profile, "hobbies", None),
+        time_of_birth=getattr(profile, "time_of_birth", None),
+        place_of_birth=getattr(profile, "place_of_birth", None),
         rashi=getattr(profile, "rashi", None),
         nakshatra=getattr(profile, "nakshatra", None),
         is_manglik=getattr(profile, "is_manglik", "DONT_KNOW"),
@@ -270,6 +285,9 @@ def update_my_profile(
             except ValueError:
                 del update_dict["date_of_birth"]
 
+    if "hobbies" in update_dict and isinstance(update_dict["hobbies"], list):
+        update_dict["hobbies"] = ", ".join(update_dict["hobbies"])
+
     for field, val in update_dict.items():
         if hasattr(profile, field) and val is not None:
             setattr(profile, field, val)
@@ -316,6 +334,9 @@ def update_profile_by_id(
                 update_dict["date_of_birth"] = datetime.strptime(dob_val, "%Y-%m-%d").date()
             except ValueError:
                 del update_dict["date_of_birth"]
+
+    if "hobbies" in update_dict and isinstance(update_dict["hobbies"], list):
+        update_dict["hobbies"] = ", ".join(update_dict["hobbies"])
 
     for field, val in update_dict.items():
         if hasattr(profile, field) and val is not None:

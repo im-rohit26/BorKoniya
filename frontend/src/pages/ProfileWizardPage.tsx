@@ -289,26 +289,52 @@ export const ProfileWizardPage: React.FC = () => {
             firstName: p.first_name || prev.firstName,
             lastName: p.last_name || prev.lastName,
             gender: p.gender || prev.gender,
-            dob: p.date_of_birth ? String(p.date_of_birth) : prev.dob,
+            dob: p.date_of_birth ? String(p.date_of_birth).split('T')[0] : prev.dob,
             heightCm: p.height_cm ? String(p.height_cm) : prev.heightCm,
             maritalStatus: p.marital_status || prev.maritalStatus,
+            hasChildren: (p as any).has_children || prev.hasChildren,
             motherTongue: p.mother_tongue || prev.motherTongue,
             community: p.community || prev.community,
             subCommunity: p.sub_community || prev.subCommunity,
             nativePlace: p.native_place || prev.nativePlace,
+            familyOriginState: (p as any).family_origin_state || prev.familyOriginState,
             currentState: p.current_state || prev.currentState,
             currentCity: p.current_city || prev.currentCity,
+            gotra: (p as any).gotra || prev.gotra,
             highestQualification: p.highest_qualification || prev.highestQualification,
+            college: (p as any).college || prev.college,
             occupation: p.occupation || prev.occupation,
             company: p.company_name || prev.company,
             annualIncome: p.annual_income || prev.annualIncome,
+            workLocation: (p as any).work_location || prev.workLocation,
+            fatherOccupation: (p as any).father_occupation || prev.fatherOccupation,
+            motherOccupation: (p as any).mother_occupation || prev.motherOccupation,
+            brothersCount: (p as any).brothers_count !== undefined && (p as any).brothers_count !== null ? String((p as any).brothers_count) : prev.brothersCount,
+            sistersCount: (p as any).sisters_count !== undefined && (p as any).sisters_count !== null ? String((p as any).sisters_count) : prev.sistersCount,
+            familyType: (p as any).family_type || prev.familyType,
+            familyValues: (p as any).family_values || prev.familyValues,
+            familyLocation: (p as any).family_location || prev.familyLocation,
             diet: p.diet || prev.diet,
             smoking: p.smoking || prev.smoking,
             drinking: p.drinking || prev.drinking,
+            hobbies: Array.isArray((p as any).hobbies)
+              ? (p as any).hobbies
+              : (p as any).hobbies
+              ? (p as any).hobbies.split(',').map((h: string) => h.trim()).filter(Boolean)
+              : prev.hobbies,
+            aboutMe: p.about_me || prev.aboutMe,
+            includeHoroscope: Boolean(
+              (p as any).time_of_birth ||
+              (p as any).place_of_birth ||
+              p.rashi ||
+              p.nakshatra ||
+              (p.is_manglik && p.is_manglik !== 'DONT_KNOW')
+            ),
+            timeOfBirth: (p as any).time_of_birth || prev.timeOfBirth,
+            placeOfBirth: (p as any).place_of_birth || prev.placeOfBirth,
             rashi: p.rashi || prev.rashi,
             nakshatra: p.nakshatra || prev.nakshatra,
             isManglik: p.is_manglik || prev.isManglik,
-            aboutMe: p.about_me || prev.aboutMe,
           }))
         }
       })
@@ -327,29 +353,45 @@ export const ProfileWizardPage: React.FC = () => {
     const primaryPhoto = photos.find((p) => p.isPrimary) || photos[0]
     try {
       await updateMyProfile({
+        profile_for: formData.profileFor,
         first_name: formData.firstName,
         last_name: formData.lastName,
         gender: formData.gender,
         date_of_birth: formData.dob,
         height_cm: parseInt(formData.heightCm, 10) || 165,
         marital_status: formData.maritalStatus,
+        has_children: formData.hasChildren,
         mother_tongue: formData.motherTongue,
         community: formData.community,
         sub_community: formData.subCommunity,
+        gotra: formData.gotra,
         native_place: formData.nativePlace,
+        family_origin_state: formData.familyOriginState,
         current_state: formData.currentState,
         current_city: formData.currentCity,
         highest_qualification: formData.highestQualification,
+        college: formData.college,
         occupation: formData.occupation,
         company_name: formData.company,
         annual_income: formData.annualIncome,
+        work_location: formData.workLocation,
+        father_occupation: formData.fatherOccupation,
+        mother_occupation: formData.motherOccupation,
+        brothers_count: formData.brothersCount,
+        sisters_count: formData.sistersCount,
+        family_type: formData.familyType,
+        family_values: formData.familyValues,
+        family_location: formData.familyLocation,
         diet: formData.diet,
         smoking: formData.smoking,
         drinking: formData.drinking,
+        hobbies: Array.isArray(formData.hobbies) ? formData.hobbies.join(', ') : formData.hobbies,
+        about_me: formData.aboutMe,
+        time_of_birth: formData.timeOfBirth,
+        place_of_birth: formData.placeOfBirth,
         rashi: formData.rashi,
         nakshatra: formData.nakshatra,
         is_manglik: formData.isManglik,
-        about_me: formData.aboutMe,
         photo_url: primaryPhoto?.url,
       })
       await refreshUser()
