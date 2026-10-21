@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, Lock, Phone, Eye, EyeOff, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, Lock, Phone, Eye, EyeOff, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { AuthErrorModal } from '../components/common/AuthErrorModal';
 import { Header } from '../components/common/Header';
@@ -114,17 +114,6 @@ export const LoginPage: React.FC = () => {
                 Log in to connect with eligible matches from the Sadgope, Gowala & Goala communities.
               </p>
             </div>
-
-            {/* Error Message Alert */}
-            {errorMessage && (
-              <div
-                role="alert"
-                className="mb-6 rounded-2xl bg-rose-50 p-4 border border-rose-200 flex items-start space-x-3 text-xs font-medium text-rose-800 animate-in fade-in"
-              >
-                <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">{errorMessage}</div>
-              </div>
-            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">

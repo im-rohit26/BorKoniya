@@ -6,7 +6,6 @@ import {
   Smartphone,
   ShieldCheck,
   CheckCircle,
-  AlertCircle,
   ArrowRight,
 } from 'lucide-react';
 import { sendOtp, verifyOtp } from '../lib/authApi';
@@ -261,17 +260,6 @@ export const RegisterPage: React.FC = () => {
                 />
               </div>
             </div>
-
-            {/* Error Banner */}
-            {errorMessage && (
-              <div
-                role="alert"
-                className="mb-6 rounded-2xl bg-rose-50 p-4 border border-rose-200 flex items-start space-x-3 text-xs font-semibold text-rose-800 animate-in fade-in"
-              >
-                <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">{errorMessage}</div>
-              </div>
-            )}
 
             {/* Step 1: Who are you creating this profile for? */}
             {step === 'who_for' && (

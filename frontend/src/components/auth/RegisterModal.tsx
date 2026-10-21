@@ -334,12 +334,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
               </p>
             </div>
 
-            {errorMessage && (
-              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
-                {errorMessage}
-              </div>
-            )}
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">First Name *</label>
@@ -513,12 +507,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
               </p>
 
             </div>
-
-            {errorMessage && (
-              <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
-                {errorMessage}
-              </div>
-            )}
 
             <div className="flex justify-center items-center gap-1.5 sm:gap-2.5 py-2">
               {otp.map((digit, idx) => (
