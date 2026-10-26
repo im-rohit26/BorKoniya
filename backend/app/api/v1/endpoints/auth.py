@@ -25,6 +25,9 @@ from app.schemas.auth import (
 )
 
 from app.services.email_service import email_service
+from app.services.fast2sms_service import fast2sms_service
+
+logger = logging.getLogger("borkonya.auth")
 
 router = APIRouter(prefix="/auth", tags=["Authentication & OTP"])
 
@@ -90,17 +93,31 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
 
     otp = f"{random.randint(100000, 999999)}"
 
+    # Deliver OTP via WhatsApp if phone is present
+    wa_error_msg = None
+    if clean_phone:
+        wa_success, wa_error_msg = fast2sms_service.send_whatsapp_otp(
+            phone_number=clean_phone,
+            otp_code=otp,
+        )
+        if not wa_success:
+            logger.warning(f"Fast2SMS WhatsApp OTP failed for {clean_phone}: {wa_error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"WhatsApp OTP delivery failed: {wa_error_msg}. Fast2SMS mein WhatsApp template approve hona zaroori hai.",
+            )
+
     # Deliver OTP via Email if email is present
     if clean_email:
-        success, error_msg = email_service.send_otp_email(
+        email_success, email_err = email_service.send_otp_email(
             to_email=clean_email,
             otp_code=otp,
             recipient_name="Member",
         )
-        if not success:
+        if not email_success and not clean_phone:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=error_msg or "Unable to send verification email. Please verify your email and try again.",
+                detail=email_err or "Unable to send verification email. Please verify your email and try again.",
             )
 
     expiry = now + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
@@ -123,12 +140,18 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
         db.add(new_otp)
     db.commit()
 
-    is_dev = settings.DEBUG and settings.ENVIRONMENT == "development"
+    channels = []
+    if clean_phone:
+        channels.append(f"WhatsApp (+91 {clean_phone})")
+    if clean_email:
+        channels.append(f"email ({clean_email})")
+    channel_info = " and ".join(channels) if channels else "your provided contact"
+
     return SendOtpResponse(
-        message="Verification code sent successfully." + (" Check your email inbox and spam folder." if clean_email else ""),
+        message=f"Verification code sent successfully to {channel_info}.",
         phone_number=clean_phone,
         email=clean_email,
-        demo_otp=otp if is_dev else None,
+        demo_otp=None,
     )
 
 
@@ -467,8 +490,11 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         "status": "OTP_SENT",
         "message": "If an account exists with this mobile number or email, a verification code has been sent.",
     }
-    if is_dev:
-        res["demo_otp"] = otp
+    if user and user.phone_number:
+        fast2sms_service.send_whatsapp_otp(
+            phone_number=user.phone_number,
+            otp_code=otp,
+        )
     return res
 
 
@@ -542,3 +568,11 @@ def check_smtp_status():
     """
     return email_service.test_connection()
 
+
+
+@router.get("/fast2sms-status")
+def check_fast2sms_status():
+    """
+    Diagnostic endpoint to test Fast2SMS WhatsApp API configuration and wallet status.
+    """
+    return fast2sms_service.test_connection()
