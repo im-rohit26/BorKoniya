@@ -93,7 +93,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     const cleanPhone = formData.phone.trim()
     const cleanEmail = formData.email.trim()
     if (!cleanPhone || cleanPhone.length < 10) {
-      triggerError('Please enter a valid 10-digit WhatsApp number')
+      triggerError('Please enter a valid 10-digit mobile number')
       return
     }
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
@@ -410,7 +410,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  WhatsApp Number (For OTP) *
+                  Mobile Number (For OTP) *
                 </label>
                 <div className="flex">
                   <span className="inline-flex items-center rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600">
@@ -501,7 +501,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                 Account Verification
               </h2>
               <p className="text-xs text-slate-600 mt-1">
-                Enter the 6-digit OTP sent to your WhatsApp number{' '}
+                Enter the 6-digit OTP sent to your mobile number{' '}
                 <span className="font-semibold text-navy-900">+91 {formData.phone}</span>
                 {formData.email ? <> and <span className="font-semibold text-navy-900 break-all">{formData.email}</span></> : ''}
               </p>

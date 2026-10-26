@@ -26,6 +26,7 @@ from app.schemas.auth import (
 
 from app.services.email_service import email_service
 from app.services.fast2sms_service import fast2sms_service
+from app.services.hanu_otp_service import hanu_otp_service
 
 logger = logging.getLogger("borkonya.auth")
 
@@ -93,18 +94,42 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
 
     otp = f"{random.randint(100000, 999999)}"
 
-    # Deliver OTP via WhatsApp if phone is present
-    wa_error_msg = None
+    # Deliver OTP via SMS (HanuOTP - No DLT required) and/or WhatsApp (Fast2SMS)
+    channels = []
+    phone_dispatched = False
+    phone_err_msgs = []
+
     if clean_phone:
-        wa_success, wa_error_msg = fast2sms_service.send_whatsapp_otp(
-            phone_number=clean_phone,
-            otp_code=otp,
-        )
-        if not wa_success:
-            logger.warning(f"Fast2SMS WhatsApp OTP failed for {clean_phone}: {wa_error_msg}")
+        # 1. Try HanuOTP Direct SMS
+        if hanu_otp_service.is_configured():
+            sms_success, sms_err = hanu_otp_service.send_sms_otp(
+                phone_number=clean_phone,
+                otp_code=otp,
+            )
+            if sms_success:
+                phone_dispatched = True
+                channels.append(f"SMS (+91 {clean_phone})")
+            elif sms_err:
+                phone_err_msgs.append(f"SMS: {sms_err}")
+
+        # 2. Try Fast2SMS WhatsApp
+        if fast2sms_service.is_configured():
+            wa_success, wa_error_msg = fast2sms_service.send_whatsapp_otp(
+                phone_number=clean_phone,
+                otp_code=otp,
+            )
+            if wa_success:
+                phone_dispatched = True
+                channels.append(f"WhatsApp (+91 {clean_phone})")
+            elif wa_error_msg:
+                phone_err_msgs.append(f"WhatsApp: {wa_error_msg}")
+
+        # If phone was given but neither provider succeeded and no email was provided
+        if not phone_dispatched and not clean_email:
+            combined_err = " | ".join(phone_err_msgs) if phone_err_msgs else "Failed to dispatch mobile OTP."
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"WhatsApp OTP delivery failed: {wa_error_msg}. Fast2SMS mein WhatsApp template approve hona zaroori hai.",
+                detail=combined_err,
             )
 
     # Deliver OTP via Email if email is present
@@ -114,10 +139,12 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
             otp_code=otp,
             recipient_name="Member",
         )
-        if not email_success and not clean_phone:
+        if email_success:
+            channels.append(f"email ({clean_email})")
+        elif not phone_dispatched:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=email_err or "Unable to send verification email. Please verify your email and try again.",
+                detail=email_err or "Unable to send verification OTP via SMS or Email. Please check your details and try again.",
             )
 
     expiry = now + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
@@ -140,18 +167,13 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
         db.add(new_otp)
     db.commit()
 
-    channels = []
-    if clean_phone:
-        channels.append(f"WhatsApp (+91 {clean_phone})")
-    if clean_email:
-        channels.append(f"email ({clean_email})")
     channel_info = " and ".join(channels) if channels else "your provided contact"
 
     return SendOtpResponse(
         message=f"Verification code sent successfully to {channel_info}.",
         phone_number=clean_phone,
         email=clean_email,
-        demo_otp=None,
+        demo_otp=otp if (settings.DEBUG and settings.ENVIRONMENT == "development") else None,
     )
 
 
@@ -489,12 +511,19 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     res = {
         "status": "OTP_SENT",
         "message": "If an account exists with this mobile number or email, a verification code has been sent.",
+        "demo_otp": otp if is_dev else None,
     }
     if user and user.phone_number:
-        fast2sms_service.send_whatsapp_otp(
-            phone_number=user.phone_number,
-            otp_code=otp,
-        )
+        if hanu_otp_service.is_configured():
+            hanu_otp_service.send_sms_otp(
+                phone_number=user.phone_number,
+                otp_code=otp,
+            )
+        if fast2sms_service.is_configured():
+            fast2sms_service.send_whatsapp_otp(
+                phone_number=user.phone_number,
+                otp_code=otp,
+            )
     return res
 
 
@@ -576,3 +605,11 @@ def check_fast2sms_status():
     Diagnostic endpoint to test Fast2SMS WhatsApp API configuration and wallet status.
     """
     return fast2sms_service.test_connection()
+
+
+@router.get("/hanu-status")
+def check_hanu_status():
+    """
+    Diagnostic endpoint to test HanuOTP (No-DLT SMS) configuration.
+    """
+    return hanu_otp_service.test_connection()

@@ -42,6 +42,22 @@ class SubscriptionService:
     def _normalize_plan_id(self, plan_id: str) -> str:
         return PLAN_ALIASES.get(plan_id, plan_id)
 
+    @staticmethod
+    def _parse_features(raw_features: Any) -> Dict[str, Any]:
+        features = raw_features
+        # Handle string or multi-encoded JSON strings
+        while isinstance(features, str):
+            try:
+                parsed = json.loads(features)
+                if parsed == features:
+                    break
+                features = parsed
+            except Exception:
+                break
+        if not isinstance(features, dict):
+            features = {}
+        return dict(features)
+
     def get_plans(self, db: Session) -> List[SubscriptionPlanResponse]:
         plans = (
             db.query(SubscriptionPlan)
@@ -51,19 +67,7 @@ class SubscriptionService:
         )
         results = []
         for p in plans:
-            features = p.features_json
-            if isinstance(features, str):
-                try:
-                    features = json.loads(features)
-                except Exception:
-                    pass
-            if isinstance(features, str):
-                try:
-                    features = json.loads(features)
-                except Exception:
-                    pass
-            if not isinstance(features, dict):
-                features = {}
+            features = self._parse_features(p.features_json)
             results.append(
                 SubscriptionPlanResponse(
                     id=p.id,
@@ -315,12 +319,7 @@ class SubscriptionService:
         plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == sub.plan_id).first()
         sub_exp = to_utc(sub.expires_at)
         days_remaining = max(0, (sub_exp - now).days) if sub_exp else 0
-        features = {}
-        if plan and plan.features_json:
-            try:
-                features = json.loads(plan.features_json)
-            except Exception:
-                features = {}
+        features = self._parse_features(plan.features_json) if plan else {}
         features["unlimited_chat"] = True
         features["view_all_profiles"] = True
 

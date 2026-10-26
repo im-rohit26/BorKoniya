@@ -81,7 +81,7 @@ def seed_plans():
                     duration_months=p["duration_months"],
                     duration_days=p["duration_days"],
                     savings_inr=p["savings_inr"],
-                    features_json=json.dumps(p["features"]),
+                    features_json=p["features"],
                     is_active=True,
                 )
                 db.add(plan)
@@ -91,7 +91,7 @@ def seed_plans():
                 existing.duration_months = p["duration_months"]
                 existing.duration_days = p["duration_days"]
                 existing.savings_inr = p["savings_inr"]
-                existing.features_json = json.dumps(p["features"])
+                existing.features_json = p["features"]
                 existing.is_active = True
 
         # Ensure community coupon BOR50 exists

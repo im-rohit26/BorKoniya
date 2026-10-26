@@ -389,3 +389,49 @@ def test_idempotent_payment_verification(client, groom_auth_headers):
 
     # Clean up
     clean_user_subscriptions(me["user_id"])
+
+
+def test_my_status_active_subscription_handles_string_and_dict_features(client, groom_auth_headers):
+    """
+    Ensure /api/v1/subscription/my-status works seamlessly whether features_json
+    is a dict, JSON string, or nested JSON string.
+    """
+    me = client.get("/api/v1/auth/me", headers=groom_auth_headers).json()
+    clean_user_subscriptions(me["user_id"])
+
+    # Activate a quarterly subscription
+    res = client.post("/api/v1/subscription/checkout", json={
+        "plan_id": "quarterly",
+        "order_id": "order_status_test_quarterly",
+    }, headers=groom_auth_headers)
+    assert res.status_code == 200
+
+    # Test status endpoint
+    status_res = client.get("/api/v1/subscription/my-status", headers=groom_auth_headers)
+    assert status_res.status_code == 200
+    status_data = status_res.json()
+    assert status_data["is_active"] is True
+    assert status_data["plan_id"] == "quarterly"
+    assert status_data["features"]["unlimited_chat"] is True
+    assert status_data["features"]["view_all_profiles"] is True
+
+    # Test when features_json is explicitly a double-encoded string in the DB
+    with SessionLocal() as db:
+        plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == "quarterly").first()
+        original_features = plan.features_json
+        plan.features_json = '"{\\"unlimited_chat\\": true, \\"custom_test\\": true}"'
+        db.commit()
+
+    try:
+        status_res = client.get("/api/v1/subscription/my-status", headers=groom_auth_headers)
+        assert status_res.status_code == 200
+        data = status_res.json()
+        assert data["is_active"] is True
+        assert data["features"]["unlimited_chat"] is True
+    finally:
+        with SessionLocal() as db:
+            plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == "quarterly").first()
+            plan.features_json = original_features
+            db.commit()
+
+    clean_user_subscriptions(me["user_id"])
