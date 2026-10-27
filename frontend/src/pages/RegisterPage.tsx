@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Users,
   Smartphone,
+  Mail,
+  Clock,
   ShieldCheck,
   CheckCircle,
   ArrowRight,
@@ -15,6 +17,150 @@ import { Footer } from '../components/common/Footer';
 import { LanguageSelectorModal } from '../components/common/LanguageSelectorModal';
 import { AuthErrorModal } from '../components/common/AuthErrorModal';
 import logoImg from '../assets/logo.jpeg';
+
+interface OtpInputRowProps {
+  value: string[];
+  onChange: (digits: string[]) => void;
+  idPrefix: string;
+  disabled?: boolean;
+}
+
+const OtpInputRow: React.FC<OtpInputRowProps> = ({
+  value,
+  onChange,
+  idPrefix,
+  disabled = false,
+}) => {
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      const newOtp = [...value];
+
+      if (newOtp[idx]) {
+        // Current input has a digit -> delete it and keep focus
+        newOtp[idx] = '';
+        onChange(newOtp);
+      } else if (idx > 0) {
+        // Current input is already empty -> delete previous digit and move focus to previous input
+        newOtp[idx - 1] = '';
+        onChange(newOtp);
+        inputRefs.current[idx - 1]?.focus();
+      }
+      return;
+    }
+
+    if (e.key === 'Delete') {
+      e.preventDefault();
+      const newOtp = [...value];
+      newOtp[idx] = '';
+      onChange(newOtp);
+      return;
+    }
+
+    if (e.key === 'ArrowLeft' && idx > 0) {
+      e.preventDefault();
+      inputRefs.current[idx - 1]?.focus();
+      return;
+    }
+
+    if (e.key === 'ArrowRight' && idx < 5) {
+      e.preventDefault();
+      inputRefs.current[idx + 1]?.focus();
+      return;
+    }
+  };
+
+  const handleChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
+    const rawVal = e.target.value;
+    const cleanDigits = rawVal.replace(/\D/g, '');
+
+    if (!cleanDigits) {
+      const newOtp = [...value];
+      newOtp[idx] = '';
+      onChange(newOtp);
+      return;
+    }
+
+    // Multiple digits entered (e.g. mobile auto-fill or inline paste)
+    if (cleanDigits.length > 1) {
+      const newOtp = [...value];
+      let lastIndex = idx;
+      for (let i = 0; i < cleanDigits.length && idx + i < 6; i++) {
+        newOtp[idx + i] = cleanDigits[i];
+        lastIndex = idx + i;
+      }
+      onChange(newOtp);
+      const nextFocus = Math.min(lastIndex + 1, 5);
+      inputRefs.current[nextFocus]?.focus();
+      return;
+    }
+
+    // Single digit entered
+    const digit = cleanDigits.slice(-1);
+    const newOtp = [...value];
+    newOtp[idx] = digit;
+    onChange(newOtp);
+
+    // Auto-advance to next input
+    if (idx < 5) {
+      inputRefs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (idx: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text/plain') || e.clipboardData.getData('text');
+    const cleanDigits = pastedText.replace(/\D/g, '').slice(0, 6);
+    if (!cleanDigits) return;
+
+    const newOtp = [...value];
+    const startIdx = cleanDigits.length === 6 ? 0 : idx;
+    for (let i = 0; i < cleanDigits.length && startIdx + i < 6; i++) {
+      newOtp[startIdx + i] = cleanDigits[i];
+    }
+    onChange(newOtp);
+
+    const focusTarget = Math.min(startIdx + cleanDigits.length, 5);
+    inputRefs.current[focusTarget]?.focus();
+  };
+
+  return (
+    <div className="flex justify-between items-center gap-1.5 sm:gap-2.5 max-w-sm sm:max-w-md py-1">
+      {value.map((digit, idx) => (
+        <input
+          key={idx}
+          ref={(el) => {
+            inputRefs.current[idx] = el;
+          }}
+          id={`${idPrefix}-${idx}`}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete={idx === 0 ? 'one-time-code' : 'off'}
+          maxLength={6}
+          value={digit}
+          disabled={disabled}
+          onFocus={(e) => e.target.select()}
+          onClick={(e) => (e.target as HTMLInputElement).select()}
+          onKeyDown={(e) => handleKeyDown(idx, e)}
+          onChange={(e) => handleChange(idx, e)}
+          onPaste={(e) => handlePaste(idx, e)}
+          className={`h-12 w-10 sm:h-13 sm:w-12 max-w-[48px] flex-1 rounded-xl border text-center text-lg sm:text-xl font-bold transition-all shadow-xs focus:outline-none ${
+            digit
+              ? 'border-blue-500 bg-blue-50/20 text-navy-950 ring-1 ring-blue-200'
+              : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100'
+          } ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}`}
+        />
+      ))}
+    </div>
+  );
+};
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -41,7 +187,18 @@ export const RegisterPage: React.FC = () => {
     confirmPassword: '',
   });
 
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  // Separate Phone and Email OTP states
+  const [phoneOtp, setPhoneOtp] = useState(['', '', '', '', '', '']);
+  const [emailOtp, setEmailOtp] = useState(['', '', '', '', '', '']);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+
+  // Separate countdown timers for Resend OTP (Mockup shows 00:30)
+  const [phoneTimer, setPhoneTimer] = useState(30);
+  const [emailTimer, setEmailTimer] = useState(30);
+  const [isResendingPhone, setIsResendingPhone] = useState(false);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -50,16 +207,32 @@ export const RegisterPage: React.FC = () => {
   const [communities, setCommunities] = useState<any[]>([]);
 
   useEffect(() => {
-    masterDataApi.getProfileForOptions().then(res => {
+    masterDataApi.getProfileForOptions().then((res) => {
       setProfileForOptions(res);
       if (res.length > 0) setProfileFor(res[0].value);
     }).catch(() => {});
     masterDataApi.getCommunities().then(setCommunities).catch(() => {});
   }, []);
 
+  // Countdown timer effect
+  useEffect(() => {
+    if (step !== 'otp_verification') return;
+    const interval = setInterval(() => {
+      setPhoneTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      setEmailTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [step]);
+
   const triggerError = (msg: string) => {
     setErrorMessage(msg);
     setShowErrorModal(true);
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSelectWhoFor = (val: string) => {
@@ -99,7 +272,17 @@ export const RegisterPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await sendOtp({ phoneNumber: cleanPhone, email: cleanEmail });
+      // Send OTP to mobile and email
+      await Promise.all([
+        sendOtp({ phoneNumber: cleanPhone }),
+        sendOtp({ email: cleanEmail }),
+      ]);
+      setPhoneTimer(30);
+      setEmailTimer(30);
+      setPhoneOtp(['', '', '', '', '', '']);
+      setEmailOtp(['', '', '', '', '', '']);
+      setPhoneVerified(false);
+      setEmailVerified(false);
       setStep('otp_verification');
     } catch (err: any) {
       triggerError(err.message || 'Failed to send verification OTP. Please try again.');
@@ -108,34 +291,79 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
-  const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) val = val[0];
-    const updated = [...otp];
-    updated[index] = val;
-    setOtp(updated);
+  const handleResendPhoneOtp = async () => {
+    if (phoneTimer > 0 || isResendingPhone || isSubmitting) return;
+    setIsResendingPhone(true);
+    try {
+      await sendOtp({ phoneNumber: formData.phone.trim() });
+      setPhoneTimer(30);
+      setPhoneOtp(['', '', '', '', '', '']);
+      setPhoneVerified(false);
+    } catch (err: any) {
+      triggerError(err.message || 'Failed to resend SMS code. Please try again.');
+    } finally {
+      setIsResendingPhone(false);
+    }
+  };
 
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`reg-otp-${index + 1}`);
-      if (nextInput) nextInput.focus();
+  const handleResendEmailOtp = async () => {
+    if (emailTimer > 0 || isResendingEmail || isSubmitting) return;
+    setIsResendingEmail(true);
+    try {
+      await sendOtp({ email: formData.email.trim() });
+      setEmailTimer(30);
+      setEmailOtp(['', '', '', '', '', '']);
+      setEmailVerified(false);
+    } catch (err: any) {
+      triggerError(err.message || 'Failed to resend Email code. Please try again.');
+    } finally {
+      setIsResendingEmail(false);
     }
   };
 
   const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setErrorMessage(null);
     setShowErrorModal(false);
-    const enteredOtp = otp.join('');
-    if (enteredOtp.length < 4) {
-      triggerError('Please enter the full verification OTP.');
+
+    const enteredPhoneOtp = phoneOtp.join('');
+    const enteredEmailOtp = emailOtp.join('');
+
+    if (enteredPhoneOtp.length !== 6) {
+      triggerError('Please enter the full 6-digit Mobile OTP sent to your phone.');
+      return;
+    }
+
+    if (enteredEmailOtp.length !== 6) {
+      triggerError('Please enter the full 6-digit Email OTP sent to your email.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 1. Verify OTP with backend
-      await verifyOtp({ phoneNumber: formData.phone.trim(), email: formData.email.trim() }, enteredOtp);
+      // 1. Verify Mobile OTP if not verified yet
+      if (!phoneVerified) {
+        try {
+          await verifyOtp({ phoneNumber: formData.phone.trim() }, enteredPhoneOtp);
+          setPhoneVerified(true);
+        } catch (err: any) {
+          throw new Error(err.message ? `Mobile OTP: ${err.message}` : 'Invalid or expired Mobile OTP code.');
+        }
+      }
 
-      // 2. Register user & establish authenticated session
+      // 2. Verify Email OTP if not verified yet
+      if (!emailVerified) {
+        try {
+          await verifyOtp({ email: formData.email.trim() }, enteredEmailOtp);
+          setEmailVerified(true);
+        } catch (err: any) {
+          throw new Error(err.message ? `Email OTP: ${err.message}` : 'Invalid or expired Email OTP code.');
+        }
+      }
+
+      // 3. Register user & establish authenticated session
       await register({
         profile_for: profileFor,
         first_name: formData.firstName.trim(),
@@ -214,9 +442,9 @@ export const RegisterPage: React.FC = () => {
         />
       )}
 
-      <main className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-lg">
-          <div className="rounded-3xl bg-white p-6 sm:p-10 shadow-xl border border-slate-200">
+      <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
+        <div className={`w-full transition-all duration-300 ${step === 'otp_verification' ? 'max-w-xl' : 'max-w-lg'}`}>
+          <div className="rounded-3xl bg-white p-5 sm:p-8 shadow-xl border border-slate-200">
             {/* Brand Logo Header */}
             <div className="text-center mb-6">
               <Link to="/" className="inline-block hover:opacity-95 transition-opacity">
@@ -231,30 +459,30 @@ export const RegisterPage: React.FC = () => {
             {/* Step Progress Bar */}
             <div className="mb-6">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                <span>
+                <span className={step === 'otp_verification' ? 'text-[#1e3a8a] font-bold' : ''}>
                   {step === 'who_for' && 'Step 1 of 3: Profile For'}
                   {step === 'basic_details' && 'Step 2 of 3: Details & Contact'}
-                  {step === 'otp_verification' && 'Step 3 of 3: Phone Verification'}
+                  {step === 'otp_verification' && 'STEP 3 OF 3: VERIFY CONTACT'}
                   {step === 'success' && 'Account Created!'}
                 </span>
-                <span className="text-crimson-700 font-semibold">
+                <span className={step === 'otp_verification' ? 'text-[#1e3a8a] font-bold' : 'text-crimson-700 font-semibold'}>
                   {step === 'who_for' && '33%'}
                   {step === 'basic_details' && '66%'}
-                  {step === 'otp_verification' && '90%'}
+                  {step === 'otp_verification' && '100%'}
                   {step === 'success' && '100%'}
                 </span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-crimson-600 to-navy-900 transition-all duration-300"
+                  className={`h-full transition-all duration-300 ${
+                    step === 'otp_verification' ? 'bg-[#1d4ed8]' : 'bg-gradient-to-r from-crimson-600 to-navy-900'
+                  }`}
                   style={{
                     width:
                       step === 'who_for'
                         ? '33%'
                         : step === 'basic_details'
                         ? '66%'
-                        : step === 'otp_verification'
-                        ? '90%'
                         : '100%',
                   }}
                 />
@@ -471,7 +699,7 @@ export const RegisterPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
+                    className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60 cursor-pointer"
                   >
                     <span>{isSubmitting ? 'Sending Code...' : 'Send Verification OTP'}</span>
                     <ArrowRight className="h-4 w-4 text-white" />
@@ -480,55 +708,143 @@ export const RegisterPage: React.FC = () => {
               </form>
             )}
 
-            {/* Step 3: OTP Verification */}
+            {/* Step 3: OTP Verification - Reference Design */}
             {step === 'otp_verification' && (
-              <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4 sm:space-y-5 animate-in fade-in">
-                <div className="text-center">
-                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <Smartphone className="h-7 w-7" />
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-bold text-navy-950 font-serif">
-                    Account Verification
+              <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4 animate-in fade-in">
+                {/* Title and Subtitle */}
+                <div className="text-center mb-5">
+                  <h2 className="text-2xl sm:text-[26px] font-bold text-navy-950 font-serif tracking-tight">
+                    Verify Your Contact Details
                   </h2>
-                  <p className="text-xs text-slate-600 mt-1">
-                    Enter the 6-digit OTP sent to your mobile number{' '}
-                    <span className="font-semibold text-navy-900">+91 {formData.phone}</span>
-                    {formData.email ? <> and <span className="font-semibold text-navy-900 break-all">{formData.email}</span></> : ''}
+                  <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Enter the codes sent to your phone and email to secure your account.
+                  </p>
+                </div>
+
+                {/* Section 1: Mobile Number Verification Card */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 flex-shrink-0 border border-blue-100">
+                      <Smartphone className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-navy-950 leading-tight">
+                        Mobile Number Verification
+                      </h3>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
+                        +91 {formData.phone}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mb-3">
+                    We sent a 6-digit code to your mobile number.
                   </p>
 
+                  <OtpInputRow
+                    value={phoneOtp}
+                    onChange={(val) => {
+                      setPhoneOtp(val);
+                      setPhoneVerified(false);
+                    }}
+                    idPrefix="phone-otp"
+                    disabled={isSubmitting}
+                  />
+
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600 mt-3 font-medium">
+                    <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                    {phoneTimer > 0 ? (
+                      <span>Resend SMS in {formatTimer(phoneTimer)}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendPhoneOtp}
+                        disabled={isResendingPhone || isSubmitting}
+                        className="hover:underline font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 cursor-pointer"
+                      >
+                        {isResendingPhone ? 'Sending SMS...' : 'Resend SMS'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex justify-center items-center gap-1.5 sm:gap-2.5 py-2">
-                  {otp.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      id={`reg-otp-${idx}`}
-                      type="text"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      className="h-11 sm:h-12 w-9 sm:w-11 max-w-[44px] flex-1 rounded-xl border border-slate-300 text-center text-base sm:text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
-                    />
-                  ))}
+                {/* Section 2: Email Verification Card */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 flex-shrink-0 border border-blue-100">
+                      <Mail className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm sm:text-base font-bold text-navy-950 leading-tight">
+                        Email Verification
+                      </h3>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5 truncate">
+                        {formData.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mb-3">
+                    We sent a 6-digit code to your email address.
+                  </p>
+
+                  <OtpInputRow
+                    value={emailOtp}
+                    onChange={(val) => {
+                      setEmailOtp(val);
+                      setEmailVerified(false);
+                    }}
+                    idPrefix="email-otp"
+                    disabled={isSubmitting}
+                  />
+
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600 mt-3 font-medium">
+                    <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                    {emailTimer > 0 ? (
+                      <span>Resend email in {formatTimer(emailTimer)}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendEmailOtp}
+                        disabled={isResendingEmail || isSubmitting}
+                        className="hover:underline font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 cursor-pointer"
+                      >
+                        {isResendingEmail ? 'Sending email...' : 'Resend email'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex gap-2.5 pt-2">
+                {/* Privacy Guarantee Note */}
+                <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-2">
+                  <ShieldCheck className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <span>Your contact details stay private and secure.</span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setStep('basic_details')}
-                    className="w-1/3 min-h-[44px] rounded-xl border border-slate-200 py-3 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    disabled={isSubmitting}
+                    className="w-1/3 min-h-[46px] rounded-xl border border-slate-300 bg-white py-3 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 min-h-[44px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-crimson-800 transition-all disabled:opacity-60"
+                    className="w-2/3 min-h-[46px] flex items-center justify-center space-x-2 rounded-xl bg-crimson-700 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-crimson-800 active:bg-crimson-900 transition-all disabled:opacity-60 cursor-pointer"
                   >
-                    <ShieldCheck className="h-4 w-4" />
-                    <span>{isSubmitting ? 'Verifying...' : 'Verify & Create Account'}</span>
+                    <span>{isSubmitting ? 'Verifying & Creating...' : 'Verify & Create Account'}</span>
+                    <ArrowRight className="h-4 w-4 text-white flex-shrink-0" />
                   </button>
                 </div>
+
+                {/* Footer Sub-Note */}
+                <p className="text-center text-[11px] text-slate-400 pt-1">
+                  Didn't receive a code? Check spam or resend when available.
+                </p>
               </form>
             )}
 
@@ -546,7 +862,7 @@ export const RegisterPage: React.FC = () => {
                 </p>
                 <div className="inline-flex items-center space-x-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Mobile Verified Badge Assigned</span>
+                  <span>Mobile & Email Verified Badges Assigned</span>
                 </div>
               </div>
             )}

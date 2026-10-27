@@ -141,16 +141,83 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
     }
   }
 
+  const handleOtpKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      e.preventDefault()
+      const newOtp = [...otp]
+      if (newOtp[idx]) {
+        newOtp[idx] = ''
+        setOtp(newOtp)
+      } else if (idx > 0) {
+        newOtp[idx - 1] = ''
+        setOtp(newOtp)
+        document.getElementById(`otp-input-${idx - 1}`)?.focus()
+      }
+      return
+    }
+    if (e.key === 'Delete') {
+      e.preventDefault()
+      const newOtp = [...otp]
+      newOtp[idx] = ''
+      setOtp(newOtp)
+      return
+    }
+    if (e.key === 'ArrowLeft' && idx > 0) {
+      e.preventDefault()
+      document.getElementById(`otp-input-${idx - 1}`)?.focus()
+      return
+    }
+    if (e.key === 'ArrowRight' && idx < 5) {
+      e.preventDefault()
+      document.getElementById(`otp-input-${idx + 1}`)?.focus()
+      return
+    }
+  }
+
   const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) val = val[0]
+    const cleanDigits = val.replace(/\D/g, '')
+    if (!cleanDigits) {
+      const updated = [...otp]
+      updated[index] = ''
+      setOtp(updated)
+      return
+    }
+    if (cleanDigits.length > 1) {
+      const updated = [...otp]
+      let lastIndex = index
+      for (let i = 0; i < cleanDigits.length && index + i < 6; i++) {
+        updated[index + i] = cleanDigits[i]
+        lastIndex = index + i
+      }
+      setOtp(updated)
+      const nextFocus = Math.min(lastIndex + 1, 5)
+      document.getElementById(`otp-input-${nextFocus}`)?.focus()
+      return
+    }
+    const digit = cleanDigits.slice(-1)
     const updated = [...otp]
-    updated[index] = val
+    updated[index] = digit
     setOtp(updated)
 
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`)
-      if (nextInput) nextInput.focus()
+    if (index < 5) {
+      document.getElementById(`otp-input-${index + 1}`)?.focus()
     }
+  }
+
+  const handleOtpPaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pastedText = e.clipboardData.getData('text/plain') || e.clipboardData.getData('text')
+    const cleanDigits = pastedText.replace(/\D/g, '').slice(0, 6)
+    if (!cleanDigits) return
+
+    const updated = [...otp]
+    const startIdx = cleanDigits.length === 6 ? 0 : index
+    for (let i = 0; i < cleanDigits.length && startIdx + i < 6; i++) {
+      updated[startIdx + i] = cleanDigits[i]
+    }
+    setOtp(updated)
+    const focusTarget = Math.min(startIdx + cleanDigits.length, 5)
+    document.getElementById(`otp-input-${focusTarget}`)?.focus()
   }
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -514,9 +581,17 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
                   key={idx}
                   id={`otp-input-${idx}`}
                   type="text"
-                  maxLength={1}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete={idx === 0 ? 'one-time-code' : 'off'}
+                  maxLength={6}
                   value={digit}
+                  disabled={isSubmitting}
+                  onFocus={(e) => e.target.select()}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onPaste={(e) => handleOtpPaste(idx, e)}
                   className="h-11 sm:h-12 w-9 sm:w-11 max-w-[44px] flex-1 rounded-xl border border-slate-300 text-center text-base sm:text-lg font-bold text-slate-900 focus:border-crimson-700 focus:ring-2 focus:ring-crimson-200 focus:outline-none shadow-xs"
                 />
               ))}
