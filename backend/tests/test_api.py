@@ -139,23 +139,74 @@ def test_forgot_and_reset_password(client):
 
 
 def test_coupon_validation_bor50(client):
-    res = client.post("/api/v1/subscription/coupon/apply", json={
+    # Monthly plan: INR 200 -> 50% = 100, Net = 100
+    res_m = client.post("/api/v1/subscription/coupon/apply", json={
         "code": "BOR50",
-        "plan_id": "monthly_premium",
+        "plan_id": "monthly",
     })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["is_valid"] is True
-    assert data["original_price_inr"] == 200.00
-    assert data["discount_amount_inr"] == 100.00
-    assert data["net_payable_inr"] == 100.00
+    assert res_m.status_code == 200
+    data_m = res_m.json()
+    assert data_m["is_valid"] is True
+    assert data_m["original_price_inr"] == 200.00
+    assert data_m["discount_amount_inr"] == 100.00
+    assert data_m["net_payable_inr"] == 100.00
+    assert data_m["discount_percentage"] == 50.00
 
+    # Quarterly plan: INR 500 -> 50% = 250, Net = 250
+    res_q = client.post("/api/v1/subscription/coupon/apply", json={
+        "code": "BOR50",
+        "plan_id": "quarterly",
+    })
+    assert res_q.status_code == 200
+    data_q = res_q.json()
+    assert data_q["is_valid"] is True
+    assert data_q["original_price_inr"] == 500.00
+    assert data_q["discount_amount_inr"] == 250.00
+    assert data_q["net_payable_inr"] == 250.00
+    assert data_q["discount_percentage"] == 50.00
+
+    # Half-yearly plan: INR 900 -> 50% = 450, Net = 450
+    res_h = client.post("/api/v1/subscription/coupon/apply", json={
+        "code": "BOR50",
+        "plan_id": "half_yearly",
+    })
+    assert res_h.status_code == 200
+    data_h = res_h.json()
+    assert data_h["is_valid"] is True
+    assert data_h["original_price_inr"] == 900.00
+    assert data_h["discount_amount_inr"] == 450.00
+    assert data_h["net_payable_inr"] == 450.00
+    assert data_h["discount_percentage"] == 50.00
+
+    # Invalid coupon code
     res_invalid = client.post("/api/v1/subscription/coupon/apply", json={
         "code": "INVALID_CODE",
-        "plan_id": "monthly_premium",
+        "plan_id": "half_yearly",
     })
-    assert res.status_code == 200
+    assert res_invalid.status_code == 200
     assert res_invalid.json()["is_valid"] is False
+    assert res_invalid.json()["discount_amount_inr"] == 0.00
+    assert res_invalid.json()["net_payable_inr"] == 900.00
+
+
+def test_coupon_validation_half_yearly_checkout(client, auth_headers):
+    # Initiate checkout for half-yearly plan with BOR50
+    init_res = client.post("/api/v1/subscription/checkout/initiate", json={
+        "plan_id": "half_yearly",
+        "coupon_code": "BOR50",
+    }, headers=auth_headers)
+    assert init_res.status_code == 200
+    order_data = init_res.json()
+    assert order_data["amount_inr"] == 900.00
+    assert order_data["discount_inr"] == 450.00
+    assert order_data["net_amount_inr"] == 450.00
+
+    # Invalid coupon must be rejected with 400
+    invalid_init = client.post("/api/v1/subscription/checkout/initiate", json={
+        "plan_id": "half_yearly",
+        "coupon_code": "FAKECOUPON",
+    }, headers=auth_headers)
+    assert invalid_init.status_code == 400
 
 
 def test_master_data_communities(client):

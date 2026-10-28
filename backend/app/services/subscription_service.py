@@ -123,17 +123,36 @@ class SubscriptionService:
                 message="Invalid or expired coupon code.",
             )
 
+        calc_discount = 0.00
+        discount_percentage = None
         if coupon.discount_type == "PERCENTAGE":
-            calc_discount = original_price * (float(coupon.discount_value) / 100.0)
-            max_discount = float(coupon.max_discount_inr) if coupon.max_discount_inr else calc_discount
-            discount = min(calc_discount, max_discount)
+            discount_percentage = float(coupon.discount_value)
+            calc_discount = original_price * (discount_percentage / 100.0)
+            if coupon.code == "BOR50":
+                discount = calc_discount
+                if coupon.max_discount_inr is not None:
+                    coupon.max_discount_inr = None
+                    try:
+                        db.commit()
+                    except Exception:
+                        pass
+            else:
+                max_discount = (
+                    float(coupon.max_discount_inr)
+                    if (coupon.max_discount_inr is not None and float(coupon.max_discount_inr) > 0)
+                    else None
+                )
+                discount = min(calc_discount, max_discount) if max_discount is not None else calc_discount
         else:
             discount = min(float(coupon.discount_value), original_price)
 
+        discount = min(discount, original_price)
         net = max(0.00, original_price - discount)
         return CouponApplyResponse(
             is_valid=True,
             coupon_code=coupon.code,
+            discount_type=coupon.discount_type,
+            discount_percentage=discount_percentage,
             original_price_inr=original_price,
             discount_amount_inr=round(discount, 2),
             net_payable_inr=round(net, 2),
@@ -148,7 +167,13 @@ class SubscriptionService:
         db: Session = None,
     ) -> PaymentInitiateResponse:
         clean_plan_id = self._normalize_plan_id(plan_id)
-        coupon_res = self.apply_coupon(coupon_code, plan_id=clean_plan_id, db=db)
+        if coupon_code and coupon_code.strip():
+            coupon_res = self.apply_coupon(coupon_code, plan_id=clean_plan_id, db=db)
+            if not coupon_res.is_valid:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail=coupon_res.message or "Invalid or expired coupon code.")
+        else:
+            coupon_res = self.apply_coupon(None, plan_id=clean_plan_id, db=db)
         plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == clean_plan_id).first() if db else None
         plan_name = plan.name if plan else "Monthly Plan"
 
@@ -200,7 +225,13 @@ class SubscriptionService:
                         expires_at=existing_sub.expires_at.isoformat(),
                     )
 
-        coupon_res = self.apply_coupon(coupon_code, plan_id=clean_plan_id, db=db)
+        if coupon_code and coupon_code.strip():
+            coupon_res = self.apply_coupon(coupon_code, plan_id=clean_plan_id, db=db)
+            if not coupon_res.is_valid:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail=coupon_res.message or "Invalid or expired coupon code.")
+        else:
+            coupon_res = self.apply_coupon(None, plan_id=clean_plan_id, db=db)
         plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == clean_plan_id).first() if db else None
         
         # Authoritative calendar-month arithmetic

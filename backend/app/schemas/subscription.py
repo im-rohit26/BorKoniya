@@ -22,6 +22,8 @@ class CouponApplyRequest(BaseModel):
 class CouponApplyResponse(BaseModel):
     is_valid: bool
     coupon_code: str
+    discount_type: Optional[str] = "PERCENTAGE"
+    discount_percentage: Optional[float] = None
     original_price_inr: float
     discount_amount_inr: float
     net_payable_inr: float

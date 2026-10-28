@@ -11,7 +11,7 @@
 - **Backend:** FastAPI (Python 3.11+) + Pydantic v2 + SQLAlchemy 2.0 + PostgreSQL / Supabase
 - **Data & Media:** Supabase Database (RLS) + Supabase Storage buckets
 - **Matching Engine:** Explainable 100% weighted rule-based compatibility scoring (`Why this match?`)
-- **Subscription Engine:** ₹200/month plan, 50% discount coupon (`BOR50` -> ₹100 net), payment service abstraction
+- **Subscription Engine:** Dynamic plans (Monthly ₹200, Quarterly ₹500, Half-yearly ₹900), 50% discount coupon (`BOR50` -> 50% off across plans), payment service abstraction
 - **Security & Privacy:** Contact masking (phone & email hidden by default), OTP verification, block & report moderation
 
 ---
@@ -96,4 +96,4 @@ npm run dev
    - Mobile and email verified badges with 6-digit OTP verification simulation.
 4. **Subscription & Coupon System:**
    - Monthly Premium plan at ₹200/month.
-   - Community coupon `BOR50` applies 50% discount yielding ₹100 net payable.
+   - Community coupon `BOR50` dynamically applies full 50% discount yielding ₹100, ₹250, and ₹450 net payable respectively.

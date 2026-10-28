@@ -19,6 +19,8 @@ export interface CouponResult {
   discount_amount_inr: number;
   net_payable_inr: number;
   message: string;
+  discount_type?: string;
+  discount_percentage?: number;
 }
 
 export interface CheckoutResult {

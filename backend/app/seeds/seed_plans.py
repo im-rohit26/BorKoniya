@@ -101,12 +101,13 @@ def seed_plans():
                 code="BOR50",
                 discount_type="PERCENTAGE",
                 discount_value=50.00,
-                max_discount_inr=100.00,
+                max_discount_inr=None,
                 is_active=True,
             ))
         else:
+            bor50.discount_type = "PERCENTAGE"
             bor50.discount_value = 50.00
-            bor50.max_discount_inr = 100.00
+            bor50.max_discount_inr = None
             bor50.is_active = True
 
         db.commit()

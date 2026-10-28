@@ -81,6 +81,24 @@ export const SubscriptionPage: React.FC = () => {
     }
   }, [plans, selectedPlanId]);
 
+  // Re-validate applied coupon when selected plan changes
+  useEffect(() => {
+    if (couponResult && couponResult.is_valid && couponResult.coupon_code) {
+      applyCoupon(couponResult.coupon_code, selectedPlanId)
+        .then((res) => {
+          if (res.is_valid) {
+            setCouponResult(res);
+          } else {
+            setCouponResult(null);
+            setCouponError(res.message || 'Invalid coupon code.');
+          }
+        })
+        .catch(() => {
+          // retain state on transient failure
+        });
+    }
+  }, [selectedPlanId]);
+
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || FALLBACK_PLAN;
 
   // 2. Handle Coupon Validation
@@ -106,9 +124,16 @@ export const SubscriptionPage: React.FC = () => {
     }
   };
 
-  // Calculate pricing
+  // Calculate pricing dynamically based on original plan price and coupon percentage/amount
   const basePrice = selectedPlan ? selectedPlan.price_inr : 200;
-  const discount = couponResult && couponResult.is_valid ? couponResult.discount_amount_inr : 0;
+  let discount = 0;
+  if (couponResult && couponResult.is_valid) {
+    if (couponResult.discount_percentage && couponResult.discount_percentage > 0) {
+      discount = Math.round((basePrice * (couponResult.discount_percentage / 100)) * 100) / 100;
+    } else {
+      discount = couponResult.discount_amount_inr;
+    }
+  }
   const netPayable = Math.max(0, basePrice - discount);
 
   // 3. Process Live Checkout & Entitlement Activation
@@ -276,9 +301,6 @@ export const SubscriptionPage: React.FC = () => {
                     key={plan.id}
                     onClick={() => {
                       setSelectedPlanId(plan.id);
-                      if (couponResult) {
-                        applyCoupon(couponResult.coupon_code, plan.id).then(setCouponResult);
-                      }
                     }}
                     className={`relative rounded-3xl p-6 sm:p-8 cursor-pointer transition-all duration-300 flex flex-col justify-between ${
                       isSelected
@@ -436,7 +458,7 @@ export const SubscriptionPage: React.FC = () => {
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
-                  <span>Community Discount (BOR50)</span>
+                  <span>Community Discount ({couponResult?.coupon_code || 'BOR50'})</span>
                   <span>-₹{discount.toFixed(2)}</span>
                 </div>
               )}
@@ -556,7 +578,7 @@ export const SubscriptionPage: React.FC = () => {
                   <span className="text-xl font-black text-crimson-700">₹{netPayable.toFixed(2)}</span>
                   {discount > 0 && (
                     <span className="text-[10px] text-emerald-600 block font-semibold">
-                      Saved ₹{discount.toFixed(0)} with BOR50
+                      Saved ₹{discount.toFixed(0)} with {couponResult?.coupon_code || 'BOR50'}
                     </span>
                   )}
                 </div>

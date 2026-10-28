@@ -315,7 +315,7 @@ class Coupon(Base):
     code = Column(String(30), unique=True, nullable=False)
     discount_type = Column(String(20), default="PERCENTAGE")
     discount_value = Column(Numeric(10, 2), default=50.00)
-    max_discount_inr = Column(Numeric(10, 2), default=100.00)
+    max_discount_inr = Column(Numeric(10, 2), nullable=True, default=None)
     is_active = Column(Boolean, default=True)
 
 

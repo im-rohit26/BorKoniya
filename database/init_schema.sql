@@ -380,5 +380,5 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Seed Default 50% Coupon (BOR50)
 INSERT INTO coupons (code, discount_type, discount_value, max_discount_inr, valid_from, usage_limit, is_active) VALUES
-('BOR50', 'PERCENTAGE', 50.00, 100.00, NOW(), 5000, TRUE)
-ON CONFLICT (code) DO NOTHING;
+('BOR50', 'PERCENTAGE', 50.00, NULL, NOW(), 5000, TRUE)
+ON CONFLICT (code) DO UPDATE SET max_discount_inr = NULL, discount_value = 50.00;

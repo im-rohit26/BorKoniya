@@ -41,15 +41,22 @@ def init_db_and_seed():
             ]
             db.add_all(sc_list)
 
-        if "coupons" in existing_tables and db.query(Coupon).filter(Coupon.code == "BOR50").count() == 0:
-            c = Coupon(
-                code="BOR50",
-                discount_type="PERCENTAGE",
-                discount_value=50.00,
-                max_discount_inr=100.00,
-                is_active=True,
-            )
-            db.add(c)
+        if "coupons" in existing_tables:
+            bor50 = db.query(Coupon).filter(Coupon.code == "BOR50").first()
+            if not bor50:
+                c = Coupon(
+                    code="BOR50",
+                    discount_type="PERCENTAGE",
+                    discount_value=50.00,
+                    max_discount_inr=None,
+                    is_active=True,
+                )
+                db.add(c)
+            else:
+                bor50.discount_type = "PERCENTAGE"
+                bor50.discount_value = 50.00
+                bor50.max_discount_inr = None
+                bor50.is_active = True
 
         db.commit()
 
