@@ -62,12 +62,6 @@ class Settings(BaseSettings):
     SMS_SENDER_ID: str = "BORKON"
     BACKEND_PUBLIC_URL: str = ""
 
-    # Fast2SMS WhatsApp
-    FAST2SMS_AUTH_KEY: str = "SZlCHojiIAFxaX9wGUpcsd8eYN6tgWLv7k2Tn4V0KmhRyQJ5PMQxZ6SheldANFn4XEPca2kC8GzURuib"
-    FAST2SMS_WHATSAPP_PHONE_NUMBER_ID: str = "675547328965599"
-    FAST2SMS_WHATSAPP_MESSAGE_ID: str = "38881"
-    FAST2SMS_SENDER_NUMBER: str = "8457960495"
-    FAST2SMS_SENDER_NAME: str = "BORKONIYA" 
 
     # HanuOTP SMS (Direct SMS without DLT)
     HANU_OTP_API_KEY: str = ""

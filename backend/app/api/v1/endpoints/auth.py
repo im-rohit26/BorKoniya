@@ -25,7 +25,6 @@ from app.schemas.auth import (
 )
 
 from app.services.email_service import email_service
-from app.services.fast2sms_service import fast2sms_service
 from app.services.hanu_otp_service import hanu_otp_service
 
 logger = logging.getLogger("borkonya.auth")
@@ -94,7 +93,6 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
 
     otp = f"{random.randint(100000, 999999)}"
 
-    # Deliver OTP via SMS (HanuOTP - No DLT required) and/or WhatsApp (Fast2SMS)
     channels = []
     phone_dispatched = False
     phone_err_msgs = []
@@ -111,18 +109,6 @@ def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
                 channels.append(f"SMS (+91 {clean_phone})")
             elif sms_err:
                 phone_err_msgs.append(f"SMS: {sms_err}")
-
-        # 2. Try Fast2SMS WhatsApp
-        if fast2sms_service.is_configured():
-            wa_success, wa_error_msg = fast2sms_service.send_whatsapp_otp(
-                phone_number=clean_phone,
-                otp_code=otp,
-            )
-            if wa_success:
-                phone_dispatched = True
-                channels.append(f"WhatsApp (+91 {clean_phone})")
-            elif wa_error_msg:
-                phone_err_msgs.append(f"WhatsApp: {wa_error_msg}")
 
         # If phone was given but neither provider succeeded and no email was provided
         if not phone_dispatched and not clean_email:
@@ -519,11 +505,6 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
                 phone_number=user.phone_number,
                 otp_code=otp,
             )
-        if fast2sms_service.is_configured():
-            fast2sms_service.send_whatsapp_otp(
-                phone_number=user.phone_number,
-                otp_code=otp,
-            )
     return res
 
 
@@ -597,14 +578,6 @@ def check_smtp_status():
     """
     return email_service.test_connection()
 
-
-
-@router.get("/fast2sms-status")
-def check_fast2sms_status():
-    """
-    Diagnostic endpoint to test Fast2SMS WhatsApp API configuration and wallet status.
-    """
-    return fast2sms_service.test_connection()
 
 
 @router.get("/hanu-status")
